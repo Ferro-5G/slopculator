@@ -5,7 +5,7 @@ Plans, not promises. Dates are not set.
 ## Before the next alpha
 
 - Cut it from the `release` branch with the workflow in [docs/releasing.md](releasing.md).
-- Sign the Windows installer.
+- Sign the Windows installer and put the Windows app back in releases.
 - Package the desktop app for macOS and Linux.
 - Release the iOS and Android apps, which are in development.
 

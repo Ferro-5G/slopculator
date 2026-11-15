@@ -19,7 +19,7 @@ Slopculator's own code is under the MIT License (see [LICENSE](LICENSE)). The bu
 | --- | --- |
 | Tauri 2 and its Rust dependencies | MIT or Apache-2.0 (dual licensed) |
 
-The installer uses the Microsoft Edge WebView2 runtime that ships with Windows; it is not redistributed.
+The app runs on the Microsoft Edge WebView2 runtime that ships with Windows. The installer embeds Microsoft's small WebView2 bootstrapper, which installs the runtime on a PC that lacks it, under Microsoft's distribution terms for WebView2. The runtime itself is not redistributed.
 
 ## Build tools (not shipped)
 
