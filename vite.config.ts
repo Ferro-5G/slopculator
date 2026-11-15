@@ -96,6 +96,10 @@ function siteHeaders(script: string): string {
     '  Cross-Origin-Opener-Policy: same-origin',
     '  Cross-Origin-Resource-Policy: same-origin',
     '  X-Frame-Options: DENY',
+    // Cloudflare's Network Error Logging. Pages sends it on custom domains even with the domain's switch off. The
+    // privacy policy discloses it in case these lines don't remove it.
+    '  ! Nel',
+    '  ! Report-To',
     '',
   ].join('\n');
 }
@@ -135,7 +139,7 @@ function siteMeta(): Plugin {
     },
     transformIndexHtml(html) {
       if (!site) return html;
-      return html.replace('</head>', `    <link rel="canonical" href="${site}app" />\n    <meta property="og:url" content="${site}app" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
+      return html.replace('</head>', `    <link rel="canonical" href="${site}app" />\n    <meta name="slopculator-home" content="./" />\n    <meta property="og:url" content="${site}app" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
     },
     generateBundle() {
       if (!site) return;

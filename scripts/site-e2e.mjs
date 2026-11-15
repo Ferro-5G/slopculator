@@ -23,11 +23,12 @@ const expect = (ok, what) => {
 
 for (const f of ['index.html', 'app.html', 'privacy.html', '_headers', 'preview.png', 'sitemap.xml', 'robots.txt']) expect(existsSync(join(dir, f)), `the build has ${f}`);
 const rules = readFileSync(join(dir, '_headers'), 'utf8');
-const headers = Object.fromEntries(rules.split('\n').filter((l) => l.startsWith('  ')).map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
+const headers = Object.fromEntries(rules.split('\n').filter((l) => l.startsWith('  ') && !l.startsWith('  !')).map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
 const app = readFileSync(join(dir, 'app.html'), 'utf8');
 const script = /<script type="module"[^>]*>([\s\S]*?)<\/script>/.exec(app)?.[1] ?? '';
 const hash = createHash('sha256').update(script).digest('base64');
 expect(headers['Content-Security-Policy']?.includes(`'sha256-${hash}'`), "the CSP's script hash is app.html's script");
+expect(/^ {2}! Nel$/m.test(rules) && /^ {2}! Report-To$/m.test(rules), "_headers removes Cloudflare's Network Error Logging headers");
 for (const page of ['index.html', 'privacy.html']) {
   const html = readFileSync(join(dir, page), 'utf8');
   expect(!/<script/i.test(html), `${page} has no script`);
@@ -81,6 +82,16 @@ await visit('/', { width: 1280, height: 800 }, async (page) => {
   await page.waitForFunction(() => !!window.slopculator);
   expect(new URL(page.url()).pathname === '/app', `Open Slopculator goes to /app, not ${page.url()}`);
 });
+for (const width of [1280, 390]) {
+  await visit('/app', { width, height: 800 }, async (page, where) => {
+    await page.waitForFunction(() => !!window.slopculator);
+    const title = await page.locator('.sheet-title').isVisible();
+    expect(!title, `${where}: an unnamed sheet's title steps aside for the logo link`);
+    await page.click('.brand-home');
+    await page.waitForURL(`${base}/`);
+    expect(!(await page.locator('dialog[open]').count()), `${where}: the logo opened a dialog instead of going home`);
+  });
+}
 await visit('/app#q=2*21', { width: 1280, height: 800 }, async (page) => {
   await page.waitForFunction(() => window.slopculator?.lines().some((l) => l.text === '2*21' && l.result === '42'));
 });

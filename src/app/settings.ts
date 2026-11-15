@@ -273,7 +273,7 @@ function openModeSheet(): void {
 function closeModeSheet(): void {
   if (modeSheetMotion.open) modeSheetMotion.set(false, motionNow() === 'full');
 }
-export const refreshModeBar = roving(modeBar, '.sheet-title, .desk-modes .seg button, .desk-modes .tog, .bar-round-slider, .pill, .bar-tog, .appear-btn, .head-find, .menu-btn, .help-btn');
+export const refreshModeBar = roving(modeBar, '.brand-home, .sheet-title,.desk-modes .seg button, .desk-modes .tog, .bar-round-slider, .pill, .bar-tog, .appear-btn, .head-find, .menu-btn, .help-btn');
 
 export function initSettings(): void {
   addPopover({ close: closeModeMenu, exclusive: true, outside: true });

@@ -84,6 +84,25 @@ button {
   background: var(--hover);
 }
 
+/* The website's logo link: the mark (and in Modern, while the sheet has no name, the word Slopculator). */
+.brand-home {
+  display: flex;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
+  flex: none;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
 .spacer {
   flex: 1;
 }

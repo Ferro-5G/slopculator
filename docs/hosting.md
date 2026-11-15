@@ -26,7 +26,7 @@ The screenshots in `site/` are WebP files of the app in Modern Dark, 1440×900 a
 
 1. In the Cloudflare dashboard, open Workers & Pages, create a Pages project and connect it to the GitHub repository.
 2. Set the build:
-   - Production branch: `main`
+   - Production branch: `release`, so the site changes only when a release is cut
    - Framework preset: None
    - Build command: `npm run build`
    - Build output directory: `dist`
@@ -52,7 +52,15 @@ The privacy policy promises no analytics and no scripts beyond the app. Each of 
 
 - Web Analytics, on the project's Metrics tab
 - Zaraz
-- On a custom domain's zone: Bot Fight Mode, Rocket Loader, Email Address Obfuscation, and any HTML minification or rewriting
+- On a custom domain's zone: Bot Fight Mode, Rocket Loader, Email Address Obfuscation, Client-side security, and any HTML minification or rewriting
+- Real User Measurements on a custom domain. Cloudflare injects its analytics script into free domains by default, and the domain doesn't show up in Web Analytics until you add it. Open Web Analytics, add the domain (it says "automatic setup"), then open Manage site, choose Disable, and click Update.
+- Network Error Logging, under the domain's Network settings. Pages still sends the `Nel` header on custom domains with that switch off, so `_headers` also tries to remove it, and the privacy policy discloses it.
+
+To check for injected scripts, fetch a page the way a browser does, since Cloudflare only injects into browser requests:
+
+```sh
+curl -s -A "Mozilla/5.0 Chrome/142" -H "Accept: text/html" https://calc.example.com/ | grep -c cloudflareinsights
+```
 
 ### A custom domain
 

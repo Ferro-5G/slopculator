@@ -150,6 +150,17 @@ function sheetSummary(d: Doc): string {
   return `${linesLabel(sheetLineCount(d.rows))}${first ? ` · ${first.text.slice(0, 40)}` : ''}`;
 }
 const sheetTitle = h('button', { type: 'button', class: 'sheet-title', title: 'Name or rename this sheet', onclick: () => renameSheet() });
+/**
+ * On the website the build names the landing page here, and the logo goes back to it. In Modern an unnamed sheet's
+ * title would read "Slopculator" beside the logo, so the link shows that name and the title steps aside until the sheet
+ * has a name. The downloaded file has no home page, so there the logo stays a picture.
+ */
+const homeHref = document.querySelector<HTMLMetaElement>('meta[name="slopculator-home"]')?.content;
+const brandName = h('span', { class: 'brand-name' }, 'Slopculator');
+const wordmark = () => h('span', { class: 'wordmark', 'aria-hidden': 'true' }, 'SLOPCULATOR');
+const brandHome = homeHref
+  ? h('a', { class: 'brand-home', href: homeHref, 'aria-label': 'Slopculator home', title: 'Slopculator home' }, appMark(), wordmark(), brandName)
+  : null;
 function setCurrentSheet(name: string | null, persist = true): void {
   setCurrentSheetName(name);
   if (!persist) { /* another tab already stored it */ } else if (name) store.set(KEYS.current, name);
@@ -161,6 +172,9 @@ function setCurrentSheet(name: string | null, persist = true): void {
 export function syncSheetTitle(): void {
   sheetTitle.textContent = currentSheet ?? (doc.ui.look === 'retro' ? 'Sheet' : 'Slopculator');
   sheetTitle.classList.toggle('unnamed', !currentSheet);
+  const brandShowsName = !!brandHome && !currentSheet && doc.ui.look !== 'retro';
+  brandName.hidden = !brandShowsName;
+  sheetTitle.hidden = brandShowsName;
 }
 /** The answer is handled when the button is pressed, not when the dialog finishes closing, so an Open straight after sees it. */
 function nameDialog(title: string, initial: string, ok: string, note: string, done: (name: string) => void, keep?: string): void {
@@ -352,7 +366,9 @@ export function initFile(): void {
   addPopover({ close: () => setMenu(false), exclusive: true, outside: true });
   setCurrentSheet(currentSheet);
   modeBar.append(
-    h('div', { class: 'brand' }, appMark(), h('span', { class: 'wordmark', 'aria-hidden': 'true' }, 'SLOPCULATOR'), sheetTitle),
+    brandHome
+      ? h('div', { class: 'brand' }, brandHome, sheetTitle)
+      : h('div', { class: 'brand' }, appMark(), wordmark(), sheetTitle),
     h('div', { class: 'spacer' }),
     menuWrap,
     h('button', { type: 'button', class: 'help-btn', title: 'Keyboard shortcuts and typing tips', 'aria-label': 'Help', onclick: () => showHelp() }, '?'),

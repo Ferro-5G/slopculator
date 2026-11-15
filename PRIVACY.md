@@ -18,6 +18,8 @@ We don't get a log of visitors, and Cloudflare's visitor analytics stays off. Cl
 
 If Cloudflare decides a visit looks like an attack, it may show a check and set a cookie, cf_clearance, that records only that you passed it.
 
+If your browser can't reach the site, it may send Cloudflare a short report about the failed connection. Cloudflare uses these reports to watch its network, and says it drops your IP address from them right away.
+
 ## Source code and downloads
 
 The code and the downloadable file are on GitHub, which has its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). The downloaded file works like the website: it makes no requests and keeps everything in the browser that opens it.
