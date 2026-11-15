@@ -11,17 +11,19 @@ import { paletteCss } from './src/ui/webtokens.ts';
 import { escapeHtml, PRIVACY_INTRO, privacyHtml } from './src/ui/privacy.ts';
 
 /**
- * Every manifest carries its own copy of the version, so a mismatch stops the build. The mobile app is only compared
- * when its directory is in the checkout. iOS doesn't accept a prerelease suffix, so its two copies leave it off.
+ * Every manifest carries its own copy of the version, so a mismatch stops the build. A platform directory (src-tauri,
+ * mobile) is compared only when it is in the checkout. iOS doesn't accept a prerelease suffix, so its two copies leave it off.
  */
 function checkVersions(): void {
   const read = (file: string) => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
   const { version } = JSON.parse(read('./package.json')) as { version: string };
-  const copies: Record<string, string | undefined> = {
-    'src-tauri/tauri.conf.json': (JSON.parse(read('./src-tauri/tauri.conf.json')) as { version: string }).version,
-    'src-tauri/Cargo.toml': /^version = "(.+)"$/m.exec(read('./src-tauri/Cargo.toml'))?.[1],
-  };
-  const expected: Record<string, string> = { 'src-tauri/tauri.conf.json': version, 'src-tauri/Cargo.toml': version };
+  const copies: Record<string, string | undefined> = {};
+  const expected: Record<string, string> = {};
+  if (existsSync(fileURLToPath(new URL('./src-tauri/tauri.conf.json', import.meta.url)))) {
+    copies['src-tauri/tauri.conf.json'] = (JSON.parse(read('./src-tauri/tauri.conf.json')) as { version: string }).version;
+    copies['src-tauri/Cargo.toml'] = /^version = "(.+)"$/m.exec(read('./src-tauri/Cargo.toml'))?.[1];
+    expected['src-tauri/tauri.conf.json'] = expected['src-tauri/Cargo.toml'] = version;
+  }
   if (existsSync(fileURLToPath(new URL('./mobile/package.json', import.meta.url)))) {
     copies['mobile/package.json'] = (JSON.parse(read('./mobile/package.json')) as { version: string }).version;
     copies['mobile/app.json'] = (JSON.parse(read('./mobile/app.json')) as { expo: { version: string } }).expo.version;
@@ -120,7 +122,7 @@ function sitePage(file: string, vars: Record<string, string>): string {
  * For a hosted copy: `SITE_URL=https://example.com/ npm run build` makes a website. The landing page (site/index.html)
  * becomes index.html, the app moves to app.html (served at /app), and the build adds /privacy, the social preview
  * image, a sitemap and a `_headers` file (Cloudflare's format) whose script hash matches this build's app.
- * Without SITE_URL the build stays the single app file that works from anywhere, the desktop app included.
+ * Without SITE_URL the build stays the single app file that works from anywhere.
  */
 function siteMeta(): Plugin {
   const raw = process.env.SITE_URL;

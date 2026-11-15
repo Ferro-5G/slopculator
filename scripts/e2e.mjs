@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { appUrl, exposeKeys, launchBrowser, openApp } from './lib/app.mjs';
 
 mkdirSync('.shots', { recursive: true });
@@ -11,7 +11,8 @@ const results = [];
 const errors = [];
 
 /** @param phone true for a 390 × 844 phone, or a phone's viewport ({ width: 375, height: 667 }). */
-async function check(name, fn, phone = false, { folded = false, clock = false, tauriCsp = false } = {}) {
+/** @param open opens the app in the page, for a check that serves it its own way. */
+async function check(name, fn, phone = false, { folded = false, clock = false, open = openApp } = {}) {
   const index = checkIndex++;
   if (shard && index % shard[1] !== shard[0]) return;
   if (process.env.E2E_MATCH && !name.includes(process.env.E2E_MATCH)) return;
@@ -24,7 +25,7 @@ async function check(name, fn, phone = false, { folded = false, clock = false, t
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   // Before the app starts, so a timer from before a freeze can't fire past it and clearTimeout can't miss one.
   if (clock) await page.clock.install();
-  await openApp(page, { tauriCsp });
+  await open(page);
   if (!phone && folded) {
     await page.keyboard.press('Control+Alt+Shift+K');
     await page.waitForTimeout(250);
@@ -53,38 +54,8 @@ const watchCanvasText = (page) => page.evaluate(() => {
   };
 });
 
-await check('Tauri CSP keeps both looks styled and the parabola visible', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['2+2', 'x*x']));
-  expect((await lines(page))[0].result === '4', 'arithmetic under the native CSP');
-  // The policy drops inline style attributes, which is how the keypad's tabs once lost their colors.
-  const tabs = await page.evaluate(() => [...document.querySelectorAll('.ti-tab')].map((t) => getComputedStyle(t).getPropertyValue('--tab').trim()));
-  expect(tabs.length === 5 && tabs.every(Boolean), `CSP blocked a tab's color: ${JSON.stringify(tabs)}`);
-  for (const look of ['modern', 'retro']) {
-    await page.selectOption('select.look', look, { force: true });
-    const theme = await page.evaluate(() => {
-      const style = getComputedStyle(document.documentElement);
-      return { ink: style.getPropertyValue('--ink').trim(), curve: style.getPropertyValue('--curve-1').trim() };
-    });
-    expect(theme.ink && theme.curve, `${look}: CSP blocked the look stylesheet: ${JSON.stringify(theme)}`);
-    const colored = await page.evaluate(async () => {
-      const image = new Image();
-      image.src = window.slopculator.graph.png();
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width; canvas.height = image.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(image, 0, 0);
-      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let count = 0;
-      for (let i = 0; i < pixels.length; i += 4) {
-        if (Math.max(...pixels.slice(i, i + 3)) - Math.min(...pixels.slice(i, i + 3)) > 60) count++;
-      }
-      return count;
-    });
-    expect(colored > 100, `${look}: no colored curve in the graph export, ${colored} pixels`);
-    await page.screenshot({ path: `.shots/e2e-tauri-csp-${look}.png` });
-  }
-}, false, { tauriCsp: true });
+// A platform directory a checkout may not have brings its own checks of the built page.
+if (existsSync('src-tauri/e2e.mjs')) await (await import('../src-tauri/e2e.mjs')).default({ check, expect, lines });
 
 await check('two tabs: lines typed in one are still there after typing in the other', async (page) => {
   const typed = (p, text) => p.waitForFunction((t) => window.slopculator.lines().some((l) => l.text === t), text);

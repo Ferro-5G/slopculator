@@ -36,8 +36,8 @@ export function buildThumbRows(): void {
       type: 'button', class: 'key fn word ti-tab',
       'aria-label': t.name, 'aria-description': t.subtitle, 'aria-expanded': 'false', 'aria-controls': 'ti-page', 'aria-haspopup': 'dialog',
     }, h('span', { class: 'kl' }, t.name));
-    // Set as properties, not in a style attribute: the Windows app's content security policy drops inline style
-    // attributes, which left every tab without its color.
+    // Set as properties, not in a style attribute: a strict content security policy drops inline style attributes,
+    // which once left every tab without its color.
     b.style.setProperty('--tab', `var(--tab-${i})`);
     b.style.setProperty('--tab-on', `var(--tab-on-${i})`);
     b.insertAdjacentHTML('afterbegin', TAB_ICONS[i]);

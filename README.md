@@ -3,7 +3,7 @@
 [![CI](https://github.com/Ferro-5G/slopculator/actions/workflows/ci.yml/badge.svg)](https://github.com/Ferro-5G/slopculator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A keyboard-first calculator and grapher. Type expressions one per line, read each answer on the right, and anything with an `x` is drawn on the graph. One TypeScript engine with no dependencies powers the web app and a Windows app.
+A keyboard-first calculator and grapher. Type expressions one per line, read each answer on the right, and anything with an `x` is drawn on the graph. One TypeScript engine with no dependencies computes every answer.
 
 ![Slopculator in the Modern look: a sheet of lines on the left, the graph on the right](docs/images/modern.png)
 
@@ -27,7 +27,6 @@ npm run build    # dist/index.html, one file that works offline
 | Platform | How | More |
 | --- | --- | --- |
 | Web | Download the page from the [latest release](https://github.com/Ferro-5G/slopculator/releases/latest), or `npm run build` and open `dist/index.html` | [Using the app](docs/using.md) |
-| Windows | `npm run app:build` (needs Rust). A 4 MB Tauri app plus an NSIS installer. Releases don't include it yet, and the installer isn't code-signed | [Releasing](docs/releasing.md) |
 
 iOS and Android apps are in development and aren't in this repository yet.
 

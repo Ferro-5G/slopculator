@@ -1,6 +1,6 @@
 # Using the app
 
-The web app and the Windows app are the same page, so everything here applies to both. [Functions](functions.md) lists what you can type, and the [guide](guide.md) has worked examples.
+Everything here applies on a computer and on a phone, except where it says otherwise. [Functions](functions.md) lists what you can type, and the [guide](guide.md) has worked examples.
 
 ## Lines
 

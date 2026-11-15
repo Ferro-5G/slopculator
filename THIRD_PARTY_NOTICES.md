@@ -2,7 +2,7 @@
 
 Slopculator's own code is under the MIT License (see [LICENSE](LICENSE)). The builds include the following third-party software and fonts under their own licenses.
 
-## Bundled in the web and desktop apps (`dist/index.html`, the Windows app)
+## Bundled in the web app (`dist/index.html`)
 
 | Component | License | Notes |
 | --- | --- | --- |
@@ -13,16 +13,9 @@ Slopculator's own code is under the MIT License (see [LICENSE](LICENSE)). The bu
 
 `src/engine/hvac.ts` follows PsychroLib (MIT, copyright The PsychroLib Contributors) for moist-air properties, using equations and coefficients from the 2017 ASHRAE Handbook of Fundamentals, chapter 1. `src/engine/refrigerants-data.ts` holds values computed with CoolProp (MIT, copyright Ian Bell and others). Saturation pressures for R-448A, R-449A, and R-454B are scaled to published tables from Honeywell and Chemours. Neither library is bundled; `scripts/build-hvac-data.py` uses them to generate the data and test values.
 
-## Desktop app shell
-
-| Component | License |
-| --- | --- |
-| Tauri 2 and its Rust dependencies | MIT or Apache-2.0 (dual licensed) |
-
-The app runs on the Microsoft Edge WebView2 runtime that ships with Windows. The installer embeds Microsoft's small WebView2 bootstrapper, which installs the runtime on a PC that lacks it, under Microsoft's distribution terms for WebView2. The runtime itself is not redistributed.
 
 ## Build tools (not shipped)
 
-Vite, vitest, tsc-rs, TypeScript, playwright-core, and the Tauri CLI are used only to build and test.
+Vite, vitest, tsc-rs, TypeScript and playwright-core are used only to build and test.
 
-Full license texts come with each package in `node_modules` and, for Rust crates, in the Cargo registry. Check this list against the lockfiles before each release.
+Full license texts come with each package in `node_modules`. Check this list against the lockfiles before each release.

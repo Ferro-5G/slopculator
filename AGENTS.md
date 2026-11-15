@@ -7,8 +7,7 @@ Slopculator is one calculator engine with several front ends. Read [docs/archite
 ```
 src/engine/   the math, with no dependencies and no DOM
 src/ui/       logic every front end shares, with no DOM
-src/app/      the web app, which Tauri also wraps for Windows
-src-tauri/    the Windows shell
+src/app/      the web app
 site/         the website around the hosted app: landing page, /privacy, their stylesheet and screenshots
 test/         vitest, plus scripts/e2e.mjs for the built app in Chrome
 mobile/       the phone app, in checkouts that have it; it has its own AGENTS.md
@@ -18,7 +17,7 @@ mobile/       the phone app, in checkouts that have it; it has its own AGENTS.md
 
 - `src/engine` imports nothing outside itself.
 - `src/ui` imports only itself and `src/engine`, and uses no browser or Node globals.
-- Platforms (`src/app`, `src-tauri`, `mobile`) import shared code. Shared code never imports a platform.
+- Platforms (`src/app`, and `mobile` where it exists) import shared code. Shared code never imports a platform.
 
 `@engine` is `src/engine` and `@shared` is `src/ui`. `npm run lint` checks these.
 
@@ -30,7 +29,6 @@ A feature or behavior reaches every front end together, unless the platform is t
 
 - A slider's range comes from its value (`wholeAwareRange`). Take the range when a drag starts and hold it until release, or the track moves under the finger.
 - The browser suite reads `dist/index.html`. Rebuilding `dist` while it runs swaps the app under the remaining checks.
-- On Windows over SSH, the links in `.cargo\bin` fail. `node scripts/windows-dev.mjs windows-build` puts the toolchain's own `bin` (under `.rustup\toolchains`) first on `PATH`; do the same before running Cargo by hand.
 - The engine also runs on phones, where the JavaScript engine has a lower BigInt limit (65,536 bits) than Node. Keep exact arithmetic inside the limits in `src/engine/exact.ts`.
 
 ## How to verify

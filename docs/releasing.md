@@ -13,13 +13,9 @@ Recommended branch protection for both branches, set in the repository's setting
 
 ## Version numbers
 
-The version lives in three places and must match:
+The version lives in `package.json` (also `package-lock.json`).
 
-- `package.json` (also `package-lock.json`)
-- `src-tauri/tauri.conf.json`
-- `src-tauri/Cargo.toml` (also `Cargo.lock`)
-
-`npm run build` stops if any of these manifests disagrees with `package.json`.
+`npm run build` stops if any other manifest disagrees with `package.json`.
 
 Tags are `v` plus the version in `package.json`: `v0.1.0-alpha.2`, `v0.1.0`. A prerelease is any tag with a hyphen, and the release workflow marks it as one.
 
@@ -42,8 +38,7 @@ Tags are `v` plus the version in `package.json`: `v0.1.0-alpha.2`, `v0.1.0`. A p
 
 ### Not in the release
 
-- **The Windows app.** Releases are web-only for now. `npm run app:build` still builds the app and an unsigned installer from source, and Windows SmartScreen warns before running that installer.
-- **macOS and Linux apps.** The web app runs in any browser there.
+Releases are web-only for now. The web app runs in any browser, on any system.
 
 ## What CI runs
 

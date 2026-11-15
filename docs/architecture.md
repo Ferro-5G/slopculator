@@ -1,6 +1,6 @@
 # How Slopculator is put together
 
-One engine, several front ends. The engine is plain TypeScript with no dependencies and no DOM, so the same code computes every answer in the web app and the Windows app. A phone app shares it too; it isn't in this repository yet, which is why `src/ui` holds logic no web page needs.
+One engine, several front ends. The engine is plain TypeScript with no dependencies and no DOM, so the same code computes every answer wherever it runs. A phone app shares it too; it isn't in this repository yet, which is why `src/ui` holds logic no web page needs.
 
 ```
 src/engine/        the math: lexer → parser → compiled closures → values, plus exact results (real, exact, precise)
@@ -8,10 +8,9 @@ src/ui/            what every front end shares, with no DOM: keypad data, typese
 src/ui/keypad.ts   keypad layout (pure data)
 src/ui/sounds.ts   UI sound recipes (pure math)
 src/app/           the web app's UI (no framework)
-src/app/graph.ts   canvas graph for the web/desktop app
+src/app/graph.ts   canvas graph for the web app
 src/app/sound.ts   plays the sound recipes with Web Audio
 src/main.ts        loads the fonts and styles and starts src/app
-src-tauri/         Windows app shell (Tauri 2)
 test/              vitest unit tests; npm run e2e drives the built app in Chrome
 ```
 
@@ -66,7 +65,7 @@ Ctrl+Alt+1…5 opens the keypad's five tabs.
 
 Keyboard design: each area is one Tab stop with arrow keys inside (`roving()`), and Esc returns to the line. `window.slopculator` exposes the same operations to scripts and agents.
 
-Motion uses independent presence, scroll and graph machines. [Frontend motion states](frontend-motion.md) describes ownership, interruption and policy changes. Shared presence transitions live in `src/ui/presence.ts`; the browser adapter lives in `src/app/motion.ts`.
+Motion uses independent presence, scroll and graph machines. Shared presence transitions live in `src/ui/presence.ts`; the browser adapter lives in `src/app/motion.ts`.
 
 ### UI conventions
 
@@ -75,7 +74,7 @@ Motion uses independent presence, scroll and graph machines. [Frontend motion st
 
 ## Stack
 
-TypeScript with no UI framework. Vite 8 bundles the web app into one file, [tsc-rs](https://github.com/pingdotgg/ts-rust) type-checks it, vitest runs the tests, and Tauri 2 wraps it as a Windows app. The engine has no runtime dependencies.
+TypeScript with no UI framework. Vite 8 bundles the web app into one file, [tsc-rs](https://github.com/pingdotgg/ts-rust) type-checks it, and vitest runs the tests. The engine has no runtime dependencies.
 
 ## Speed
 

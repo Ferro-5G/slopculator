@@ -35,11 +35,10 @@ body:
       label: Where
       options:
         - Web app
-        - Windows app
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: Version, and browser or Windows version
-      placeholder: 0.2.0-alpha.1, Edge 140 on Windows 11
+      label: Version, browser and system
+      placeholder: 0.1.0-alpha, Chrome 142 on macOS 15

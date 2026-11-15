@@ -22,8 +22,8 @@ import { showToast } from './toast';
 import { settleMotions } from './motion';
 
 const lookSheet = document.createElement('style');
-// Tauri authorizes packaged styles with a CSP nonce. The runtime look needs the same
-// nonce, including when its text changes; unsafe-inline is ignored when a nonce is set.
+// A content security policy can authorize the packaged styles by nonce. The runtime look needs the same nonce,
+// including when its text changes, since unsafe-inline is ignored once a nonce is set.
 const styleNonce = document.querySelector<HTMLStyleElement>('style[nonce]')?.nonce;
 if (styleNonce) lookSheet.nonce = styleNonce;
 export let curveColors: string[] = [];
@@ -180,7 +180,7 @@ export function applyTheme(): void {
   curveColors = Array.from({ length: CURVES }, (_, i) => cs.getPropertyValue(`--curve-${i + 1}`).trim());
   syncTabColors();
   syncAppearance();
-  // Browser chrome on phones (and the Tauri title bar) follows the panel color.
+  // Browser chrome on phones, and a native title bar, follows the panel color.
   let meta = document.querySelector<HTMLMetaElement>('meta[name=theme-color]');
   if (!meta) { meta = h('meta', { name: 'theme-color' }); document.head.append(meta); }
   meta.content = cs.getPropertyValue('--panel').trim();

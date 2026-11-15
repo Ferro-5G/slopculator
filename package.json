@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha",
   "license": "MIT",
   "private": true,
-  "description": "Keyboard-first calculator and grapher: web app and Windows app",
+  "description": "Keyboard-first calculator and grapher for the web",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ferro-5G/slopculator.git"
@@ -19,14 +19,10 @@
     "test": "vitest run",
     "lint": "node scripts/lint.mjs",
     "typecheck": "tsc-rs --noEmit -p tsconfig.json",
-    "tauri": "tauri",
-    "app:dev": "tauri dev",
-    "app:build": "tauri build",
     "e2e": "node scripts/e2e.mjs && node scripts/audit-e2e.mjs && node scripts/site-e2e.mjs",
     "verify": "npm run lint && npm test && npm run build && npm run e2e"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^26.6.6",
     "playwright-core": "^1.64.1",
     "tsc-rs": "^0.8.0",

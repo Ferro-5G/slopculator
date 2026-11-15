@@ -1,6 +1,5 @@
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -23,25 +22,8 @@ export const KEYS = {
 export const exposeKeys = (context) => context.addInitScript((keys) => { window.slopKeys = keys; }, KEYS);
 
 /** Open the app and wait for its first frame: boot focuses on the next animation frame, before the first user edit. */
-export async function openApp(page, { tauriCsp = false } = {}) {
-  let url = appUrl;
-  if (tauriCsp) {
-    // Tauri gives packaged styles a nonce and hashes inline scripts. Its style nonce also
-    // disables unsafe-inline, so runtime theme sheets must inherit the packaged nonce.
-    const nonce = 'slopculator-csp-test';
-    const html = readFileSync('dist/index.html', 'utf8').replace(/<style\b/g, `<style nonce="${nonce}"`);
-    const hashes = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
-      .map(([, code]) => `'sha256-${createHash('sha256').update(code).digest('base64')}'`);
-    const { app } = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-    const csp = app.security.csp
-      .replace(/style-src[^;]*/, `$& 'nonce-${nonce}'`)
-      .replace(/script-src[^;]*/, `$& ${hashes.join(' ')}`);
-    url = 'http://tauri.localhost/';
-    await page.route(url, (route) => route.fulfill({
-      contentType: 'text/html', body: html, headers: { 'Content-Security-Policy': csp },
-    }));
-  }
-  await page.goto(url);
+export async function openApp(page) {
+  await page.goto(appUrl);
   await page.waitForFunction(() => !!window.slopculator);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
