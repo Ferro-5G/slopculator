@@ -32,7 +32,7 @@ Write commit messages and pull request descriptions in plain sentences: what cha
 
 - The engine (`src/engine/`) has no dependencies and no DOM. Keep it that way; it runs in the browser, in Node, and on phones.
 - The web app has no UI framework. Views are created once and updated in place.
-- Error messages are plain sentences. `fail('Division by zero')`, not a code.
+- Error messages are plain sentences (ex., `fail('Division by zero')`)
 - [docs/architecture.md](docs/architecture.md) explains how the pieces fit and how to add a function. A new function needs a `def(...)`, a test, and, if it belongs on the keypad, a key in `src/ui/keypad.ts` with a home in `src/ui/thumbindex.ts`.
 - No formatter is configured. Single quotes, two-space indent, and otherwise match the file you are in.
 
