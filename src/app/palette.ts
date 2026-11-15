@@ -21,6 +21,7 @@ import { COMBINE_HELP, COMBINE_OPS } from '../ui/combine';
 import { openMatrixEditor, openShapeEditor, openVectorEditor } from './editors';
 import { coarse, kb } from './platform';
 import { prideUnlocked, setPride } from './pride';
+import { showPrivacy } from './privacydialog';
 import { focusLine } from './rowviews';
 import { doc, currentSheet } from './sheet';
 import { setKeypad, keypadOn } from './shell';
@@ -95,6 +96,7 @@ function paletteCommands(): Command[] {
   action('Import sheet…', 'JSON file', importJSON);
   action(doc.ui.sound === false ? 'Turn key sounds on' : 'Turn key sounds off', '', () => toggleKeySound());
   action('Keyboard shortcuts', 'Every key, in one list', COMMANDS.help.run, COMMANDS.help.keys);
+  action('Privacy', 'What Slopculator keeps, and where', showPrivacy);
   TABS.forEach((t, i) => action(`Keypad: ${t.name}`, `Open the ${t.name} tab: ${t.subtitle}`, () => { if (!keypadOn()) setKeypad(true); if (ti.tab !== i) toggleTab(i, true); }, `Ctrl+Alt+${i + 1}`));
   const example = (label: string, lines: string[], detail: string) => cmds.push({ label, detail, group: 'Example', run: () => { for (const l of lines) appendLine(l); } });
   example('Shade a normal curve', ['μ = 400', 'σ = 50', 'normaldist(μ, σ)'], 'μ, σ sliders and a curve; tick Cumulative probability');

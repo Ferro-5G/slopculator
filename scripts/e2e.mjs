@@ -3877,6 +3877,28 @@ await check('a link adds its lines as one undoable step, within its limits, and 
   expect(JSON.stringify(await texts()) === JSON.stringify(['rate = 0.05', 'sqrt(16)']), `after Undo: ${JSON.stringify(await texts())}`);
 });
 
+await check('a ?q= query adds nothing, since a query reaches the host\'s logs', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['1+1']));
+  await page.goto('about:blank');
+  await page.goto(`${appUrl}?q=${encodeURIComponent('2*21')}`);
+  await page.waitForFunction(() => !!window.slopculator);
+  const texts = (await lines(page)).map((l) => l.text);
+  expect(JSON.stringify(texts) === JSON.stringify(['1+1']), `after the query: ${JSON.stringify(texts)}`);
+});
+
+await check('File > Privacy shows the policy, with its links opening in a new tab', async (page) => {
+  await page.click('.menu-btn');
+  await page.getByRole('menuitem', { name: 'Privacy' }).click();
+  const dialog = page.locator('dialog.privacy');
+  await dialog.waitFor();
+  expect(await dialog.evaluate((d) => d.open), 'the dialog is not open');
+  expect((await dialog.locator('h1').textContent()) === 'Privacy', 'no Privacy title');
+  const links = await dialog.locator('a').evaluateAll((as) => as.map((a) => [a.href, a.target, a.rel]));
+  expect(links.length === 3 && links.every(([href, target, rel]) => href.startsWith('https://') && target === '_blank' && rel === 'noopener noreferrer'), JSON.stringify(links));
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+});
+
 await check('an imported line id with a quote in it still draws the graph', async (page) => {
   await page.click('.menu-btn');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.menu button', { hasText: 'Import' }).click()]);

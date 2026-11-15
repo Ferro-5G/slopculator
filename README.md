@@ -33,13 +33,13 @@ iOS and Android apps are in development and aren't in this repository yet.
 
 ## Hosting the web app
 
-`npm run build` makes `dist/index.html`, a single file with no network requests, so any static host can serve it: upload that one file as `index.html`. To make the page easy to find in search, build with its address:
+`npm run build` makes `dist/index.html`, a single file with no network requests, so any static host can serve it as `index.html`. For a real site, build with its address:
 
 ```sh
 SITE_URL=https://calc.example.com/ npm run build
 ```
 
-That adds a canonical link, a social preview image (`preview.png`), `sitemap.xml` and `robots.txt` beside `index.html`. Upload all four. The page also carries a description and structured data for search engines, and a plain-text summary for crawlers that don't run JavaScript.
+That makes a small website: a landing page at `/`, the app at `/app`, the privacy policy at `/privacy`, a social preview image, `sitemap.xml`, `robots.txt`, and a `_headers` file of security headers whose script hash matches the build. Upload everything in `dist/`. [docs/hosting.md](docs/hosting.md) covers Cloudflare Pages, the settings to leave off, and custom domains.
 
 ## What it does
 
@@ -63,12 +63,17 @@ Every function is listed in [docs/functions.md](docs/functions.md).
 | [Page API](docs/page-api.md) | Driving the web page from scripts and AI agents |
 | [Architecture](docs/architecture.md) | How the engine and its front ends fit together |
 | [Releasing](docs/releasing.md) | Branches, version numbers, and how a release is cut |
+| [Hosting](docs/hosting.md) | Serving the web app, its headers, and Cloudflare Pages |
 | [Changelog](CHANGELOG.md) | What changed in each version |
 | [Roadmap](docs/roadmap.md) | What comes next |
 
 ## Contributing
 
 Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup and the checks to run. `npm run verify` runs all of them.
+
+## Privacy
+
+Slopculator collects nothing. Your sheets stay in your browser, and the page makes no network requests. The full policy is in [PRIVACY.md](PRIVACY.md) and under File > Privacy in the app.
 
 ## License
 

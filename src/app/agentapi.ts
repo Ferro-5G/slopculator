@@ -97,9 +97,12 @@ const api = {
     view: () => ({ ...graph.view }),
   },
 };
-/** #q=normalcdf(-inf,-2.5)&q=zscore(180,280,40) appends those lines on open, as one step Undo takes back. */
+/**
+ * #q=normalcdf(-inf,-2.5)&q=zscore(180,280,40) appends those lines on open, as one step Undo takes back. Only the hash
+ * is read: a ?q= query would reach the host's logs, and the privacy policy says calculations never leave the browser.
+ */
 export function linesFromUrl(): void {
-  const raw = location.hash.startsWith('#') ? location.hash.slice(1) : location.search.slice(1);
+  const raw = location.hash.slice(1);
   const { lines, dropped, clashes } = linkLines(new URLSearchParams(raw).getAll('q'), sheetNames(doc.rows, doc.settings.lineNames));
   if (!lines.length && !dropped && !clashes.length) return;
   // Before the lines go in, so a link whose lines freeze or crash the tab doesn't run again on reload.

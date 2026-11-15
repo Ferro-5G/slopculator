@@ -699,6 +699,11 @@ dialog p {
   margin: 0 0 16px;
 }
 
+dialog a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
 dialog table th {
   text-align: left;
   font-weight: 400;

@@ -60,6 +60,8 @@ jobs:
       - run: npx vite build
       - if: matrix.suite == 'audit'
         run: node scripts/audit-e2e.mjs
+      - if: matrix.suite == 'audit'
+        run: node scripts/site-e2e.mjs
       - if: matrix.suite != 'audit'
         run: node scripts/e2e.mjs
         env:

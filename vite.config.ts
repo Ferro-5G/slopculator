@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
@@ -7,6 +8,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 // With their extensions, as in the modules these import: Node loads this file and what it imports as written.
 import { DESKTOP_QUERY, PHONE_QUERY } from './src/app/breakpoints.ts';
 import { paletteCss } from './src/ui/webtokens.ts';
+import { escapeHtml, PRIVACY_INTRO, privacyHtml } from './src/ui/privacy.ts';
 
 /**
  * Every manifest carries its own copy of the version, so a mismatch stops the build. The mobile app is only compared
@@ -72,24 +74,98 @@ function sharedColors(): Plugin {
   };
 }
 
+/** The headers every response of a hosted copy carries, from docs/hosting.md. `script` is the app's module script. */
+function siteHeaders(script: string): string {
+  const hash = createHash('sha256').update(script).digest('base64');
+  const csp = [
+    "default-src 'none'", `script-src 'sha256-${hash}'`, "style-src 'unsafe-inline'", 'font-src data:', 'img-src data:',
+    "connect-src 'none'", "base-uri 'none'", "form-action 'none'", "object-src 'none'", "frame-ancestors 'none'",
+  ].join('; ');
+  const off = ['accelerometer', 'autoplay', 'camera', 'display-capture', 'encrypted-media', 'fullscreen', 'geolocation', 'gyroscope', 'hid',
+    'idle-detection', 'magnetometer', 'microphone', 'midi', 'payment', 'picture-in-picture', 'publickey-credentials-get', 'screen-wake-lock',
+    'serial', 'usb', 'xr-spatial-tracking', 'clipboard-read'].map((f) => `${f}=()`);
+  return [
+    '/*',
+    `  Content-Security-Policy: ${csp}`,
+    '  X-Content-Type-Options: nosniff',
+    '  Referrer-Policy: no-referrer',
+    `  Permissions-Policy: ${[...off, 'clipboard-write=(self)', 'web-share=(self)'].join(', ')}`,
+    '  Strict-Transport-Security: max-age=63072000; includeSubDomains',
+    '  Cross-Origin-Opener-Policy: same-origin',
+    '  Cross-Origin-Resource-Policy: same-origin',
+    '  X-Frame-Options: DENY',
+    '',
+  ].join('\n');
+}
+const moduleScript = (html: string) => /<script type="module"[^>]*>([\s\S]*?)<\/script>/.exec(html)?.[1];
+
+/** The fonts the website uses, inlined, since the content security policy only lets fonts come from data: URLs. */
+function siteFonts(): string {
+  const faces: [string, string, number][] = [['Geist Sans', 'geist-sans', 400], ['Geist Sans', 'geist-sans', 500], ['Geist Sans', 'geist-sans', 600], ['Geist Sans', 'geist-sans', 700], ['Geist Mono', 'geist-mono', 400]];
+  return faces.map(([family, pkg, weight]) => {
+    const data = readFileSync(resolve('node_modules/@fontsource', pkg, 'files', `${pkg}-latin-${weight}-normal.woff2`)).toString('base64');
+    return `@font-face { font-family: '${family}'; font-weight: ${weight}; font-style: normal; font-display: swap; src: url(data:font/woff2;base64,${data}) format('woff2'); }`;
+  }).join('\n');
+}
+const dataUrl = (file: string, type: string) => `data:${type};base64,${readFileSync(resolve(file)).toString('base64')}`;
+/** Fills a page in site/ : each {{name}} becomes vars[name], and a name with no value stops the build. */
+function sitePage(file: string, vars: Record<string, string>): string {
+  return readFileSync(resolve('site', file), 'utf8').replace(/\{\{(\w+)\}\}/g, (_, name: string) => {
+    if (!(name in vars)) throw new Error(`site-meta: site/${file} wants {{${name}}}`);
+    return vars[name];
+  });
+}
+
 /**
- * For a hosted copy: `SITE_URL=https://example.com/ npm run build` adds the canonical address, the social preview
- * image and a sitemap. Without it the build stays a file that works from anywhere, the desktop app included.
+ * For a hosted copy: `SITE_URL=https://example.com/ npm run build` makes a website. The landing page (site/index.html)
+ * becomes index.html, the app moves to app.html (served at /app), and the build adds /privacy, the social preview
+ * image, a sitemap and a `_headers` file (Cloudflare's format) whose script hash matches this build's app.
+ * Without SITE_URL the build stays the single app file that works from anywhere, the desktop app included.
  */
 function siteMeta(): Plugin {
   const raw = process.env.SITE_URL;
   const site = raw ? new URL(raw.endsWith('/') ? raw : `${raw}/`).href : null;
+  let outDir = 'dist';
   return {
     name: 'site-meta',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     transformIndexHtml(html) {
       if (!site) return html;
-      return html.replace('</head>', `    <link rel="canonical" href="${site}" />\n    <meta property="og:url" content="${site}" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
+      return html.replace('</head>', `    <link rel="canonical" href="${site}app" />\n    <meta property="og:url" content="${site}app" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
     },
     generateBundle() {
       if (!site) return;
       this.emitFile({ type: 'asset', fileName: 'preview.png', source: readFileSync(resolve('docs/images/modern.png')) });
-      this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${site}</loc></url></urlset>\n` });
+      const urls = [site, `${site}app`, `${site}privacy`].map((u) => `<url><loc>${u}</loc></url>`).join('');
+      this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>\n` });
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: `User-agent: *\nAllow: /\nSitemap: ${site}sitemap.xml\n` });
+    },
+    // After the single-file plugin has inlined the script, so the hash is of what the app actually runs.
+    closeBundle() {
+      if (!site) return;
+      const app = readFileSync(resolve(outDir, 'index.html'), 'utf8');
+      const script = moduleScript(app);
+      if (script === undefined) throw new Error('site-meta: no module script in index.html to hash');
+      writeFileSync(resolve(outDir, '_headers'), siteHeaders(script));
+      renameSync(resolve(outDir, 'index.html'), resolve(outDir, 'app.html'));
+      const icon = /<link rel="icon"[^>]*>/.exec(readFileSync(resolve('index.html'), 'utf8'))?.[0] ?? '';
+      const shared = { icon, logo: /href="([^"]*)"/.exec(icon)?.[1] ?? '', fonts: siteFonts(), css: readFileSync(resolve('site/site.css'), 'utf8') };
+      const version = (JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }).version;
+      writeFileSync(resolve(outDir, 'index.html'), sitePage('index.html', {
+        ...shared,
+        head: `<link rel="canonical" href="${site}" />\n    <meta property="og:url" content="${site}" />\n    <meta property="og:image" content="${site}preview.png" />`,
+        version: `v${version}`,
+        desktop: dataUrl('site/app-desktop.webp', 'image/webp'),
+        phone: dataUrl('site/app-phone.webp', 'image/webp'),
+      }));
+      writeFileSync(resolve(outDir, 'privacy.html'), sitePage('privacy.html', {
+        ...shared,
+        head: `<link rel="canonical" href="${site}privacy" />`,
+        intro: escapeHtml(PRIVACY_INTRO),
+        policy: privacyHtml(),
+      }));
     },
   };
 }

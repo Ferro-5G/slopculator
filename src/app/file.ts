@@ -1,4 +1,5 @@
 import { downloadBlob, fileDate, fileStem } from './download';
+import { showPrivacy } from './privacydialog';
 import { copyName, isEmptyLine, linesLabel, SAVED_SHEETS_FAILED, sheetAsText as sheetText, sheetLineCount, withSheetView } from '../ui/document';
 import { setSound, play } from './sound';
 import { showHelp, COMMANDS } from './commands';
@@ -57,6 +58,7 @@ export function buildMenu(): void {
       item('History…', '', openHistoryDialog),
       item('Reorder lines', '', () => setReorder(true)),
       item('Clear all', '', clearAll),
+      item('Privacy', '', showPrivacy),
       h('hr'),
       h('div', { class: 'menu-row file-row', role: 'group', 'aria-label': 'Sheet file' }, h('span', { 'aria-hidden': 'true' }, 'Sheet file'),
         h('div', { class: 'menu-btns' }, small('Export', 'Export the sheet', '.json', exportJSON), small('Import', 'Import a sheet', '.json', importJSON))),
@@ -92,6 +94,7 @@ export function buildMenu(): void {
     h('hr'),
     item('Find a function or command', COMMANDS.palette.keys, COMMANDS.palette.run),
     item('Keyboard shortcuts', COMMANDS.help.keys, COMMANDS.help.run),
+    item('Privacy', '', showPrivacy),
   );
   syncAppearanceSlots();
 }

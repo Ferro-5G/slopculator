@@ -9,6 +9,7 @@ mobile/.expo/
 mobile/android/
 mobile/ios/
 dist-node/
+dist-site/
 .DS_Store
 Thumbs.db
 *.tgz

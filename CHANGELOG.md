@@ -2,9 +2,9 @@
 
 Notable changes, newest first. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-No version has been released yet. The first release moves this section under its version number and date (see [docs/releasing.md](docs/releasing.md)).
-
 ## [Unreleased]
+
+## [0.1.0-alpha] - 2026-11-15
 
 The first public version.
 
@@ -24,7 +24,8 @@ The first public version.
 
 ### Platforms
 
-- Web: one HTML file that works offline, on a computer or a phone. Added to a phone's home screen, it opens full screen. It can be hosted as a static page (see the README), and a link ending in `#q=…` adds lines to the open sheet.
+- Web: one HTML file that works offline, on a computer or a phone. Added to a phone's home screen, it opens full screen. A hosted build is a small website: a landing page, the app at `/app`, the privacy policy, and security headers built to match (see [docs/hosting.md](docs/hosting.md)), and a link ending in `#q=…` adds lines to the open sheet.
+- Privacy: nothing is collected. Sheets stay in the browser and the page makes no network requests. The policy is under File > Privacy and in [PRIVACY.md](PRIVACY.md).
 - Two looks: Modern (Light, Dark, OLED black, High contrast, six accent colors) and Retro (printer paper and sculpted keycaps).
 - Motion can be Full, Reduced or Off, and anything that animates can be interrupted or reversed partway.
 - Windows: the same page in a Tauri app, built from source with `npm run app:build`. This release doesn't include it.
@@ -36,3 +37,6 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - The Windows app isn't in this release. A build from source isn't code-signed, so SmartScreen warns before its installer runs.
 - iOS and Android apps are in development and not part of this release.
+
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.1.0-alpha...HEAD
+[0.1.0-alpha]: https://github.com/Ferro-5G/slopculator/releases/tag/v0.1.0-alpha

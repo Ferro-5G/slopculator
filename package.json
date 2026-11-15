@@ -1,6 +1,6 @@
 {
   "name": "slopculator",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha",
   "license": "MIT",
   "private": true,
   "description": "Keyboard-first calculator and grapher: web app and Windows app",
@@ -22,7 +22,7 @@
     "tauri": "tauri",
     "app:dev": "tauri dev",
     "app:build": "tauri build",
-    "e2e": "node scripts/e2e.mjs && node scripts/audit-e2e.mjs",
+    "e2e": "node scripts/e2e.mjs && node scripts/audit-e2e.mjs && node scripts/site-e2e.mjs",
     "verify": "npm run lint && npm test && npm run build && npm run e2e"
   },
   "devDependencies": {

@@ -11,4 +11,4 @@ slopculator.usage('invNorm')                           // how to call it
 slopculator.graph.png()                                // data URL of the graph
 ```
 
-Opening `index.html#q=normalcdf(-inf,-2.5)&q=zscore(180,280,40)` adds those lines to the open sheet as one step that Undo takes back. A link adds at most 50 lines of up to 1,000 characters each, and leaves out any line that would redefine a built-in function or a name the sheet already defines. Every control has a label, so accessibility-tree tools like Playwright can drive the page by role and name. `scripts/e2e.mjs` does exactly that.
+Opening `index.html#q=normalcdf(-inf,-2.5)&q=zscore(180,280,40)` (on the website, `/app#q=…`) adds those lines to the open sheet as one step that Undo takes back. A link adds at most 50 lines of up to 1,000 characters each, and leaves out any line that would redefine a built-in function or a name the sheet already defines. Only the part after `#` is read, since browsers never send it to the server; a `?q=` query does nothing. Every control has a label, so accessibility-tree tools like Playwright can drive the page by role and name. `scripts/e2e.mjs` does exactly that.

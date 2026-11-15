@@ -9,6 +9,7 @@ src/engine/   the math, with no dependencies and no DOM
 src/ui/       logic every front end shares, with no DOM
 src/app/      the web app, which Tauri also wraps for Windows
 src-tauri/    the Windows shell
+site/         the website around the hosted app: landing page, /privacy, their stylesheet and screenshots
 test/         vitest, plus scripts/e2e.mjs for the built app in Chrome
 mobile/       the phone app, in checkouts that have it; it has its own AGENTS.md
 ```
