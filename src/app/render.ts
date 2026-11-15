@@ -7,7 +7,7 @@ import { prettyText } from '../ui/typeset';
 import { type GraphChip, findDraggables, showGraphChips, syncGraphSliders, graphSummary, syncMarksHint, scheduleCurveFit } from './graphpane';
 import { graph, listEl, graphHost, keypadEl, announcer } from './layout';
 import { lineCalm } from './lineeditor';
-import { renderOut, renderTex, renderExtra } from './lineoutput';
+import { batchLayout, renderOut, renderTex, renderExtra } from './lineoutput';
 import { syncListEdges } from './listscroll';
 import { starter, syncListTools } from './listtools';
 import { narrow } from './platform';
@@ -23,7 +23,7 @@ export function renderResults(): void {
   const pal = curveColors;
   const drawables: Drawable[] = [];
   const chips: GraphChip[] = [];
-  results.forEach((r, k) => {
+  batchLayout(() => results.forEach((r, k) => {
     const row = doc.rows[k];
     // A focus change can redraw between a sheet's lines changing and its results catching up.
     if (!row || row.id !== r.id) return;
@@ -60,7 +60,7 @@ export function renderResults(): void {
     if (row.kind === 'expr') renderTex(v, row, r);
     if (row.kind === 'expr') renderExtra(v, row, r, o);
     else renderTableFoot(v, r, o);
-  });
+  }));
   const piTicks = wantsPiTicks(doc.rows, results, doc.settings.deg);
   showGraphChips(chips);
   syncGraphSliders();

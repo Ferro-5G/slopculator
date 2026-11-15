@@ -2,7 +2,7 @@ import { BUILTINS, BUILTIN_NAMES, CONSTANTS } from '../engine/builtins';
 import { canonicalName } from '../engine/lexer';
 import { isUnit } from '../engine/units';
 import type { RowInput, RowResult } from '../engine/document';
-import { callFunction, callNameBefore, splitTop, TYPED_CLOSERS as CLOSERS, TYPED_OPENERS as OPENERS, usageForms } from './brackets';
+import { callFunction, callNameBefore, nameStart, splitTop, TYPED_CLOSERS as CLOSERS, TYPED_OPENERS as OPENERS, usageForms } from './brackets';
 import { isStrayComma } from './errortext';
 import { keyCall, PANELS } from './keypad';
 import { escapeRegExp } from './text';
@@ -79,15 +79,15 @@ function looseMatch(word: string, name: string): boolean {
 
 /** Null when there's no word, or the caret is inside one. */
 export function completions(text: string, caret: number, candidates: Candidate[], limit = 5): Completion | null {
-  const m = /[A-Za-z][A-Za-z0-9_]*$/.exec(text.slice(0, caret));
-  if (!m || m[0].length < 2) return null;
+  const at = nameStart(text, caret);
+  const word = at < 0 ? '' : text.slice(at, caret);
+  if (word.length < 2) return null;
   if (/[A-Za-z0-9_(]/.test(text[caret] ?? '')) return null;
   // Inside quotes it's a unit or text ("mi", "R410A"), never a name to complete: "mi" would turn into min.
   if ((text.slice(0, caret).match(/"/g)?.length ?? 0) % 2 === 1) return null;
   // A unit after a number ("5 mi", "10ft") is a unit, the same guard as the one-click fix, which offers convert():
   // Tab mustn't turn it into min or a look-alike.
-  if (isUnit(m[0]) && /\d\s*$/.test(text.slice(0, caret - m[0].length))) return null;
-  const word = m[0];
+  if (isUnit(word) && /\d\s*$/.test(text.slice(0, at))) return null;
   // A finished name offers nothing: Tab would otherwise swap it for a longer or looser match (mean for median, sd for sdp).
   if (candidates.some((c) => c.name === word) || Object.hasOwn(CONSTANTS, canonicalName(word))) return null;
   const lw = word.toLowerCase();

@@ -1,4 +1,4 @@
-import { callFunction, callNameBefore, CLOSERS, OPENERS, pieces, usageForms } from './brackets';
+import { callFunction, callNameBefore, callsIn, CLOSERS, OPENERS, pieces, usageForms } from './brackets';
 import { charBefore, escapeRegExp } from './text';
 
 export type FnInfo = (name: string) => { usage?: string; min?: number } | undefined;
@@ -139,9 +139,9 @@ export function slots(text: string, caret: number, info: FnInfo): Slots {
 
 export function unfilled(text: string, info: FnInfo): number {
   let n = 0;
-  for (const m of text.matchAll(/([A-Za-z][A-Za-z0-9_]*)\(/g)) {
-    const name = callFunction(m[1]);
-    const open = m.index! + m[1].length;
+  for (const call of callsIn(text)) {
+    const name = callFunction(call.name);
+    const open = call.index + call.name.length;
     const args = pieces(text, open + 1, closing(text, open));
     const got = paramsFor(name, info, args.length);
     if (!got) continue;

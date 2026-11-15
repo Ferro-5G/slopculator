@@ -73,7 +73,8 @@ export function syncGraphSliders(): void {
     }));
   }
   for (const { row, value } of items) {
-    const range = graphSliders.querySelector<HTMLInputElement>(`input[data-row="${row.id}"]`);
+    // Escaped: an id comes from whatever file was imported, and a quote in it made this throw on every render.
+    const range = graphSliders.querySelector<HTMLInputElement>(`input[data-row="${CSS.escape(row.id)}"]`);
     if (!range) continue;
     const rg = wholeAwareRange(value, row.slider);
     fitRange(range, rg, value);

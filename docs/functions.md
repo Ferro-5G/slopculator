@@ -110,4 +110,4 @@ Moist-air results match PsychroLib, and refrigerant tables match CoolProp. R-448
 
 Errors stop the line with a reason: division by zero, `nCr` with non-whole numbers, a singular matrix, `√` of a negative outside Complex mode. A typo like `normcdf` gets "Did you mean normalcdf?" with a one-click fix.
 
-Each line has a budget of 2 seconds and 10 million values. A line that goes past it, like a recursive function with no memo or a `seq` inside a `seq`, stops with a message instead of freezing the app.
+Each line has a budget of 2 seconds and 10 million values, and the whole sheet has 6 seconds. A line that goes past it, like a recursive function with no memo or a `seq` inside a `seq`, stops with a message instead of freezing the app.

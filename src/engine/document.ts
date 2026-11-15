@@ -1,5 +1,5 @@
 import { errorSpan, lineWarnings, type LineWarning, type Span } from './diagnostics';
-import { BudgetError, CalcError, EdgeError, OrderError, OverflowError, drawDeadline, errorText, isDrawing, quietSample, varErrorText, withLineBudget } from './errors';
+import { BudgetError, CalcError, EdgeError, OrderError, OverflowError, drawDeadline, errorText, isDrawing, quietSample, varErrorText, withLineBudget, withSheetBudget } from './errors';
 import { isHeading, parse, type Node, type RelOp } from './parser';
 import { isIdentifier } from './lexer';
 import { Env, RESERVED, SETTINGS, compile, settingsKey, type Fn, type Settings } from './evaluator';
@@ -332,7 +332,21 @@ function classifyDefinition(ast: Node): Pick<Parsed, 'defVar' | 'defFunc'> {
   return {};
 }
 
+/** The variable or function a line defines, by the rules a sheet uses, or null: y = 2x is a curve, not a definition of y. */
+export function lineDefines(text: string): string | null {
+  try {
+    const { defVar, defFunc } = classifyDefinition(parse(text));
+    return defVar?.name ?? defFunc?.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function evaluateDocument(rows: RowInput[], settings: Settings): RowResult[] {
+  return withSheetBudget(() => evaluateSheet(rows, settings));
+}
+
+function evaluateSheet(rows: RowInput[], settings: Settings): RowResult[] {
   const env: Env = new Env(settings, {
     improve: (name, v) => {
       const pr = exact.varFinal(name);
@@ -426,6 +440,9 @@ export function evaluateDocument(rows: RowInput[], settings: Settings): RowResul
       } catch (e) {
         res.error = errorText(e);
         res.graph = [];
+        // Its own line ran out of time, so the timeout is its answer: every line that reads it would otherwise spend
+        // its own 2 seconds finding that out again.
+        if (e instanceof BudgetError && p.defVar && !dup(p.defVar.name)) env.remember(p.defVar.name, new BudgetError(varErrorText(p.defVar.name, e.message)));
       }
     }));
     running.delete(p.index);

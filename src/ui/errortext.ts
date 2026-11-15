@@ -114,12 +114,27 @@ function sameKindFix(text: string): LineFix | null {
   return { label: `Use ${line}`, title: `Put both in one unit (${ua}): ${line}`, text: line };
 }
 
+// Tried only where a number can start. A global regex retried at every digit of a run with no unit after it, and
+// inQuotes counted quotes from the start for each match, so a long line took seconds.
+const NUMBER_UNIT = /(\d[\d,]*(?:\.\d*)?|\.\d+)\s*([A-Za-zµ°][\w/²³°]*)/y;
+const isDigit = (c: string | undefined): boolean => c !== undefined && c >= '0' && c <= '9';
+// Inside a run like 1,250 a match from the run's first digit already covers every later start.
+const midNumber = (text: string, i: number): boolean => isDigit(text[i - 1]) || (text[i - 1] === ',' && isDigit(text[i - 2]));
+
 function mixedUnitKinds(text: string): { a: string; b: string; op: 'added' | 'subtracted' } | null {
-  const q = /(\d[\d,]*(?:\.\d*)?|\.\d+)\s*([A-Za-zµ°][\w/²³°]*)/g;
   const found: { kind: string; end: number; start: number }[] = [];
-  for (let m; (m = q.exec(text)); ) {
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '"') quoted = !quoted;
+    if (!(text[i] === '.' || (isDigit(text[i]) && !midNumber(text, i)))) continue;
+    NUMBER_UNIT.lastIndex = i;
+    const m = NUMBER_UNIT.exec(text);
+    if (!m) continue;
     const k = unitKind(m[2]);
-    if (k && !inQuotes(text, m.index)) found.push({ kind: k, start: m.index, end: m.index + m[0].length });
+    if (k && !quoted) found.push({ kind: k, start: i, end: i + m[0].length });
+    // Quotes inside the match count too, as the scan from the start used to count them.
+    for (let j = i + 1; j < i + m[0].length; j++) if (text[j] === '"') quoted = !quoted;
+    i += m[0].length - 1;
   }
   for (let i = 1; i < found.length; i++) {
     const between = text.slice(found[i - 1].end, found[i].start);
@@ -138,10 +153,27 @@ function unitMessage(text: string, error: string, isUnit: (name: string) => bool
   if (same) return `Put both in one unit: ${same.text}`;
   const fix = unitFix(text, isUnit);
   if (fix) return `Units go in convert(): ${fix.text}`;
-  const at = new RegExp(`(-?\\d[\\d,.]*)\\s*${escapeRegExp(u)}(?![\\w])`).exec(text);
-  if (!at) return null;
+  const value = numberBeforeUnit(text, u);
+  if (value === null) return null;
   const to = other(u);
-  return to ? `${u} looks like a unit. Units go in convert(), like convert(${plainNum(at[1])}, "${u}", "${to}")` : `${u} looks like a unit. Units go in convert(value, "${u}", "unit")`;
+  return to ? `${u} looks like a unit. Units go in convert(), like convert(${plainNum(value)}, "${u}", "${to}")` : `${u} looks like a unit. Units go in convert(value, "${u}", "unit")`;
+}
+
+/**
+ * The number written before the first use of unit u that has one, as /(-?\d[\d,.]*)\s*u(?!\w)/ finds it. That regex
+ * retried at every digit of a long run, so this finds u and reads back from it instead.
+ */
+function numberBeforeUnit(text: string, u: string): string | null {
+  const after = new RegExp(`${escapeRegExp(u)}(?![\\w])`, 'g');
+  for (let m; (m = after.exec(text)); ) {
+    let end = m.index;
+    while (end > 0 && /\s/.test(text[end - 1])) end--;
+    let start = end;
+    while (start > 0 && /[\d,.]/.test(text[start - 1])) start--;
+    while (start < end && !isDigit(text[start])) start++;
+    if (start < end) return text.slice(text[start - 1] === '-' ? start - 1 : start, end);
+  }
+  return null;
 }
 
 export function inQuotes(text: string, at: number): boolean {

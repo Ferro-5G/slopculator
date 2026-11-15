@@ -46,6 +46,7 @@ const enum P {
 
 const MINUS = '−';
 const REL: Record<string, string> = { '=': '=', '<': '<', '>': '>', '<=': '≤', '>=': '≥' };
+// Read with Object.hasOwn: a name a line types, like constructor, would otherwise find Object.prototype's.
 const CONST: Record<string, string> = { pi: 'π', inf: '∞', infinity: '∞', tau: 'τ', phi: 'φ' };
 const STACK_MAX = 12;
 
@@ -89,7 +90,7 @@ function fence(open: string, close: string, body: MathBox[]): MathBox {
 }
 
 function idBoxes(name: string): MathBox[] {
-  if (CONST[name]) return [run(CONST[name], 'name')];
+  if (Object.hasOwn(CONST, name)) return [run(CONST[name], 'name')];
   const sub = /^(\p{L})_([\p{L}\p{N}]+)$/u.exec(name);
   if (sub) return [{ t: 'sub', base: [run(sub[1], 'var')], sub: [run(sub[2], /^\d+$/.test(sub[2]) ? 'num' : 'name')] }];
   return [run(name, [...name].length === 1 ? 'var' : 'name')];
@@ -103,7 +104,7 @@ function numBoxes(n: Extract<Node, { k: 'num' }>): MathBox[] {
 }
 
 function isLetter(n: Node): boolean {
-  return n.k === 'id' && (!!CONST[n.name] || /^\p{L}(_[\p{L}\p{N}]+)?$/u.test(n.name));
+  return n.k === 'id' && (Object.hasOwn(CONST, n.name) || /^\p{L}(_[\p{L}\p{N}]+)?$/u.test(n.name));
 }
 
 function startsLetterLike(n: Node): boolean {
@@ -249,6 +250,25 @@ class Setter {
   }
 }
 
+/** How many boxes deep a list goes, which is how deeply a page nests elements to draw it. */
+function nesting(list: MathBox[]): number {
+  let deepest = 0;
+  for (const b of list) {
+    const inner = b.t === 'run' ? []
+      : b.t === 'sup' ? [b.base, b.exp]
+      : b.t === 'sub' ? [b.base, b.sub]
+      : b.t === 'frac' ? [b.num, b.den]
+      : b.t === 'sqrt' ? [b.body, b.index ?? []]
+      : b.t === 'fence' ? [b.body]
+      : b.t === 'matrix' ? b.rows.flat()
+      : b.rows.flatMap((r) => [r.val ?? [], r.cond ?? []]);
+    for (const l of inner) deepest = Math.max(deepest, 1 + nesting(l));
+  }
+  return deepest;
+}
+/** Chrome's layout crashed the tab at about 300 nested roots, which a link can supply; past this the line stays text. */
+const NESTING_MAX = 100;
+
 export function typeset(src: string, opts: TypesetOptions = {}): MathBox[] | null {
   const text = src.trim();
   if (!text || isHeading(text)) return null;
@@ -258,7 +278,8 @@ export function typeset(src: string, opts: TypesetOptions = {}): MathBox[] | nul
   } catch {
     return null;
   }
-  return new Setter(opts.stack ?? true).node(tree);
+  const boxes = new Setter(opts.stack ?? true).node(tree);
+  return nesting(boxes) > NESTING_MAX ? null : boxes;
 }
 
 const SUP: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', [MINUS]: '⁻', '-': '⁻', '+': '⁺', n: 'ⁿ', x: 'ˣ', i: 'ⁱ' };

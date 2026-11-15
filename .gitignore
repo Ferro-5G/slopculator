@@ -19,3 +19,13 @@ trailer/out/
 # Android Gradle output inside local Expo modules
 mobile/modules/*/android/build/
 .claude/worktrees/
+
+# Secrets and signing keys never belong in the repository
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync } from 'node:fs';
-import { exposeKeys, launchBrowser, openApp } from './lib/app.mjs';
+import { appUrl, exposeKeys, launchBrowser, openApp } from './lib/app.mjs';
 
 mkdirSync('.shots', { recursive: true });
 // Independent browser profiles make optional parallel batches safe. E2E_SHARD=0/4 runs the first of four.
@@ -3859,6 +3859,53 @@ await check('design system: desktop Undo stays available for ten seconds', async
   await page.clock.runFor(200);
   expect(await page.evaluate(() => document.querySelector('.toast').inert), 'Undo still takes input after ten seconds');
 }, false, { clock: true });
+
+await check('a link adds its lines as one undoable step, within its limits, and never redefines a name', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['rate = 0.05', 'sqrt(16)']));
+  const q = ['sqrt(t) = t*100', 'rate = 1', 'k = 2', '1+1', '9'.repeat(1001)].map((l) => `q=${encodeURIComponent(l)}`).join('&');
+  await page.goto('about:blank');
+  await page.goto(`${appUrl}#${q}`);
+  await page.waitForFunction(() => !!window.slopculator);
+  const texts = async () => (await lines(page)).map((l) => l.text);
+  expect(JSON.stringify(await texts()) === JSON.stringify(['rate = 0.05', 'sqrt(16)', 'k = 2', '1+1']), `after the link: ${JSON.stringify(await texts())}`);
+  expect((await lines(page))[1].result === '4', 'the link redefined sqrt');
+  expect((await lines(page))[0].result === '0.05' && !(await lines(page))[0].error, 'the link broke rate');
+  expect(!(await page.evaluate(() => location.hash)), 'the link stayed in the address');
+  const toast = await page.textContent('.toast');
+  expect(toast.includes("Added 2 lines from the link and left out 3. A link can't redefine sqrt or rate"), toast);
+  await page.click('.toast button');
+  expect(JSON.stringify(await texts()) === JSON.stringify(['rate = 0.05', 'sqrt(16)']), `after Undo: ${JSON.stringify(await texts())}`);
+});
+
+await check('an imported line id with a quote in it still draws the graph', async (page) => {
+  await page.click('.menu-btn');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.menu button', { hasText: 'Import' }).click()]);
+  const rows = [{ id: 'q"x', kind: 'expr', text: 'a = 2' }, { id: 'r2', kind: 'expr', text: 'y = a x' }];
+  await chooser.setFiles({ name: 'quote.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ rows })) });
+  await page.waitForFunction(() => window.slopculator.lines().length === 2);
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const names = await page.evaluate(() => window.slopculator.graph.names().map((n) => n.text));
+  expect(names.length === 1, `curves on the graph: ${JSON.stringify(names)}`);
+  expect(await page.evaluate(() => window.slopculator.addLine('1+1').result) === '2', 'adding a line failed');
+});
+
+await check('a matrix too big to show draws its top-left corner and says so', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['A = identity(20)', 'B = augment(augment(A, A), A)', 'transpose(B) * B']));
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.result')].map((r) => ({ cells: r.querySelectorAll('table.mat td').length, more: r.querySelector('.mat-more')?.textContent ?? null })));
+  expect(shown[0].cells === 400 && shown[0].more === null, `identity(20): ${JSON.stringify(shown[0])}`);
+  expect(shown[1].cells === 21 * 20 && shown[1].more === '20 × 60 matrix, showing the top-left 20 × 20', `20 × 60: ${JSON.stringify(shown[1])}`);
+  expect(shown[2].cells === 21 * 21 && shown[2].more === '60 × 60 matrix, showing the top-left 20 × 20', `60 × 60: ${JSON.stringify(shown[2])}`);
+  expect((await lines(page))[2].result.split('],').length === 60, 'the answer itself lost rows');
+});
+
+await check('names like constructor typeset as themselves', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['constructor = 5', 'a_constructor = 2', 'constructor + a_constructor']));
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const tex = await page.evaluate(() => [...document.querySelectorAll('.tex')].map((t) => t.textContent));
+  expect(!tex.some((t) => /native code/.test(t)), `typeset: ${JSON.stringify(tex)}`);
+  expect((await lines(page))[2].result === '7', 'the lines did not evaluate');
+});
 
 if (!process.env.E2E_MATCH && !shard) console.log(results.join('\n'));
 console.log(`${results.filter((r) => r.startsWith('PASS')).length} passed, ${results.filter((r) => r.startsWith('FAIL')).length} failed`);

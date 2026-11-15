@@ -8,9 +8,42 @@ export const closerOf = (open: string): string | undefined => TYPED_CLOSERS[TYPE
 export const callFunction = (name: string): string => (/^log_/.test(name) ? 'log' : name);
 
 /** The forms a usage line lists, as in "log(x), log(b, x), or log_b(x)". */
-export const usageForms = (usage: string): string[] => usage.split(/;\s*|\s+or\s+|,\s+(?=(?:or\s+)?[A-Za-z_]\w*\()/).map((f) => f.trim().replace(/^or\s+/, ''));
+// One space before "or", not \s+: each form is trimmed anyway, and \s+ retried at every space of a long run.
+export const usageForms = (usage: string): string[] => usage.split(/;\s*|\sor\s+|,\s+(?=(?:or\s+)?[A-Za-z_]\w*\()/).map((f) => f.trim().replace(/^or\s+/, ''));
 
-export const callNameBefore = (text: string, open: number): string | undefined => /([A-Za-z][A-Za-z0-9_]*)$/.exec(text.slice(0, open))?.[1];
+const isWordChar = (c: string): boolean => /[A-Za-z0-9_]/.test(c);
+const isLetter = (c: string): boolean => /[A-Za-z]/.test(c);
+
+/**
+ * Where the name that ends at end starts: the first letter in the run of word characters before end, or -1. It finds
+ * what /[A-Za-z][A-Za-z0-9_]*$/ would, in one pass. That regex retried at every letter of a long run, so a line of
+ * 50,000 letters took seconds.
+ */
+export function nameStart(text: string, end: number): number {
+  let start = end;
+  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (start < end && !isLetter(text[start])) start++;
+  return start < end ? start : -1;
+}
+
+export const callNameBefore = (text: string, open: number): string | undefined => {
+  const start = nameStart(text, open);
+  return start < 0 ? undefined : text.slice(start, open);
+};
+
+/** Each name( in text, as /([A-Za-z][A-Za-z0-9_]*)\(/g finds them, in one pass. */
+export function callsIn(text: string): { name: string; index: number }[] {
+  const out: { name: string; index: number }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    if (!isWordChar(text[i])) continue;
+    let end = i;
+    while (end < text.length && isWordChar(text[end])) end++;
+    const start = nameStart(text, end);
+    if (start >= 0 && text[end] === '(') out.push({ name: text.slice(start, end), index: start });
+    i = end;
+  }
+  return out;
+}
 
 export const leadingCall = (s: string): string | null => /^([A-Za-z_]\w*)\(/.exec(s)?.[1] ?? null;
 

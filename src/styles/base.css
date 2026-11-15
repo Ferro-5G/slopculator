@@ -491,6 +491,19 @@ button {
   max-width: 100%;
 }
 
+.mat-cut {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mat-more {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
 .mat-scroll {
   display: block;
   overflow: auto hidden;

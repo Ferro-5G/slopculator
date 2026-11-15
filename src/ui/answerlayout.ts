@@ -21,6 +21,26 @@ export function unitCircleDrawing({ cos, sin, angle }: UnitCircleFigure): UnitCi
   };
 }
 
+/** The most rows, and the most columns, a matrix answer shows. identity() stops at 20, so most matrices fit whole. */
+export const MATRIX_SHOWN_MAX = 20;
+
+/**
+ * The cells a matrix answer shows, formatted by cell: all of them, or the top-left corner of a bigger matrix with … and
+ * ⋮ where the rest would be, plus a line that says so. A 256 × 256 matrix (twenty lines of augment) used to draw all
+ * 65,536 cells on every load, which froze the page for seconds. Copying the answer still copies every entry.
+ */
+export function matrixCells<T>(m: readonly (readonly T[])[], cell: (c: T, i: number, j: number) => string): { cells: string[][]; more: string | null } {
+  const rows = m.length, cols = m[0]?.length ?? 0;
+  const r = Math.min(rows, MATRIX_SHOWN_MAX), c = Math.min(cols, MATRIX_SHOWN_MAX);
+  const cells = m.slice(0, r).map((row, i) => {
+    const out = row.slice(0, c).map((x, j) => cell(x, i, j));
+    if (c < cols) out.push('…');
+    return out;
+  });
+  if (r < rows) cells.push(Array.from({ length: cells[0]?.length ?? 0 }, () => '⋮'));
+  return { cells, more: r < rows || c < cols ? `${rows} × ${cols} matrix, showing the top-left ${r} × ${c}` : null };
+}
+
 const MATRIX_MIN_FONT = 12;
 
 /** The font size that fits a matrix `need` wide into `room`, or null when it already fits or there's no room to measure. */

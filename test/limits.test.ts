@@ -1,6 +1,7 @@
 // Inputs that used to hang, run out of memory, or give a wrong answer. Each case is from an audit of the engine.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { run } from './sheet';
+import { cleanSettings, evaluateDocument } from '../src/engine/document';
 import { plainNumber } from '../src/engine/format';
 import { roundTo } from '../src/engine/numeric';
 
@@ -21,6 +22,37 @@ describe('work that used to hang or run out of memory', () => {
     vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
     const res = run(['f(n) = {n < 1: 1, f(n-1) + f(n-1)}', 'f(60)']).lines;
     expect(res[1].error).toMatch(/more than 2 seconds/);
+  });
+  it('stops matrix work that runs past its time budget, on a line and in a graph', () => {
+    // A matrix product never called charge(), so a curve made of them drew every sample to the end: a link could save
+    // one that froze each later load for minutes.
+    const matrices = ['I = identity(20)', 'P = augment(augment(I, I), augment(I, I))', 'Q = transpose(P)'];
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    // This clock runs past the sheet's budget before the last line starts, so either limit may be the one that stops it.
+    expect(run([...matrices, 'sum(trace(Q*P), j, 1, 50)']).lines[3].error).toMatch(/takes more than \d seconds/);
+    const rows = [...matrices, 'y = x + trace(Q*P)'].map((text, k) => ({ id: `r${k}`, kind: 'expr' as const, text }));
+    const { f } = evaluateDocument(rows, cleanSettings({}))[3].graph[0] as { f: (x: number) => number };
+    const samples = Array.from({ length: 40 }, (_, k) => f(k));
+    expect(samples[0]).toBe(80);
+    expect(samples.at(-1)).toBeNaN();
+  });
+  it('keeps a definition\'s own timeout as its answer, so the lines that read it don\'t work it out again', () => {
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    const res = run(['f(n) = {n < 1: 1, f(n-1) + f(n-1)}', 'k = f(60)', 'k + 1', 'k + 2']).lines;
+    expect(res[1].error).toMatch(/more than 2 seconds/);
+    for (const r of res.slice(2)) expect(r.error).toMatch(/^"k" has an error: .*more than 2 seconds/);
+  });
+  it('stops a sheet of slow lines at the sheet\'s budget, and still works out the cheap lines after it', () => {
+    // Each slow line used to get a fresh 2 seconds, so a file of them froze every load and keystroke for minutes.
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+    const res = run(['f(n) = {n < 1: 1, f(n-1) + f(n-1)}', 'f(60)', 'f(61)', 'f(62)', '1 + 1']).lines;
+    expect(res[1].error).toMatch(/This line takes more than 2 seconds/);
+    expect(res[2].error).toMatch(/whole sheet takes more than 6 seconds/);
+    expect(res[3].error).toMatch(/whole sheet takes more than 6 seconds/);
+    expect(res[4].result).toBe('2');
   });
   it('stops a line that builds too many values', () => {
     // Test the allocation guard independently of the wall-clock budget, which has its own test above.

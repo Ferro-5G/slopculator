@@ -1,4 +1,4 @@
-import { charge, fail, failEdge, failLazy, warningNote } from './errors';
+import { charge, chargeWork, fail, failEdge, failLazy, warningNote } from './errors';
 import { TRIG, type Node } from './parser';
 import { children, lettersOf } from './ast';
 import type { Env, Fn } from './evaluator';
@@ -870,6 +870,7 @@ def('rref', {
       if (i < 0) break;
       [m[i], m[r]] = [m[r], m[i]];
       [size[i], size[r]] = [size[r], size[i]];
+      chargeWork(2 * rows * cols);
       const lv = m[r][lead];
       m[r] = m[r].map((x) => x / lv);
       size[r] = size[r].map((x) => x / Math.abs(lv));

@@ -1,4 +1,4 @@
-import { fail, failEdge, failLazy, failOverflow } from './errors';
+import { chargeWork, fail, failEdge, failLazy, failOverflow } from './errors';
 import { hypotOf, isWhole, maxOf } from './numeric';
 
 interface Complex { t: 'complex'; re: number; im: number }
@@ -134,6 +134,7 @@ export const PIVOT_TOL = 1e-12;
 
 export function matMulTidy(a: number[][], b: number[][]): number[][] {
   return matMul(a, b).map((row, i) => row.map((x, j) => {
+    chargeWork(b.length);
     let size = 0;
     for (let t = 0; t < b.length; t++) size += Math.abs(a[i][t] * b[t][j]);
     return tidy(x, size);
@@ -145,6 +146,7 @@ export function matMul(a: number[][], b: number[][]): number[][] {
   if (a[0].length !== k) fail(`Can't multiply ${n}×${a[0].length} by ${k}×${m}: inner sizes must match`);
   const out: number[][] = [];
   for (let i = 0; i < n; i++) {
+    chargeWork(m * k);
     const row = new Array<number>(m).fill(0);
     for (let j = 0; j < m; j++) {
       let s = 0;
@@ -177,6 +179,7 @@ export function matInverse(a: number[][]): number[][] | null {
     if (Math.abs(m[p][c]) < PIVOT_TOL * scale) return null;
     [m[c], m[p]] = [m[p], m[c]];
     [size[c], size[p]] = [size[p], size[c]];
+    chargeWork(2 * n * n);
     const pv = m[c][c];
     for (let j = 0; j < 2 * n; j++) { m[c][j] /= pv; size[c][j] /= Math.abs(pv); }
     for (let r = 0; r < n; r++) {
@@ -211,6 +214,7 @@ export function determinant(a: number[][]): number {
       det = -det;
     }
     det *= m[c][c];
+    chargeWork((n - c) * (n - c));
     for (let r = c + 1; r < n; r++) {
       const f = m[r][c] / m[c][c];
       for (let j = c; j < n; j++) m[r][j] -= f * m[c][j];

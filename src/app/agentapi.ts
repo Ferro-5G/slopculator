@@ -4,12 +4,14 @@ import { type RowInput, cleanSettings, evaluateDocument } from '../engine/docume
 import { Settings } from '../engine/evaluator';
 import { plainValue, type DisplayOpts } from '../engine/format';
 import { USAGE } from '../ui/complete';
+import { linkLines, linkLinesLabel, sheetNames } from '../ui/links';
 import { setSetting } from './controls';
-import { clearAll, replaceLines, appendLine } from './edits';
+import { clearAll, replaceLines, appendLine, appendLinkLines } from './edits';
 import { sheetAsText } from './file';
 import { graph } from './layout';
 import { doc, results, opts } from './sheet';
 import { setThemeValue } from './theme';
+import { showToast } from './toast';
 
 /**
  * window.slopculator lets scripts and AI agents use the calculator without clicking.
@@ -95,13 +97,16 @@ const api = {
     view: () => ({ ...graph.view }),
   },
 };
-/** #q=normalcdf(-inf,-2.5)&q=zscore(180,280,40) appends those lines on open. */
+/** #q=normalcdf(-inf,-2.5)&q=zscore(180,280,40) appends those lines on open, as one step Undo takes back. */
 export function linesFromUrl(): void {
   const raw = location.hash.startsWith('#') ? location.hash.slice(1) : location.search.slice(1);
-  const qs = new URLSearchParams(raw).getAll('q').filter((q) => q.trim());
-  if (!qs.length) return;
-  for (const q of qs) appendLine(q);
+  const { lines, dropped, clashes } = linkLines(new URLSearchParams(raw).getAll('q'), sheetNames(doc.rows, doc.settings.lineNames));
+  if (!lines.length && !dropped && !clashes.length) return;
+  // Before the lines go in, so a link whose lines freeze or crash the tab doesn't run again on reload.
   history.replaceState(null, '', location.pathname);
+  const label = linkLinesLabel(lines.length, dropped, clashes);
+  if (lines.length) appendLinkLines(lines, label);
+  else showToast(label);
 }
 
 export function initAgentapi(): void {

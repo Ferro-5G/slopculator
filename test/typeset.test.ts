@@ -60,6 +60,20 @@ describe('typeset', () => {
     expect(typeset('2 +')).toBeNull();
   });
 
+  it('leaves a line too deeply nested to lay out as plain text, but not a long flat one', () => {
+    const nested = (n: number) => `${'sqrt('.repeat(n)}2${')'.repeat(n)}`;
+    expect(typeset(nested(300))).toBeNull();
+    expect(typeset(nested(20))).not.toBeNull();
+    expect(typeset(Array.from({ length: 500 }, (_, k) => k).join('+'))).not.toBeNull();
+  });
+
+  it('draws a name like constructor as the name, not as Object.prototype\'s', () => {
+    const text = (boxes: MathBox[] | null) => JSON.stringify(boxes);
+    expect(text(typeset('constructor = 5'))).not.toMatch(/native code/);
+    expect(text(typeset('constructor = 5'))).toMatch(/"constructor"/);
+    expect(typeset('toString + 1')).not.toBeNull();
+  });
+
   it('stacks short fractions, and not when asked not to', () => {
     expect(kinds(typeset('x^2/4'))).toEqual(['frac']);
     expect(kinds(typeset('x^2/4', { stack: false }))).toEqual(['sup', '/', '4']);

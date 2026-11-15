@@ -167,7 +167,7 @@ export function mapSource(root: HTMLElement, src: string): void {
   for (const run of root.querySelectorAll<HTMLElement>('.m-run')) {
     const s = run.textContent ?? '';
     let best = -1, len = 0;
-    for (const sp of SPELLINGS[s] ?? [s]) {
+    for (const sp of Object.hasOwn(SPELLINGS, s) ? SPELLINGS[s] : [s]) {
       const k = lower.indexOf(sp.toLowerCase(), at);
       if (k >= 0 && k - at <= MAX_GAP && (best < 0 || k < best)) { best = k; len = sp.length; }
     }

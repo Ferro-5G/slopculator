@@ -72,22 +72,51 @@ let deadline = Infinity;
 let ticks = 0;
 let items = 0;
 const LINE_BUDGET_MS = 2000;
+const SHEET_BUDGET_MS = 6000;
 const ITEM_LIMIT = 10_000_000;
+
+const TOO_SLOW = `This line takes more than ${LINE_BUDGET_MS / 1000} seconds to work out, so it was stopped`;
+const SHEET_TOO_SLOW = `The whole sheet takes more than ${SHEET_BUDGET_MS / 1000} seconds to work out, so this line was stopped`;
+
+/** When the sheet being evaluated runs out of time, and which of the two limits the open deadline is. */
+let sheetEnd = Infinity;
+let stopText = TOO_SLOW;
+
+/**
+ * Runs fn, a whole sheet's evaluation, with the sheet's budget. Each line still gets its own 2 seconds, but no line
+ * runs past the sheet's end: without this, a sheet of slow lines (one a file or a link can bring in) cost 2 seconds a
+ * line on every load and every keystroke. Cheap lines after the end still finish, since the clock is read only every
+ * 1024 steps.
+ */
+export function withSheetBudget<T>(fn: () => T): T {
+  const outer = sheetEnd;
+  sheetEnd = Date.now() + SHEET_BUDGET_MS;
+  try {
+    return fn();
+  } finally {
+    sheetEnd = outer;
+  }
+}
 
 /**
  * Runs fn with a line's budget. A line can need another line worked out first (ans in a definition reads the line
- * above it), so this puts back the budget that was open before, with the time spent in between given back.
+ * above it), so this puts back the budget that was open before, with the time spent in between given back, up to the
+ * sheet's end.
  */
 export function withLineBudget<T>(fn: () => T): T {
-  const outer = { deadline, ticks, items };
+  const outer = { deadline, ticks, items, stopText };
   const started = Date.now();
-  deadline = started + LINE_BUDGET_MS;
+  const lineEnd = started + LINE_BUDGET_MS;
+  deadline = Math.min(lineEnd, sheetEnd);
+  stopText = lineEnd <= sheetEnd ? TOO_SLOW : SHEET_TOO_SLOW;
   ticks = 0;
   items = 0;
   try {
     return fn();
   } finally {
-    deadline = outer.deadline + (Date.now() - started);
+    const given = outer.deadline + (Date.now() - started);
+    deadline = outer.deadline === Infinity || given <= sheetEnd ? given : sheetEnd;
+    stopText = deadline === given ? outer.stopText : SHEET_TOO_SLOW;
     ticks = outer.ticks;
     items = outer.items;
   }
@@ -96,9 +125,20 @@ export function withLineBudget<T>(fn: () => T): T {
 export function charge(count = 0): void {
   if (deadline === Infinity) return;
   if (count && (items += count) > ITEM_LIMIT) throw new BudgetError('This line builds more than 10 million values, so it was stopped');
-  if ((++ticks & 1023) === 0 && Date.now() > deadline) {
-    throw new BudgetError(`This line takes more than ${LINE_BUDGET_MS / 1000} seconds to work out, so it was stopped`);
-  }
+  if ((++ticks & 1023) === 0 && Date.now() > deadline) throw new BudgetError(stopText);
+}
+
+/**
+ * charge() counts calls, and one call to a built-in can be most of a second's work: a 512×512 matrix product is 134
+ * million multiply-adds. Built-ins that do that much charge their work here, and the clock is read every million units
+ * however few calls they took, so a graph whose samples are matrix products still stops at its budget.
+ */
+let work = 0;
+const WORK_PER_CHECK = 1 << 20;
+export function chargeWork(units: number): void {
+  if (deadline === Infinity || (work += units) < WORK_PER_CHECK) return;
+  work = 0;
+  if (Date.now() > deadline) throw new BudgetError(stopText);
 }
 
 export const drawDeadline = (): number => Date.now() + LINE_BUDGET_MS;

@@ -4,7 +4,7 @@ import { isWarningNote } from '../engine/errors';
 import { type DisplayOpts, type Precise, formatNumber, formatValue, recordCell, plainValue, groupDigits } from '../engine/format';
 import { isUnit, otherUnit } from '../engine/units';
 import { isDist, type UnitCircleFigure, Value } from '../engine/values';
-import { isLongAnswer, matrixFitFont, UNIT_CIRCLE, unitCircleDrawing } from '../ui/answerlayout';
+import { isLongAnswer, matrixCells, matrixFitFont, UNIT_CIRCLE, unitCircleDrawing } from '../ui/answerlayout';
 import { asList } from '../ui/complete';
 import { DIST_OFF, type DistBounds, distPresets, distStatement } from '../ui/distview';
 import { leadingOperator, errorFixes, UNFINISHED_HINT, isStrayComma, lineErrorText, thousandsFix } from '../ui/errortext';
@@ -42,21 +42,48 @@ export function renderTex(v: RowView, row: Extract<Row, { kind: 'expr' }>, r: Ro
   v.tex.replaceChildren(node);
   measureTex(v);
 }
+/**
+ * Measuring a row writes a style, reads a width, and writes again, and each read after a write makes the browser lay out
+ * the whole page. One row at a time, a sheet of 2,000 rows took over 7 seconds to load. Inside batchLayout the rows are
+ * queued instead, and measured together: every write, then every read, then every write, for one layout in all.
+ */
+let queued: { tex: Set<RowView>; scopes: Set<ParentNode> } | null = null;
+export function batchLayout(fn: () => void): void {
+  if (queued) return fn();
+  const batch = (queued = { tex: new Set(), scopes: new Set() });
+  try {
+    fn();
+  } finally {
+    queued = null;
+    measureAll([...batch.tex], [...batch.scopes]);
+  }
+}
 export function measureTex(v: RowView): void {
-  if (!v.tex || !v.el.classList.contains('typeset') || v.el.classList.contains('active')) return;
-  v.tex.style.width = 'max-content';
-  const w = v.tex.offsetWidth;
-  v.tex.style.width = '';
-  (v.tex.parentElement as HTMLElement).style.setProperty('--nat', `${Math.ceil(w)}px`);
+  if (queued) queued.tex.add(v);
+  else measureAll([v], []);
 }
 function fitMatrices(scope: ParentNode): void {
-  const wraps = [...scope.querySelectorAll<HTMLElement>('.result .mat-wrap')];
+  if (queued) queued.scopes.add(scope);
+  else measureAll([], [scope]);
+}
+function measureAll(rows: RowView[], scopes: ParentNode[]): void {
+  const tex = rows.filter((v) => v.tex && v.el.classList.contains('typeset') && !v.el.classList.contains('active')).map((v) => v.tex!);
+  const wraps = [...new Set(scopes.flatMap((s) => [...s.querySelectorAll<HTMLElement>('.result .mat-wrap')]))];
+  for (const t of tex) t.style.width = 'max-content';
   for (const w of wraps) w.style.fontSize = '';
+  const widths = tex.map((t) => t.offsetWidth);
   const sized = wraps.map((w) => {
     const box = w.querySelector<HTMLElement>('.mat-scroll'), table = w.querySelector('table');
-    return [w, matrixFitFont(parseFloat(getComputedStyle(w).fontSize), box?.clientWidth ?? 0, table?.offsetWidth ?? 0)] as const;
+    return matrixFitFont(parseFloat(getComputedStyle(w).fontSize), box?.clientWidth ?? 0, table?.offsetWidth ?? 0);
   });
-  for (const [w, px] of sized) if (px) w.style.fontSize = `${px}px`;
+  tex.forEach((t, k) => {
+    t.style.width = '';
+    (t.parentElement as HTMLElement).style.setProperty('--nat', `${Math.ceil(widths[k])}px`);
+  });
+  wraps.forEach((w, k) => {
+    const px = sized[k];
+    if (px) w.style.fontSize = `${px}px`;
+  });
 }
 
 function unitCircleSvg(figure: UnitCircleFigure): string {
@@ -77,8 +104,10 @@ function valueNode(v: Value, o: DisplayOpts, prob: boolean, ex?: Precise): HTMLE
   if (typeof v === 'object' && v.t === 'matrix') {
     const t = h('table', { class: 'mat' });
     const exm = ex && 't' in ex && ex.t === 'matrix' ? ex.m : undefined;
-    v.m.forEach((r, i) => t.append(h('tr', {}, ...r.map((c, j) => h('td', {}, formatNumber(c, o, false, exm?.[i]?.[j]))))));
-    return h('span', { class: 'mat-wrap' }, h('span', { class: 'mat-scroll' }, t));
+    const { cells, more } = matrixCells(v.m, (c, i, j) => formatNumber(c, o, false, exm?.[i]?.[j]));
+    for (const r of cells) t.append(h('tr', {}, ...r.map((c) => h('td', {}, c))));
+    const wrap = h('span', { class: 'mat-wrap' }, h('span', { class: 'mat-scroll' }, t));
+    return more ? h('span', { class: 'mat-cut' }, wrap, h('span', { class: 'mat-more' }, more)) : wrap;
   }
   if (typeof v === 'object' && v.t === 'record') {
     const t = h('table', { class: 'rec' }, h('caption', {}, v.title));
@@ -369,5 +398,5 @@ export function initLineoutput(): void {
     matrixFitWidth = listEl.clientWidth;
     fitMatrices(listEl);
   }).observe(listEl);
-  document.fonts?.addEventListener('loadingdone', () => { for (const v of views.values()) measureTex(v); syncListEdges(); });
+  document.fonts?.addEventListener('loadingdone', () => { batchLayout(() => { for (const v of views.values()) measureTex(v); }); syncListEdges(); });
 }

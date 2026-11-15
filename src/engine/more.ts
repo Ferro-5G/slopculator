@@ -1,4 +1,4 @@
-import { fail } from './errors';
+import { chargeWork, fail } from './errors';
 import type { Builtin, Def } from './builtin-types';
 import type { Env } from './evaluator';
 import {
@@ -676,6 +676,7 @@ export function registerMore(def: Def): void {
       if (A.length !== B.length) fail(`augment needs the same number of rows (A has ${A.length}, B has ${B.length})`);
       const cols = (A[0]?.length ?? 0) + (B[0]?.length ?? 0);
       if (A.length * cols > 1_000_000) fail(`augment would make a ${A.length}×${cols} matrix; the limit is a million entries`);
+      chargeWork(A.length * cols);
       return matrix(A.map((r, i) => [...r, ...B[i]]));
     },
   });

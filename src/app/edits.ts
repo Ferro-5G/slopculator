@@ -143,6 +143,23 @@ export function appendLine(text: string): void {
   renderNow();
   saveSoon();
 }
+/** Lines a link adds: one render however many there are, and one step, so Undo takes them all back. */
+export function appendLinkLines(texts: string[], label: string): void {
+  const before = doc.rows;
+  const rows = [...before];
+  const last = rows[rows.length - 1];
+  let k = 0;
+  if (last.kind === 'expr' && isEmptyLine(last)) rows[rows.length - 1] = { ...last, text: texts[k++] };
+  for (; k < texts.length; k++) rows.push({ id: newId(), kind: 'expr', text: texts[k], color: nextColor(rows) });
+  const put = (next: Row[]) => {
+    doc.rows = next;
+    screen.rebuildRows();
+    renderNow();
+    saveSoon();
+  };
+  put(rows);
+  pushStep({ label, undo: () => put(before), redo: () => put(rows) }, false);
+}
 export function replaceLines(texts: string[]): void {
   dragEnds();
   commitRow(activeId);
