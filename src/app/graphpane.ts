@@ -170,14 +170,21 @@ export function graphSummary(): string {
     ? `Graph, ${span}. ${parts.join('; ')}. Arrow keys pan, plus and minus zoom, F fits, 0 resets. [ and ] step through the zeros, highs and lows and crossings; Enter pins one.`
     : `Graph, empty, ${span}. Arrow keys pan, plus and minus zoom.`;
 }
+/** NaN until the look's stylesheet is in, since that sheet defines --graph-min-w. */
 const clampLeft = (w: number) => {
   const graphMin = parseFloat(getComputedStyle(main).getPropertyValue('--graph-min-w'));
   return Math.max(320, Math.min(main.clientWidth - splitter.getBoundingClientRect().width - graphMin, w));
 };
+/** A NaN width would void the grid's columns, stacking the graph under a full-width notebook, so it's never written. */
 function setLeft(w: number): void {
-  main.style.setProperty('--left', `${clampLeft(w)}px`);
+  const left = clampLeft(w);
+  if (Number.isFinite(left)) main.style.setProperty('--left', `${left}px`);
 }
-const savedLeft = Number(store.get(KEYS.left));
+/** The width the splitter was last dragged to. Call after applyTheme, which puts in the stylesheet clampLeft reads. */
+export function restoreLeft(): void {
+  const saved = Number(store.get(KEYS.left));
+  if (saved > 0) setLeft(saved);
+}
 
 export function initGraphpane(): void {
   graphPane.addEventListener('pointerenter', () => { graphPointed = true; syncMarksHint(); });
@@ -272,7 +279,8 @@ export function initGraphpane(): void {
       // Preserve the grab point across looks and gutter widths.
       const w = startWidth + ev.clientX - startX;
       setLeft(w);
-      store.set(KEYS.left, String(clampLeft(w)));
+      const left = clampLeft(w);
+      if (Number.isFinite(left)) store.set(KEYS.left, String(left));
     };
     const up = () => {
       splitter.classList.remove('dragging');
@@ -285,6 +293,5 @@ export function initGraphpane(): void {
     splitter.addEventListener('pointercancel', up);
   });
   splitter.addEventListener('dblclick', () => { main.style.removeProperty('--left'); store.remove(KEYS.left); });
-  if (savedLeft) setLeft(savedLeft);
   window.addEventListener('resize', () => { if (main.style.getPropertyValue('--left')) setLeft(parseFloat(main.style.getPropertyValue('--left'))); });
 }

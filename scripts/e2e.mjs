@@ -2071,6 +2071,16 @@ await check('desktop: the keypad is up at the start, under the notebook; the Key
   expect(await page.isVisible('.keypad .numpad .key'), 'an old save hid the desktop keypad');
 });
 
+await check('desktop: a dragged notebook width comes back on reload with the graph beside it', async (page) => {
+  // Boot used to clamp the saved width before the look's stylesheet was in, wrote --left: NaNpx, and the graph fell under a full-width notebook.
+  await page.evaluate(() => localStorage.setItem(slopKeys.left, '700'));
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  const left = await page.locator('.left').boundingBox(), graph = await page.locator('.graph-pane').boundingBox();
+  expect(Math.abs(left.width - 700) <= 1, `the notebook is ${left.width} px wide, not the saved 700`);
+  expect(graph.x >= left.x + left.width && Math.abs(graph.y - left.y) <= 1, `the graph is not beside the notebook: ${JSON.stringify({ left, graph })}`);
+});
+
 await check('desktop: the hint row under the keys is blank at rest and says what the key or tile you point at does, on up to two lines', async (page) => {
   const hint = () => page.textContent('.key-hint');
   expect(await page.isVisible('.key-hint') && (await hint()) === '', `the hint at rest: ${await hint()}`);

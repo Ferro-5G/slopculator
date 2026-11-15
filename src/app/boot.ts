@@ -2,7 +2,7 @@ import { initOverlay } from './overlay';
 import { initAgentapi, linesFromUrl } from './agentapi';
 import { initCommands } from './commands';
 import { buildMenu, initFile } from './file';
-import { initGraphpane } from './graphpane';
+import { initGraphpane, restoreLeft } from './graphpane';
 import { fitKeyLabels, buildKeypad, initKeypad } from './keypad';
 import { graph, listEl } from './layout';
 import { initLineoutput } from './lineoutput';
@@ -49,6 +49,7 @@ export function boot(): void {
   document.fonts.addEventListener('loadingdone', () => fitBar());
   setSound(doc.ui.sound !== false);
   applyTheme();
+  restoreLeft();
   buildMenu();
   buildKeypad();
   applyUI();
