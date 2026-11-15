@@ -1,0 +1,30 @@
+import { narrow } from './platform';
+import { Graph } from './graph';
+import { h } from './dom';
+
+export const app = document.getElementById('app')!;
+export const modeBar = h('header', { class: 'modebar' });
+export const listEl = h('div', { class: 'rows', role: 'list', 'data-scroll': 'rest' });
+export const listTools = h('div', { class: 'list-tools' });
+export const coverTop = h('div', { class: 'edge-cover top', 'aria-hidden': 'true' });
+export const coverBottom = h('div', { class: 'edge-cover bottom', 'aria-hidden': 'true' });
+export const keypadEl = h('section', { class: 'keypad', id: 'keypad' });
+export const tape = h('div', { class: 'tape' }, listTools, listEl, coverTop, coverBottom);
+export const leftPane = h('div', { class: 'left' }, modeBar, tape, keypadEl);
+export const graphHost = h('div', { class: 'graph-host' });
+export const graphTools = h('div', { class: 'graph-tools' });
+export const graphChips = h('div', { class: 'graph-chips', role: 'toolbar', 'aria-label': 'Plotted lines', hidden: true });
+export const marksHint = h('div', { class: 'marks-hint', 'aria-hidden': 'true' }, h('kbd', {}, '['), ' ', h('kbd', {}, ']'), ' step through points');
+export const graphSliders = h('div', { class: 'graph-sliders', role: 'group', 'aria-label': 'Sliders', hidden: true });
+/** What sits over or under the plot. On a phone it floats, and the graph is told how much it covers. */
+export const graphDock = h('div', { class: 'graph-dock' }, graphChips, graphSliders, graphTools);
+export const graphPane = h('section', { class: 'graph-pane' }, graphHost, graphDock, marksHint);
+export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize' });
+export const main = h('main', { class: 'main' }, leftPane, splitter, graphPane);
+export const toast = h('div', { class: 'toast', role: 'status' });
+toast.inert = true;
+export const mobileNav = h('nav', { class: 'mobile-nav', 'aria-label': 'View' });
+app.append(main, mobileNav, toast);
+export const graph = new Graph(graphHost, () => narrow.matches);
+export const announcer = h('div', { class: 'sr-only', 'aria-live': 'polite', role: 'status' });
+app.append(announcer);

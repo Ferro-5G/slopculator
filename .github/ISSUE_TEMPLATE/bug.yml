@@ -1,0 +1,45 @@
+name: Bug or wrong answer
+description: Something broke, looked wrong, or gave the wrong result
+labels: [bug]
+body:
+  - type: textarea
+    id: typed
+    attributes:
+      label: What you typed
+      description: The exact lines, one per line. For a wrong answer the exact text matters.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: got
+    attributes:
+      label: What you got
+      description: The answer or error shown, or what happened. A screenshot helps for anything visual.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: modes
+    attributes:
+      label: Modes
+      description: Deg or Rad, Dec or Exact, and any others you changed.
+      placeholder: Deg, Dec
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Web app
+        - Windows app
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version, and browser or Windows version
+      placeholder: 0.2.0-alpha.1, Edge 140 on Windows 11

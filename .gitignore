@@ -1,0 +1,21 @@
+node_modules/
+dist/
+*.log
+.shots/
+src-tauri/target/
+src-tauri/gen/
+mobile/node_modules/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+dist-node/
+.DS_Store
+Thumbs.db
+*.tgz
+
+# Trailer renders: clips, frames, cue timelines, audio and video
+trailer/out/
+
+# Android Gradle output inside local Expo modules
+mobile/modules/*/android/build/
+.claude/worktrees/

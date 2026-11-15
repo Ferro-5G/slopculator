@@ -1,0 +1,1316 @@
+/* The script sets these custom properties for the stylesheets to use: --end-pad (the list's extra paper at the end),
+   --nat (a typeset line's natural width), --ti-cols and --tile-h (the Thumb Index grid), --c (a line's color), --left
+   (the splitter), and --tab-N, --tab-on-N and --tab-name-N (the tabs' colors, from theme.ts). */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.4 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+@supports (height: 100dvh) {
+  html,
+  body {
+    height: 100dvh;
+  }
+}
+
+button,
+input,
+select,
+output {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.main.no-graph {
+  grid-template-columns: 1fr;
+}
+
+.main.no-graph .left {
+  max-width: 760px;
+  width: 100%;
+  justify-self: center;
+}
+
+.graph-canvas {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.graph-canvas.dragging {
+  cursor: grabbing;
+}
+
+.graph-canvas.grab {
+  cursor: grab;
+}
+
+.graph-canvas.moving {
+  cursor: grabbing;
+}
+
+.graph-chips {
+  display: none;
+}
+
+.sheet-title:hover {
+  background: var(--hover);
+}
+
+.spacer {
+  flex: 1;
+}
+
+@media (--phone) {
+  /* Equal side tracks keep the pane switcher centered when the keyboard action hides. */
+  #app > .mobile-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .mobile-nav > .nav-seg {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .mobile-nav > .spacer {
+    display: none;
+  }
+
+  .mobile-nav > .nav-keys {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+.appear-menu {
+  min-width: 300px;
+}
+
+/* Shortcuts in the sans face, which draws ⌃ ⇧ ⌫ at full size and on the line. They sit on the label's baseline. */
+.menu [role='menuitem'] {
+  align-items: baseline;
+}
+
+.menu .hint {
+  font: 500 12px/1 var(--sans);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.menu .hint.word {
+  font-size: 11.5px;
+}
+
+/* An on/off row in Appearance: the label in the rows' ink, and a switch at the right that its aria-checked moves. */
+.menu .appear-pride {
+  align-items: center;
+  color: var(--ink-2);
+}
+
+.appear-pride .knob {
+  flex: none;
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--rule-2);
+  transition: background 0.2s;
+}
+
+.appear-pride .knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  transition: transform 0.2s cubic-bezier(0.3, 1.2, 0.5, 1);
+}
+
+.appear-pride[aria-checked='true'] .knob {
+  background: var(--accent);
+}
+
+.appear-pride[aria-checked='true'] .knob::after {
+  transform: translateX(12px);
+}
+
+[data-motion='off'] .appear-pride .knob,
+[data-motion='off'] .appear-pride .knob::after {
+  transition: none;
+}
+
+/* In the phone's Modes sheet the switch is the size of that sheet's other switches. */
+.ms-appear .appear-pride .knob {
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+}
+
+.ms-appear .appear-pride .knob::after {
+  width: 24px;
+  height: 24px;
+}
+
+.ms-appear .appear-pride[aria-checked='true'] .knob::after {
+  transform: translateX(18px);
+}
+
+.menu-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.mode-menu .mode-row {
+  grid-template-columns: 118px 1fr;
+}
+
+.mode-menu .mode-row[hidden] {
+  display: none;
+}
+
+.mode-row .togs {
+  display: flex;
+  gap: 6px;
+}
+
+.round-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.muted {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.row.typing .warn-dot {
+  visibility: hidden;
+}
+
+.warn-line {
+  display: none;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 0 0 4px;
+}
+
+.row.active:not(.typing) .warn-line:not([hidden]) {
+  display: flex;
+}
+
+.list-tools .spacer {
+  flex: 1;
+}
+
+@media (pointer: coarse) {
+  .list-tools .keys-toggle {
+    display: none;
+  }
+}
+
+.rows > * {
+  scroll-snap-align: start;
+}
+
+/* The starter's heading and cards are lines too, so the edge rests on them, not on the block around them. */
+.rows > .starter {
+  scroll-snap-align: none;
+}
+
+.rows .starter-head,
+.rows .starter-card {
+  scroll-snap-align: start;
+}
+
+/* settleTop (listscroll.ts) glides the top edge onto a line; snapping would pull its in-between positions back. */
+.rows.settling {
+  scroll-snap-type: none;
+}
+
+.tape {
+  position: relative;
+}
+
+.list-tools {
+  position: relative;
+  z-index: 3;
+  transition: box-shadow 0.15s;
+}
+
+.tape.more::after {
+  opacity: 1;
+}
+
+.edge-cover.on {
+  opacity: 1;
+}
+
+.table-row.has-error .idx {
+  position: relative;
+}
+
+.line {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: center;
+  column-gap: 16px;
+  min-height: 32px;
+}
+
+.row.active .expr,
+.row:focus-within .expr,
+.heading-row .expr {
+  color: var(--ink);
+}
+
+.src {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.row.typeset:not(.active) .src {
+  flex: 1 0 min(100%, var(--nat, 0px));
+}
+
+.row.active:not(.has-error) .src {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.src .expr {
+  width: 100%;
+}
+
+.row.typeset:not(.active) .tex {
+  display: block;
+}
+
+/* z-index: a matrix's brackets are positioned, and would otherwise sit over this input and take the click. */
+.row.typeset:not(.active) .src .expr {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+}
+
+.m-seg {
+  white-space: nowrap;
+}
+
+/* Long numeric expressions wrap between inputs in every browser layout. */
+.line:has(.out .result):not(:has(.out .note, .out .err, .out.long-answer)) .tex {
+  white-space: normal;
+  overflow-wrap: normal;
+}
+
+.line:has(.out .result):not(:has(.out .note, .out .err, .out.long-answer)) .tex :is(.m-seg, .m-fence) {
+  white-space: normal;
+}
+
+.line:has(.out .result):not(:has(.out .note, .out .err, .out.long-answer)) .tex .m-punct::after {
+  content: '\200B';
+}
+
+.m-sup.tall > .m-exp {
+  vertical-align: 1.25em;
+}
+
+.m-sub {
+  font-size: 0.72em;
+  vertical-align: -0.32em;
+  line-height: 1;
+}
+
+.m-sqrt,
+.m-fence.tall,
+.m-cases {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.m-rad,
+.m-dl,
+.m-dr {
+  position: relative;
+  flex: none;
+}
+
+.m-rad {
+  width: 0.62em;
+}
+
+.m-fbody {
+  align-self: baseline;
+  padding: 2px 0.06em;
+}
+
+.m-cases {
+  vertical-align: middle;
+}
+
+.out {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 0 0 2px;
+}
+
+.hint-line .cand {
+  all: unset;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.result .val,
+.dist-prob .pv {
+  white-space: nowrap;
+}
+
+.result .val.long {
+  white-space: normal;
+  /* anywhere, not break-word: a 90-digit exact integer has no spaces, and only anywhere lets it shrink to the line. */
+  overflow-wrap: anywhere;
+}
+
+.row.completing .err {
+  display: none;
+}
+
+.row.has-error .line .expr {
+  flex: 1 1 auto;
+  min-width: 6ch;
+}
+
+.row.has-error .out .fix {
+  flex: none;
+}
+
+.row.has-error:not(.typing, .completing) .line .out {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  max-width: 100%;
+  padding-bottom: 4px;
+}
+
+.row.has-error:not(.active) .out .err {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.row.typing .err,
+.row.typing .fix:not(.calm-fix) {
+  display: none;
+}
+
+.note {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.note.warn {
+  color: var(--warn);
+}
+
+.truth.yes {
+  color: var(--ok);
+}
+
+.truth.no {
+  color: var(--err);
+}
+
+.row.lone .del {
+  visibility: hidden;
+}
+
+.row:hover .del,
+.row.active .del,
+.del:focus-visible {
+  opacity: 1;
+}
+
+.del:hover {
+  color: var(--err);
+}
+
+/* Square brackets, not bars: bars on both sides would read as a determinant. */
+.mat-wrap {
+  position: relative;
+  display: inline-block;
+  padding: 0 1.5px;
+}
+
+.result .mat-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mat-scroll {
+  display: block;
+  overflow: auto hidden;
+  scrollbar-width: thin;
+}
+
+.result .mat td {
+  padding: 0 0.4em;
+}
+
+.mat {
+  border-collapse: collapse;
+}
+
+.rec {
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-left: auto;
+}
+
+.lim:hover,
+.lim:focus {
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  color: var(--ink);
+  outline: 0;
+}
+
+.dist {
+  display: grid;
+  gap: 7px;
+  padding: 4px 0 8px;
+  font-size: 13px;
+}
+
+.cdf-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-2);
+  width: max-content;
+  cursor: pointer;
+}
+
+.bounds {
+  display: none;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.dist.on .bounds {
+  display: grid;
+}
+
+.dist-prob .stmt {
+  color: var(--ink-2);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.dist-prob:hover {
+  background: var(--hover);
+}
+
+.presets {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.dist,
+.extra {
+  min-width: 0;
+}
+
+.dist.on .presets {
+  display: flex;
+}
+
+.preset:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.dist-err {
+  color: var(--err);
+  font-size: 12.5px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  padding: 2px 0 6px;
+}
+
+.tbl tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tbl input.computed {
+  color: var(--ink-2);
+}
+
+.tbl .sum {
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: right;
+  padding: 3px 8px 0;
+}
+
+.tbl .sum.warn {
+  color: var(--warn);
+}
+
+.row.completing .fix {
+  display: none;
+}
+
+:root {
+  --pad-h: 264px;
+  --kgap: 6px;
+}
+
+.pad-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.numpad {
+  flex: 4 0 calc(var(--kgap) * 3);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kgap);
+}
+
+.krow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--kgap);
+}
+
+/* Each key takes touches out to the middle of the gaps around it, so every point of the keys is some key's. */
+.key::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--kgap) / -2);
+}
+
+.key .kl.two {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 13px;
+  line-height: 1.05;
+}
+
+/* A clip wipe, so the cap's rounded corners stay true; scaling the layer squashed them at the start. */
+@keyframes clear-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* The caption may run into the key's side padding: "hold: clear" on the narrowest phone. The key keeps its width. */
+.key.act .ks {
+  max-width: calc(100% + 4px);
+  margin-inline: -2px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+.kh-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+dialog h1[tabindex]:focus-visible {
+  outline: none;
+}
+
+dialog h2 + table,
+dialog p {
+  margin: 0 0 16px;
+}
+
+dialog table th {
+  text-align: left;
+  font-weight: 400;
+  padding: 3px 16px 3px 0;
+  white-space: nowrap;
+}
+
+/* On a phone the two-column shortcut table squeezes the explanations into a sliver; stack each key over its line. */
+@media (max-width: 520px) {
+  dialog.help table,
+  dialog.help tbody,
+  dialog.help tr,
+  dialog.help th,
+  dialog.help td {
+    display: block;
+  }
+
+  dialog.help th {
+    padding: 8px 0 2px;
+    white-space: normal;
+  }
+
+  dialog.help td {
+    padding: 0 0 2px;
+  }
+}
+
+.mx-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mx-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.mx-size span:not(:first-child) {
+  margin-left: 10px;
+}
+
+.mx-dims {
+  font-family: var(--mono);
+}
+
+.mx-grid {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.mx-grid.mx-points {
+  grid-template-columns: 1.5rem 7rem 7rem;
+  align-items: center;
+  justify-content: start;
+}
+
+.mx-point,
+.mx-axis {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.mx-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.toast.at-top {
+  transform: translate(-50%, -8px);
+}
+
+.toast.at-top.show {
+  transform: translate(-50%, 0);
+}
+
+.toast.actionable {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* In the strip under the desktop's keys: the strip's own box, its message on one line, Undo at the right. */
+.toast.in-foot,
+.toast.in-foot.show {
+  transform: none;
+}
+
+.toast.in-foot {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--rule-2);
+  backdrop-filter: none;
+  transition: opacity 0.16s;
+}
+
+.toast.in-foot > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.toast.in-foot > button {
+  flex: none;
+}
+
+/* Key help waits under a message instead of showing through it. */
+.keypad.has-toast .key-hint {
+  visibility: hidden;
+}
+
+/* Only while it shows: a hidden Undo mustn't catch a tap meant for what's under it. */
+.toast.actionable.show {
+  pointer-events: auto;
+}
+
+.sheet-dialog {
+  width: min(480px, 92vw);
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.history-dialog {
+  width: min(680px, 92vw);
+}
+
+.history-text {
+  overflow: hidden;
+  font-family: var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.history-result {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 7px 8px;
+  font-family: var(--mono);
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.history-result:hover {
+  color: var(--accent);
+}
+
+.history-more {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.history-clear {
+  margin-right: auto;
+  color: var(--err);
+}
+
+.sheet-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 0 -6px 14px;
+}
+
+.sheet-item:hover {
+  background: var(--hover);
+}
+
+.sheet-name {
+  font-weight: 500;
+}
+
+.sheet-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-del {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 17px;
+  padding: 0 10px;
+}
+
+.sheet-del:hover {
+  color: var(--err);
+}
+
+.pal-label {
+  font: 500 14px var(--mono);
+  white-space: nowrap;
+}
+
+.pal-detail {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.pal-keys {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pal-empty {
+  padding: 18px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.key:focus-visible {
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.expr:focus-visible {
+  outline: none;
+}
+
+[data-theme^='contrast'] .err::before {
+  content: '⚠ ';
+}
+
+.mobile-nav {
+  display: none;
+}
+
+/* A phone held upright is typed on with one thumb: fixed heights, not a share of the window. The bank's two rows are
+   --bank-row and the pad's four --pad-row, so a shorter screen gives the list less, not the keys. */
+@media (max-width: 760px) and (min-height: 461px) {
+
+  .numpad {
+    flex: 0 0 calc(4 * var(--pad-row) + 3 * var(--kgap));
+  }
+}
+
+.pride-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--rainbow));
+  animation: pride-burst 0.9s ease-out forwards;
+}
+
+@keyframes pride-burst {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}
+
+@container left (max-width: 440px) {
+  .modes .pill:not(.more) {
+    display: none;
+  }
+
+  .pill.more {
+    display: inline-flex;
+  }
+}
+
+.line:has(.out.long-answer) {
+  align-content: flex-start;
+}
+
+.line .out.long-answer {
+  flex: 1 0 100%;
+  justify-content: stretch;
+  min-width: 0;
+}
+
+.out.long-answer .result {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.out.long-answer .result .val {
+  display: block;
+  /* Exactly five whole lines of 22 px, so the box never cuts a line through its digits. */
+  max-height: 110px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font: 500 15px/22px var(--mono);
+  letter-spacing: 0;
+}
+
+.out.long-answer .result .val.more {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 8px), transparent); /* a hint at the very foot; the footer carries the cue and five whole lines stay */
+}
+
+.desk-modes,
+.desk-more,
+.bar-tog,
+.key-foot {
+  display: none;
+}
+
+.out.long-answer .long-cue {
+  flex: 1 0 100%;
+  padding: 6px 6px 4px;
+  line-height: 16px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.head-pill {
+  display: contents;
+}
+
+.head-find {
+  display: none;
+}
+
+@keyframes key-found {
+  0%, 35% { box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent); }
+  100% { box-shadow: 0 0 0 2px transparent, 0 0 0 6px transparent; }
+}
+
+[data-motion='off'] .key.found {
+  animation-duration: 1.6s;
+  animation-timing-function: steps(1, end);
+}
+
+.key.has-sub .kl {
+  margin-bottom: 10px;
+}
+
+.key .kl .ksup {
+  font-size: 0.62em;
+  line-height: 0;
+  vertical-align: 0.6em;
+  margin-left: 0.04em;
+}
+
+.slider-row .lim.lo {
+  text-align: right;
+}
+
+.slider-row .lim.hi {
+  text-align: left;
+}
+
+.appear-btn .appear-word {
+  display: none;
+}
+
+.reorder-done {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font: 600 14px/1 var(--sans);
+}
+
+.rows.reordering .row .line {
+  padding-right: 96px;
+}
+
+.rows.reordering .row .expr {
+  pointer-events: none;
+}
+
+.row > .reorder {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  transform: translateY(-50%);
+}
+
+.reorder-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--well);
+  color: var(--ink);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.35;
+}
+
+.menu .file-row .menu-btns button {
+  min-width: 64px;
+}
+
+.out .calm-hint {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* The calm hint waits for the first pause, so the line doesn't grow under the fingers at every operator (12+3×4).
+   Once it has shown it stays through typing (calm-held) until the line is finished or left: nothing moves. */
+.row.typing:not(.calm-held) .out .calm-hint {
+  display: none;
+}
+
+/* Desktop: a slider row takes the line's whole width, so its track isn't left at its 120 px minimum. */
+.slider-row {
+  flex: 1 0 100%;
+}
+
+.marks-hint.show {
+  opacity: 1;
+}
+
+/* The pointer's readout is drawn in the same corner, so the keyboard hint steps aside while the pointer is on the plot. */
+.graph-pane:has(.graph-host:hover) .marks-hint.show {
+  opacity: 0;
+}
+
+@media (--phone) {
+  .marks-hint {
+    display: none;
+  }
+
+  /* A phone zooms with its fingers, so these go, kept for screen readers. 1:1 goes too: without zoom keys Home does its job. */
+  .graph-tools .gt-zoom {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .graph-tools .gt-square {
+    display: none;
+  }
+}
+
+.graph-tools button:disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+.graph-tools button:disabled[aria-pressed='true'] {
+  background: transparent;
+}
+
+.graph-dock {
+  display: contents;
+}
+
+.row.calm .out .fix.calm-fix {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  color: var(--ink-2);
+}
+
+/* Reorder lines: the ↑ ↓ buttons take the right, so the expression gets the line's width and its answer goes
+   underneath, right-aligned, rather than both squeezing until invNorm(0.95) breaks mid-name. Nothing below moves. */
+.rows.reordering .row .line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rows.reordering .row .line .src {
+  width: auto;
+  max-width: none;
+}
+
+.rows.reordering .row .line .out {
+  justify-self: end;
+  margin-left: 0;
+}
+
+/* Only a caption that shows lifts a label: outside a captioned row (the desktop's ⌫, whose caption the hint row
+   replaces) the label sits with its neighbours. */
+.key.has-sub:not(.cap-row) .kl {
+  margin-bottom: 0;
+}
+
+/* A two-line face in a captioned row keeps at least 4 px from the cap's top: it goes no higher than its own height
+   allows, even when the row's labels sit higher. */
+.key.cap-row .kl.two {
+  top: max(min(-4%, calc(50% - 25px)), calc(18px - 50%));
+}
+
+/* ⌫ about 15 px tall on the desktop, where it has no caption (its outline is 11 of the icon's 20 units), and 13 px over
+   "hold: clear" on a phone, its stroke the caret arrows' weight. */
+.numpad .key[data-action='back'] .kicon.back {
+  width: 24px;
+  height: 24px;
+}
+
+@media (--desktop) {
+  .numpad .key[data-action='back'] .kicon.back {
+    width: 27px;
+    height: 27px;
+  }
+}
+
+.slider-row .lim.lo,
+.slider-row .lim.hi {
+  width: auto;
+  min-width: 2.5ch;
+  padding-inline: 0;
+}
+
+/* The Open list's focus ring sits inside each sheet's button, so the list's edge never clips it. */
+.sheet-list .sheet-open:focus-visible,
+.sheet-list .sheet-del:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.row.active.typing .warn-line.now:not([hidden]) {
+  display: flex;
+}
+
+.row.typing:has(.warn-line.now:not([hidden])) .warn-dot {
+  visibility: visible;
+}
+
+.graph-sliders {
+  display: none;
+}
+
+.rec-fig {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 16px;
+}
+
+.uc {
+  width: 112px;
+  height: 112px;
+  flex: none;
+  fill: none;
+}
+
+.uc-axis {
+  stroke: var(--ink-3);
+  stroke-width: 0.75;
+  opacity: 0.6;
+}
+
+.uc-ring {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+}
+
+.uc-leg {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.uc-arc {
+  stroke: var(--accent);
+  stroke-width: 1.25;
+}
+
+.uc-arrow {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.uc-dot {
+  fill: var(--accent);
+}
+
+.uc text {
+  fill: var(--ink-3);
+  font-family: var(--sans);
+  font-size: 10px;
+}

@@ -1,0 +1,1189 @@
+[
+ {
+  "name": "Basic",
+  "keys": [
+   {
+    "label": "x",
+    "does": "x"
+   },
+   {
+    "label": "y",
+    "does": "y"
+   },
+   {
+    "label": "π",
+    "does": "π"
+   },
+   {
+    "label": "e",
+    "does": "e"
+   },
+   {
+    "label": "x²",
+    "does": "^2"
+   },
+   {
+    "label": "x⁻¹",
+    "does": "^-1"
+   },
+   {
+    "label": "%",
+    "does": "%"
+   },
+   {
+    "label": "|x|",
+    "does": "|¦|"
+   },
+   {
+    "label": "n!",
+    "does": "!"
+   }
+  ]
+ },
+ {
+  "name": "Sci",
+  "keys": [
+   {
+    "label": "ln",
+    "does": "ln(¦)"
+   },
+   {
+    "label": "eˣ",
+    "does": "e^"
+   },
+   {
+    "label": "log",
+    "does": "log(¦)"
+   },
+   {
+    "label": "10ˣ",
+    "does": "10^"
+   },
+   {
+    "label": "solve",
+    "does": "solve(¦)"
+   },
+   {
+    "label": "quad",
+    "does": "quad(¦)"
+   },
+   {
+    "label": "log_b",
+    "does": "log_¦()"
+   },
+   {
+    "label": "E",
+    "does": "E"
+   },
+   {
+    "label": "x⁻¹",
+    "does": "^-1"
+   },
+   {
+    "label": "n!",
+    "does": "!"
+   },
+   {
+    "label": "sin",
+    "does": "sin(¦)"
+   },
+   {
+    "label": "cos",
+    "does": "cos(¦)"
+   },
+   {
+    "label": "tan",
+    "does": "tan(¦)"
+   },
+   {
+    "label": "abs",
+    "does": "abs(¦)"
+   },
+   {
+    "label": "∛",
+    "does": "∛(¦)"
+   },
+   {
+    "label": "ⁿ√",
+    "does": "nthroot(¦)"
+   },
+   {
+    "label": "floor",
+    "does": "floor(¦)"
+   },
+   {
+    "label": "ceil",
+    "does": "ceil(¦)"
+   },
+   {
+    "label": "round",
+    "does": "round(¦)"
+   },
+   {
+    "label": "mod",
+    "does": "mod(¦)"
+   },
+   {
+    "label": "gcd",
+    "does": "gcd(¦)"
+   },
+   {
+    "label": "lcm",
+    "does": "lcm(¦)"
+   },
+   {
+    "label": "re",
+    "does": "re(¦)"
+   },
+   {
+    "label": "im",
+    "does": "im(¦)"
+   },
+   {
+    "label": "arg",
+    "does": "arg(¦)"
+   },
+   {
+    "label": "conj",
+    "does": "conj(¦)"
+   },
+   {
+    "label": "a",
+    "does": "a"
+   },
+   {
+    "label": "b",
+    "does": "b"
+   },
+   {
+    "label": "c",
+    "does": "c"
+   },
+   {
+    "label": "n",
+    "does": "n"
+   },
+   {
+    "label": "seq",
+    "does": "seq(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Matrix",
+  "keys": [
+   {
+    "label": "new matrix",
+    "does": "action:matrix"
+   },
+   {
+    "label": "[[ ]]",
+    "does": "[[¦]]"
+   },
+   {
+    "label": "det",
+    "does": "det(¦)"
+   },
+   {
+    "label": "inv",
+    "does": "inv(¦)"
+   },
+   {
+    "label": "A^-1",
+    "does": "^-1"
+   },
+   {
+    "label": "transpose",
+    "does": "transpose(¦)"
+   },
+   {
+    "label": "[ ]",
+    "does": "[¦]"
+   },
+   {
+    "label": "⟨ ⟩",
+    "does": "⟨¦⟩"
+   },
+   {
+    "label": "identity",
+    "does": "identity(¦)"
+   },
+   {
+    "label": "rref",
+    "does": "rref(¦)"
+   },
+   {
+    "label": "linsolve",
+    "does": "linsolve(¦)"
+   },
+   {
+    "label": "trace",
+    "does": "trace(¦)"
+   },
+   {
+    "label": "rank",
+    "does": "rank(¦)"
+   },
+   {
+    "label": "eigen",
+    "does": "eigen(¦)"
+   },
+   {
+    "label": "dot",
+    "does": "dot(¦)"
+   },
+   {
+    "label": "cross",
+    "does": "cross(¦)"
+   },
+   {
+    "label": "mag",
+    "does": "mag(¦)"
+   },
+   {
+    "label": "unit",
+    "does": "unit(¦)"
+   },
+   {
+    "label": "vec",
+    "does": "vec(¦)"
+   },
+   {
+    "label": "angle",
+    "does": "angle(¦)"
+   },
+   {
+    "label": "rotation",
+    "does": "rotation(¦)"
+   },
+   {
+    "label": "dilation",
+    "does": "dilation(¦)"
+   },
+   {
+    "label": "reflectx",
+    "does": "reflectx"
+   },
+   {
+    "label": "reflecty",
+    "does": "reflecty"
+   },
+   {
+    "label": "reflectyx",
+    "does": "reflectyx"
+   },
+   {
+    "label": "apply",
+    "does": "apply(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Trig",
+  "keys": [
+   {
+    "label": "sin",
+    "does": "sin(¦)"
+   },
+   {
+    "label": "sin⁻¹",
+    "does": "asin(¦)"
+   },
+   {
+    "label": "cos",
+    "does": "cos(¦)"
+   },
+   {
+    "label": "cos⁻¹",
+    "does": "acos(¦)"
+   },
+   {
+    "label": "tan",
+    "does": "tan(¦)"
+   },
+   {
+    "label": "tan⁻¹",
+    "does": "atan(¦)"
+   },
+   {
+    "label": "π",
+    "does": "π"
+   },
+   {
+    "label": "°",
+    "does": "°"
+   },
+   {
+    "label": "θ",
+    "does": "θ"
+   },
+   {
+    "label": "atan2",
+    "does": "atan2(¦)"
+   },
+   {
+    "label": "csc",
+    "does": "csc(¦)"
+   },
+   {
+    "label": "sec",
+    "does": "sec(¦)"
+   },
+   {
+    "label": "cot",
+    "does": "cot(¦)"
+   },
+   {
+    "label": "sin²",
+    "does": "sin(¦)^2"
+   },
+   {
+    "label": "torad",
+    "does": "torad(¦)"
+   },
+   {
+    "label": "todeg",
+    "does": "todeg(¦)"
+   },
+   {
+    "label": "arclen",
+    "does": "arclen(¦)"
+   },
+   {
+    "label": "sector",
+    "does": "sector(¦)"
+   },
+   {
+    "label": "unitcircle",
+    "does": "unitcircle(¦)"
+   },
+   {
+    "label": "period",
+    "does": "period(¦)"
+   },
+   {
+    "label": "y =",
+    "does": "y ="
+   },
+   {
+    "label": "x",
+    "does": "x"
+   },
+   {
+    "label": "trigform",
+    "does": "trigform(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Calc",
+  "keys": [
+   {
+    "label": "deriv",
+    "does": "deriv(¦)"
+   },
+   {
+    "label": "deriv2",
+    "does": "deriv2(¦)"
+   },
+   {
+    "label": "∫",
+    "does": "integral(¦, t, , )"
+   },
+   {
+    "label": "t",
+    "does": "t"
+   },
+   {
+    "label": "linreg",
+    "does": "linreg(¦)"
+   },
+   {
+    "label": "quadreg",
+    "does": "quadreg(¦)"
+   },
+   {
+    "label": "roots",
+    "does": "roots(¦)"
+   },
+   {
+    "label": "polyval",
+    "does": "polyval(¦)"
+   },
+   {
+    "label": "expreg",
+    "does": "expreg(¦)"
+   },
+   {
+    "label": "corr",
+    "does": "corr(¦)"
+   },
+   {
+    "label": "percentile",
+    "does": "percentile(¦)"
+   },
+   {
+    "label": "quartiles",
+    "does": "quartiles(¦)"
+   },
+   {
+    "label": "tcdf",
+    "does": "tcdf(¦)"
+   },
+   {
+    "label": "invT",
+    "does": "invT(¦)"
+   },
+   {
+    "label": "chi2cdf",
+    "does": "chi2cdf(¦)"
+   },
+   {
+    "label": "geompdf",
+    "does": "geompdf(¦)"
+   },
+   {
+    "label": "poissonpdf",
+    "does": "poissonpdf(¦)"
+   },
+   {
+    "label": "poissoncdf",
+    "does": "poissoncdf(¦)"
+   },
+   {
+    "label": "gamma",
+    "does": "gamma(¦)"
+   },
+   {
+    "label": "isprime",
+    "does": "isprime(¦)"
+   },
+   {
+    "label": "factor",
+    "does": "factor(¦)"
+   },
+   {
+    "label": "divisors",
+    "does": "divisors(¦)"
+   },
+   {
+    "label": "quot",
+    "does": "quot(¦)"
+   },
+   {
+    "label": "rem",
+    "does": "rem(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Normal",
+  "keys": [
+   {
+    "label": "normaldist",
+    "does": "normaldist(0, 1)"
+   },
+   {
+    "label": "zscore",
+    "does": "zscore(¦)"
+   },
+   {
+    "label": "normalcdf",
+    "does": "normalcdf(¦)"
+   },
+   {
+    "label": "x_from_z",
+    "does": "x_from_z(¦)"
+   },
+   {
+    "label": "invNorm",
+    "does": "invNorm(¦)"
+   },
+   {
+    "label": "zcrit",
+    "does": "zcrit(¦)"
+   },
+   {
+    "label": "−∞",
+    "does": "-inf"
+   },
+   {
+    "label": "∞",
+    "does": "inf"
+   },
+   {
+    "label": "left tail",
+    "does": "normleft(¦)"
+   },
+   {
+    "label": "right tail",
+    "does": "normright(¦)"
+   },
+   {
+    "label": "between",
+    "does": "normbetween(¦)"
+   },
+   {
+    "label": "outside",
+    "does": "normoutside(¦)"
+   },
+   {
+    "label": "μ",
+    "does": "μ"
+   },
+   {
+    "label": "σ",
+    "does": "σ"
+   },
+   {
+    "label": "μ =",
+    "does": "μ ="
+   },
+   {
+    "label": "σ =",
+    "does": "σ ="
+   },
+   {
+    "label": "normalpdf",
+    "does": "normalpdf(¦)"
+   },
+   {
+    "label": "empirical",
+    "does": "empirical(¦)"
+   },
+   {
+    "label": "moe",
+    "does": "moe(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Stats",
+  "keys": [
+   {
+    "label": "mean",
+    "does": "mean(¦)"
+   },
+   {
+    "label": "{ }",
+    "does": "{¦}"
+   },
+   {
+    "label": "sdp",
+    "does": "sdp(¦)"
+   },
+   {
+    "label": "sds",
+    "does": "sds(¦)"
+   },
+   {
+    "label": "nCr",
+    "does": "nCr(¦)"
+   },
+   {
+    "label": "nPr",
+    "does": "nPr(¦)"
+   },
+   {
+    "label": "median",
+    "does": "median(¦)"
+   },
+   {
+    "label": "mode",
+    "does": "mode(¦)"
+   },
+   {
+    "label": "+ table",
+    "does": "action:table"
+   },
+   {
+    "label": "range",
+    "does": "range(¦)"
+   },
+   {
+    "label": "n!",
+    "does": "!"
+   },
+   {
+    "label": "count",
+    "does": "count(¦)"
+   },
+   {
+    "label": "sd",
+    "does": "sd(¦)"
+   },
+   {
+    "label": "varp",
+    "does": "varp(¦)"
+   },
+   {
+    "label": "fivenum",
+    "does": "fivenum(¦)"
+   },
+   {
+    "label": "stats",
+    "does": "stats(¦)"
+   },
+   {
+    "label": "sort",
+    "does": "sort(¦)"
+   },
+   {
+    "label": "sum",
+    "does": "sum(¦)"
+   },
+   {
+    "label": "max",
+    "does": "max(¦)"
+   },
+   {
+    "label": "min",
+    "does": "min(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Prob",
+  "keys": [
+   {
+    "label": "binompdf",
+    "does": "binompdf(¦)"
+   },
+   {
+    "label": "binomcdf",
+    "does": "binomcdf(¦)"
+   },
+   {
+    "label": "EV",
+    "does": "EV(¦)"
+   },
+   {
+    "label": "{ }",
+    "does": "{¦}"
+   },
+   {
+    "label": "binomge",
+    "does": "binomge(¦)"
+   },
+   {
+    "label": "binomgt",
+    "does": "binomgt(¦)"
+   },
+   {
+    "label": "binomlt",
+    "does": "binomlt(¦)"
+   },
+   {
+    "label": "between",
+    "does": "binombetween(¦)"
+   },
+   {
+    "label": "binomdist",
+    "does": "binomdist(10, 0.5)"
+   },
+   {
+    "label": "binomstats",
+    "does": "binomstats(¦)"
+   },
+   {
+    "label": "netgain",
+    "does": "netgain(¦)"
+   },
+   {
+    "label": "p",
+    "does": "p"
+   },
+   {
+    "label": "phat",
+    "does": "phat(¦)"
+   },
+   {
+    "label": "sep",
+    "does": "sep(¦)"
+   },
+   {
+    "label": "moep",
+    "does": "moep(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Graph",
+  "keys": [
+   {
+    "label": "y =",
+    "does": "y ="
+   },
+   {
+    "label": "x",
+    "does": "x"
+   },
+   {
+    "label": "x =",
+    "does": "x ="
+   },
+   {
+    "label": "y",
+    "does": "y"
+   },
+   {
+    "label": "f(x)=",
+    "does": "f(x) ="
+   },
+   {
+    "label": "( , )",
+    "does": "(¦, )"
+   },
+   {
+    "label": "<",
+    "does": "<"
+   },
+   {
+    "label": ">",
+    "does": ">"
+   },
+   {
+    "label": "≤",
+    "does": "<="
+   },
+   {
+    "label": "≥",
+    "does": ">="
+   },
+   {
+    "label": "{x>0}",
+    "does": "{x > ¦0}"
+   },
+   {
+    "label": "{ : }",
+    "does": "{x < 0: ¦, }"
+   },
+   {
+    "label": "a =",
+    "does": "a ="
+   },
+   {
+    "label": "b =",
+    "does": "b ="
+   },
+   {
+    "label": "c =",
+    "does": "c ="
+   },
+   {
+    "label": "d =",
+    "does": "d ="
+   }
+  ]
+ },
+ {
+  "name": "Geometry",
+  "keys": [
+   {
+    "label": "( , )",
+    "does": "(¦, )"
+   },
+   {
+    "label": "distance",
+    "does": "distance(¦)"
+   },
+   {
+    "label": "slope",
+    "does": "slope(¦)"
+   },
+   {
+    "label": "midpoint",
+    "does": "midpoint(¦)"
+   },
+   {
+    "label": "area",
+    "does": "area(¦)"
+   },
+   {
+    "label": "polygon",
+    "does": "polygon(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Money",
+  "keys": [
+   {
+    "label": "pmt",
+    "does": "pmt(¦)"
+   },
+   {
+    "label": "compound",
+    "does": "compound(¦)"
+   },
+   {
+    "label": "simple",
+    "does": "simple(¦)"
+   },
+   {
+    "label": "continuous",
+    "does": "continuous(¦)"
+   },
+   {
+    "label": "pctchange",
+    "does": "pctchange(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Convert",
+  "keys": [
+   {
+    "label": "convert",
+    "does": "convert(¦, \"mi\", \"km\")"
+   },
+   {
+    "label": "hex",
+    "does": "hex(¦)"
+   },
+   {
+    "label": "bin",
+    "does": "bin(¦)"
+   },
+   {
+    "label": "dec",
+    "does": "dec(\"¦\", 16)"
+   },
+   {
+    "label": "\" \"",
+    "does": "\"¦\""
+   }
+  ]
+ },
+ {
+  "name": "Air",
+  "keys": [
+   {
+    "label": "psych",
+    "does": "psych(¦)"
+   },
+   {
+    "label": "wetbulb",
+    "does": "wetbulb(¦)"
+   },
+   {
+    "label": "enthalpy",
+    "does": "enthalpy(¦)"
+   },
+   {
+    "label": "dewpoint",
+    "does": "dewpoint(¦)"
+   },
+   {
+    "label": "coil",
+    "does": "coil(¦)"
+   },
+   {
+    "label": "coilwb",
+    "does": "coilwb(¦)"
+   },
+   {
+    "label": "grains",
+    "does": "grains(¦)"
+   },
+   {
+    "label": "SI",
+    "does": "\"SI\""
+   },
+   {
+    "label": "sensible",
+    "does": "sensibleheat(¦)"
+   },
+   {
+    "label": "latent",
+    "does": "latentheat(¦)"
+   },
+   {
+    "label": "total",
+    "does": "totalheat(¦)"
+   },
+   {
+    "label": "shratio",
+    "does": "shratio(¦)"
+   },
+   {
+    "label": "psychwb",
+    "does": "psychwb(¦)"
+   },
+   {
+    "label": "psychdp",
+    "does": "psychdp(¦)"
+   },
+   {
+    "label": "RH wb",
+    "does": "rhfromwb(¦)"
+   },
+   {
+    "label": "RH dp",
+    "does": "rhfromdp(¦)"
+   },
+   {
+    "label": "specvol",
+    "does": "specvol(¦)"
+   },
+   {
+    "label": "density",
+    "does": "airdensity(¦)"
+   },
+   {
+    "label": "humratio",
+    "does": "humratio(¦)"
+   },
+   {
+    "label": "airflow",
+    "does": "airflow(¦)"
+   },
+   {
+    "label": "temprise",
+    "does": "temprise(¦)"
+   },
+   {
+    "label": "mixair",
+    "does": "mixair(¦)"
+   },
+   {
+    "label": "OA %",
+    "does": "oapercent(¦)"
+   },
+   {
+    "label": "mixtemp",
+    "does": "mixtemp(¦)"
+   },
+   {
+    "label": "bypass",
+    "does": "bypassfactor(¦)"
+   },
+   {
+    "label": "ACH",
+    "does": "airchanges(¦)"
+   },
+   {
+    "label": "uaheat",
+    "does": "uaheat(¦)"
+   },
+   {
+    "label": "uvalue",
+    "does": "uvalue(¦)"
+   },
+   {
+    "label": "altitude",
+    "does": "altpressure(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Refrig",
+  "keys": [
+   {
+    "label": "SH",
+    "does": "superheat(¦)"
+   },
+   {
+    "label": "SC",
+    "does": "subcool(¦)"
+   },
+   {
+    "label": "ptchart",
+    "does": "ptchart(¦)"
+   },
+   {
+    "label": "refcycle",
+    "does": "refcycle(¦)"
+   },
+   {
+    "label": "410A",
+    "does": "\"R410A\""
+   },
+   {
+    "label": "454B",
+    "does": "\"R454B\""
+   },
+   {
+    "label": "32",
+    "does": "\"R32\""
+   },
+   {
+    "label": "22",
+    "does": "\"R22\""
+   },
+   {
+    "label": "134a",
+    "does": "\"R134a\""
+   },
+   {
+    "label": "404A",
+    "does": "\"R404A\""
+   },
+   {
+    "label": "\" \"",
+    "does": "\"¦\""
+   },
+   {
+    "label": "list",
+    "does": "refrigerants()"
+   },
+   {
+    "label": "sattemp",
+    "does": "sattemp(¦)"
+   },
+   {
+    "label": "SI",
+    "does": "\"SI\""
+   },
+   {
+    "label": "SH goal",
+    "does": "targetsuperheat(¦)"
+   },
+   {
+    "label": "refprops",
+    "does": "refprops(¦)"
+   },
+   {
+    "label": "tbubble",
+    "does": "tbubble(¦)"
+   },
+   {
+    "label": "tdew",
+    "does": "tdew(¦)"
+   },
+   {
+    "label": "pbubble",
+    "does": "pbubble(¦)"
+   },
+   {
+    "label": "pdew",
+    "does": "pdew(¦)"
+   },
+   {
+    "label": "eertocop",
+    "does": "eertocop(¦)"
+   },
+   {
+    "label": "coptoeer",
+    "does": "coptoeer(¦)"
+   },
+   {
+    "label": "coptokw",
+    "does": "coptokwton(¦)"
+   },
+   {
+    "label": "kwtocop",
+    "does": "kwtontocop(¦)"
+   },
+   {
+    "label": "carnot",
+    "does": "carnotcop(¦)"
+   },
+   {
+    "label": "psat",
+    "does": "psat(¦)"
+   }
+  ]
+ },
+ {
+  "name": "Flow",
+  "keys": [
+   {
+    "label": "ductvel",
+    "does": "ductvel(¦)"
+   },
+   {
+    "label": "ductloss",
+    "does": "ductloss(¦)"
+   },
+   {
+    "label": "ductsize",
+    "does": "ductsize(¦)"
+   },
+   {
+    "label": "convert",
+    "does": "convert(¦, \"CFM\", \"L/s\")"
+   },
+   {
+    "label": "ductdia",
+    "does": "ductdia(¦)"
+   },
+   {
+    "label": "eqdia",
+    "does": "eqdia(¦)"
+   },
+   {
+    "label": "rectduct",
+    "does": "rectduct(¦)"
+   },
+   {
+    "label": "SI",
+    "does": "\"SI\""
+   },
+   {
+    "label": "velpress",
+    "does": "velpressure(¦)"
+   },
+   {
+    "label": "pitot",
+    "does": "velfromvp(¦)"
+   },
+   {
+    "label": "fanlaws",
+    "does": "fanlaws(¦)"
+   },
+   {
+    "label": "fanpower",
+    "does": "fanpower(¦)"
+   },
+   {
+    "label": "achflow",
+    "does": "achflow(¦)"
+   },
+   {
+    "label": "ventair",
+    "does": "ventair(¦)"
+   },
+   {
+    "label": "water",
+    "does": "waterheat(¦)"
+   },
+   {
+    "label": "GPM",
+    "does": "waterflow(¦)"
+   },
+   {
+    "label": "pump",
+    "does": "pumppower(¦)"
+   },
+   {
+    "label": "pipevel",
+    "does": "pipevel(¦)"
+   },
+   {
+    "label": "pipeloss",
+    "does": "pipeloss(¦)"
+   },
+   {
+    "label": "valvecv",
+    "does": "valvecv(¦)"
+   },
+   {
+    "label": "Cv flow",
+    "does": "valveflow(¦)"
+   },
+   {
+    "label": "gasinput",
+    "does": "gasinput(¦)"
+   },
+   {
+    "label": "kW",
+    "does": "elecpower(¦)"
+   },
+   {
+    "label": "V imbal",
+    "does": "voltimbalance(¦)"
+   }
+  ]
+ }
+]

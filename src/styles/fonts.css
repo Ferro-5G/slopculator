@@ -1,0 +1,8 @@
+/* The app's exponents (10⁶⁰, 10⁻⁵, sin⁻¹) come from one tight set, built by scripts/build-fonts.py. The Latin
+   subsets only have ¹²³, so an exponent would otherwise mix faces and space out. */
+@font-face {
+  font-family: 'Superscripts';
+  src: url('../assets/Superscripts.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+B2, U+B3, U+B9, U+2070, U+2074-2079, U+207A, U+207B;
+}

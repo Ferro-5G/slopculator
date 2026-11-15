@@ -1,0 +1,438 @@
+.ti-rows {
+  flex: 2 0 var(--kgap);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kgap);
+}
+
+/* Six keys a row, sharing it as the pad's keys do, so every edge lines up with the pad under it. */
+.ti-row {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--kgap);
+}
+
+.key.ti-tab {
+  gap: 1px;
+  padding-top: 3px;
+}
+
+.ti-tab .ti-glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.ti-tab .ti-fx {
+  width: auto;
+  font: italic 500 11.5px/16px var(--sans);
+  letter-spacing: 0;
+}
+
+.keys .key.ti-tab .kl {
+  font-size: 12.5px;
+}
+
+.key.ti-tab::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 28%;
+  right: 28%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--tab);
+  pointer-events: none;
+}
+
+.key.ti-tab.lit,
+.key.ti-tab.lit:hover {
+  background: var(--tab);
+  color: var(--tab-on);
+}
+
+.keys .key.ti-tab.lit .kl {
+  color: var(--tab-on);
+}
+
+.key.ti-tab.lit::before {
+  display: none;
+}
+
+.ti-page:not([hidden]) {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  /* placeThumbPage reads these to size the tiles (thumb.ts sets --tile-h and --ti-cols from them). */
+  --ti-strip: 44px;
+  --ti-strip-compact: 34px;
+  --ti-chips: 36px;
+  --ti-chips-compact: 30px;
+  --ti-gap: 6px;
+  --ti-gap-compact: 4px;
+  --ti-pad: 8px;
+  --ti-pad-compact: 4px;
+  --ti-grid-top: 2px;
+  padding: 0 var(--ti-pad) var(--ti-pad);
+  border: 1px solid var(--rule-2);
+  border-radius: 14px;
+  background: var(--menu);
+  box-shadow: var(--shadow-float);
+}
+
+.ti-page.compact {
+  padding: 0 var(--ti-pad-compact) var(--ti-pad-compact);
+}
+
+.ti-page.ti-in {
+  animation: ti-in 0.16s ease-out both;
+}
+
+@keyframes ti-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ti-strip {
+  flex: none;
+  height: var(--ti-strip);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ti-page.compact .ti-strip {
+  height: var(--ti-strip-compact);
+}
+
+.ti-segs {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--well);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.ti-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 1px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font: 500 13px/1 var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.ti-seg[aria-selected='true'] {
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 0 0 1px var(--rule);
+}
+
+.ti-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.ti-title b {
+  flex: none;
+  font: 600 16px/1.2 var(--sans);
+  color: var(--ink);
+}
+
+.ti-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.ti-page.compact .ti-close {
+  height: 34px;
+}
+
+.ti-close:active {
+  background: var(--press);
+}
+
+.ti-chips {
+  flex: none;
+  height: var(--ti-chips);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ti-page.compact .ti-chips {
+  height: var(--ti-chips-compact);
+}
+
+.ti-chips-label {
+  font: 12px var(--sans);
+  color: var(--ink-3);
+}
+
+.ti-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--key-fn);
+  color: var(--key-fn-ink);
+  font: 13px/1 var(--mono);
+}
+
+.ti-chip[aria-checked='true'] {
+  background: var(--tab);
+  color: var(--tab-on);
+}
+
+/* At most 4 × 5 tiles (5 across on a wide desktop column), one width. Short desktop grids scroll at their readable minimum. */
+.ti-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ti-cols, 4), minmax(0, 1fr));
+  grid-auto-rows: var(--tile-h, 44px);
+  gap: var(--ti-gap);
+  margin-top: var(--ti-grid-top);
+}
+
+.ti-page.compact .ti-grid {
+  gap: var(--ti-gap-compact);
+}
+
+.ti-any {
+  grid-column: 1 / -1;
+}
+
+.ti-tile {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 3px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--key-fn);
+  box-shadow: var(--key-depth);
+  color: var(--key-fn-ink);
+  transition: background 0.1s, transform 0.09s;
+}
+
+.ti-tile:active {
+  transform: scale(0.96);
+  background: color-mix(in srgb, var(--key-fn) 88%, var(--ink));
+}
+
+.ti-face,
+.ti-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+
+.ti-face {
+  font: 500 15.5px/1.15 var(--sans);
+}
+
+.ti-face sub {
+  font-size: 0.68em;
+  line-height: 0;
+}
+
+.ti-name {
+  font: 11px/1.15 var(--mono);
+  color: var(--tab-name);
+}
+
+.ti-page.compact .ti-name {
+  display: none;
+}
+
+.pal-item:has(.pal-keys.home) {
+  grid-template-columns: 34px auto 1fr auto;
+}
+
+.pal-keys.home {
+  display: inline-block;
+  font: 11.5px var(--sans);
+  color: var(--ink-2);
+}
+
+.hint-line button.next-slot,
+.hint-line button.grid-chip {
+  pointer-events: auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font: 600 13px/1 var(--sans);
+}
+
+.hint-line button.grid-chip {
+  font-family: var(--mono);
+}
+
+/* A pill that says what it undoes (Clear all) keeps to one line: centred on the window, it would otherwise wrap at
+   half its width. */
+.toast {
+  width: max-content;
+}
+
+.hint-line .sig.cell .of {
+  color: var(--ink-3);
+}
+.src .slots {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  overflow: hidden;
+  white-space: pre;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.src .slots .slot {
+  color: var(--ink-3);
+}
+
+/* The cell you're filling: its letter on a tint, the others left faint. A shadow and no padding, so nothing shifts off the caret. */
+.src .slots .slot.current {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--ink);
+}
+
+.src .expr.slotted {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (--desktop) {
+  .ti-page.scrolling .ti-grid {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden auto;
+    align-content: start;
+    padding-bottom: 2px;
+  }
+
+  .ti-page:not([hidden]) {
+    --ti-pad: 10px;
+    --ti-pad-compact: 10px;
+    left: 8px;
+    right: 8px;
+    padding: 0 10px 10px;
+    border-radius: 12px;
+  }
+
+  .ti-strip {
+    height: var(--ti-strip);
+    gap: 8px;
+  }
+
+  .ti-segs {
+    height: 30px;
+  }
+
+  .ti-seg {
+    font-size: 12.5px;
+  }
+
+  .ti-seg:hover:not([aria-selected='true']) {
+    color: var(--ink);
+  }
+
+  .ti-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .ti-close:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+
+  .ti-chip:hover:not([aria-checked='true']) {
+    background: color-mix(in srgb, var(--key-fn) 88%, var(--ink));
+  }
+
+  .ti-tile {
+    gap: 2px;
+    border-radius: 10px;
+  }
+
+  .ti-tile:hover {
+    background: color-mix(in srgb, var(--key-fn) 90%, var(--ink));
+  }
+
+  .ti-face {
+    font-size: 16px;
+  }
+
+  .ti-name {
+    font-size: 11.5px;
+  }
+
+  /* Keyboard focus: the accent ring the keys wear, inside the tile so the grid's gap never clips it. */
+  .ti-tile:focus-visible,
+  .ti-seg:focus-visible,
+  .ti-chip:focus-visible,
+  .ti-close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .key.ti-tab:not(.lit):hover {
+    background: color-mix(in srgb, var(--kc) 90%, var(--ink));
+  }
+
+  .keys .key.ti-tab .kl {
+    font-size: 13px;
+  }
+
+  .hint-line button.next-slot,
+  .hint-line button.grid-chip {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,149 @@
+/* One timing for the Modes sheet and its scrim, in both looks. */
+:root {
+  --sheet-motion-duration: 180ms;
+  --sheet-motion-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after,
+[data-motion='off'] ::backdrop {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Reduced: nothing moves. Quick fades and color changes stay. */
+[data-motion='reduced'] *,
+[data-motion='reduced'] *::before,
+[data-motion='reduced'] *::after {
+  animation-name: none !important;
+  transition-property: opacity, color, background-color, border-color, box-shadow !important;
+  scroll-behavior: auto !important;
+}
+
+[data-motion='reduced'] .menu:not([hidden]),
+[data-motion='reduced'] dialog[open],
+[data-motion='reduced'] dialog[open]::backdrop {
+  animation-name: fade-in !important;
+  animation-delay: 0ms !important;
+}
+
+[data-motion='reduced'] button:active,
+[data-motion='reduced'] [role='tab']:active,
+[data-motion='reduced'] .key:active,
+[data-motion='reduced'] .key.pop {
+  transform: none !important;
+}
+
+.menu-note {
+  padding: 0 10px 5px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.swatches {
+  display: flex;
+  gap: 5px;
+}
+
+/* Past the menu's own button styles, in the desktop popover and the phone's Modes sheet alike. */
+:is(.menu, .ms-appear) .swatch,
+:is(.menu, .ms-appear) .swatch:hover,
+:is(.menu, .ms-appear) .swatch:focus {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+:is(.menu, .ms-appear) .swatch[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--glass-strong), 0 0 0 4px var(--ink);
+}
+
+:is(.menu, .ms-appear) .swatch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+[data-look='modern'] .toast.undo-only button {
+  text-decoration: none;
+}
+
+@media (--phone) {
+  .appear-wrap {
+    display: none !important;
+  }
+
+  .ms-appear .swatches {
+    gap: 9px;
+  }
+
+  .ms-appear .swatch,
+  .ms-appear .swatch:hover,
+  .ms-appear .swatch:focus {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+.appear-sample {
+  margin: 2px 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.as-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  margin: 4px 0;
+  padding-right: 12px;
+  background: var(--active-fill, var(--tape-active));
+  box-shadow: inset var(--active-bar-w, 0) 0 0 var(--accent), inset 4px 0 0 var(--print-head, transparent);
+  color: var(--ink);
+}
+
+[data-look='retro'] .as-line {
+  margin: 0;
+}
+
+.as-idx {
+  width: 32px;
+  text-align: center;
+  font: 500 11px/1 var(--mono);
+  color: var(--ink-3);
+}
+
+.as-expr {
+  flex: 1;
+  font: 17px/1 var(--sans);
+}
+
+[data-look='retro'] .as-expr {
+  font-family: var(--mono);
+}
+
+.as-ans {
+  font: 600 17px/1 var(--sans);
+}
+
+[data-look='retro'] .as-ans {
+  font: 700 16px/1 var(--mono);
+}
+
+.as-keys {
+  display: flex;
+  gap: 6px;
+  height: 44px;
+  padding: 7px;
+  border-top: 1px solid var(--rule);
+  background: var(--key-bed, var(--well));
+}

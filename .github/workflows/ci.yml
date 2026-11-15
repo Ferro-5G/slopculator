@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+      - run: npm ci
+      # The mobile app is a directory a checkout may not have. Where it is, the unit tests include its tests.
+      - if: hashFiles('mobile/package-lock.json') != ''
+        run: npm ci --prefix mobile
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - if: hashFiles('mobile/package-lock.json') != ''
+        run: npm run typecheck --prefix mobile
+
+  # The browser checks are most of the run, so they are split across runners. Each check opens its own
+  # browser profile, so a shard doesn't depend on the checks before it. `npm run e2e` still runs them all.
+  e2e:
+    name: e2e (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ['0/4', '1/4', '2/4', '3/4', audit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vite build
+      - if: matrix.suite == 'audit'
+        run: node scripts/audit-e2e.mjs
+      - if: matrix.suite != 'audit'
+        run: node scripts/e2e.mjs
+        env:
+          E2E_SHARD: ${{ matrix.suite }}
+      - if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-shots-${{ strategy.job-index }}
+          path: .shots/
+          if-no-files-found: ignore

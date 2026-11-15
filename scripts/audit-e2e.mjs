@@ -1,0 +1,524 @@
+import { mkdirSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { exposeKeys, launchBrowser, openApp } from './lib/app.mjs';
+
+const browser = await launchBrowser();
+let failures = 0;
+const undo = (p) => p.keyboard.press('ControlOrMeta+z');
+const redo = (p) => p.keyboard.press('ControlOrMeta+Shift+z');
+const texts = (p) => p.evaluate(() => window.slopculator.lines().map((r) => r.text));
+const seed = (p, lines) => p.evaluate((lines) => window.slopculator.setLines(lines), lines);
+const expr = (p) => p.locator('.rows .row .expr').last();
+/** Takes down the Undo toast that seeding leaves over the list toolbar for 10 s, so a click there isn't held until it fades. */
+const dropToast = (p) => p.evaluate(() => { const t = document.querySelector('.toast'); t.classList.remove('show'); t.inert = true; });
+async function save(p, name) {
+  await p.keyboard.press('Control+Alt+s');
+  // The open dialog: the last one closed is removed on its close event, a task later, and may still be in the page.
+  await p.locator('dialog[open] input').fill(name);
+  await p.locator('dialog[open] button[value=ok]').click();
+  await expr(p).focus();
+}
+async function check(name, fn, options = {}) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...options });
+  await exposeKeys(context);
+  const p = await context.newPage();
+  const errors = [];
+  p.on('pageerror', (e) => errors.push(e.message));
+  p.on('dialog', (d) => d.accept());
+  try {
+    await openApp(p);
+    await fn(p);
+    assert.deepEqual(errors, []);
+    console.log(`PASS  ${name}`);
+  } catch (e) {
+    failures++;
+    console.error(`FAIL  ${name}: ${e.message}`);
+  } finally {
+    await context.close();
+  }
+}
+
+for (const operation of ['clear', 'delete']) {
+  await check(`${operation} replacement line survives undo and redo of later typing`, async (p) => {
+    await seed(p, ['5']);
+    if (operation === 'clear') await p.evaluate(() => window.slopculator.clear());
+    else await p.locator('.rows .row .del').click();
+    await expr(p).fill('42');
+    await undo(p); await undo(p);
+    assert.deepEqual(await texts(p), ['5']);
+    await redo(p); await redo(p);
+    assert.deepEqual(await texts(p), ['42']);
+    if (operation === 'clear') {
+      mkdirSync('.shots', { recursive: true });
+      await p.screenshot({ path: '.shots/audit-undo-redo.png' });
+    }
+  });
+}
+
+await check('setLines undo replaces the new lines and redo restores them', async (p) => {
+  await seed(p, ['1', '2']);
+  await seed(p, ['3', '4']);
+  await undo(p);
+  assert.deepEqual(await texts(p), ['1', '2']);
+  await redo(p);
+  assert.deepEqual(await texts(p), ['3', '4']);
+});
+
+await check('multi-line paste is one undoable step and keeps row IDs on redo', async (p) => {
+  await seed(p, ['1']);
+  await p.evaluate(() => {
+    const input = document.querySelector('.rows .row .expr');
+    input.focus(); input.setSelectionRange(0, 1);
+    const data = new DataTransfer(); data.setData('text/plain', '5\n6');
+    input.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+  });
+  assert.deepEqual(await texts(p), ['5', '6']);
+  await expr(p).fill('67');
+  await undo(p); await undo(p);
+  assert.deepEqual(await texts(p), ['1']);
+  await redo(p); await redo(p);
+  assert.deepEqual(await texts(p), ['5', '67']);
+});
+
+for (const trailing of [[], ['']]) {
+  await check(`Combine has its own undo with ${trailing.length ? 'an empty' : 'a new'} result line`, async (p) => {
+    await seed(p, ['1', '2', ...trailing]);
+    await dropToast(p);
+    await p.locator('.combine button[aria-label="Add all lines"]').click();
+    assert.deepEqual(await texts(p), ['1', '2', '1 + 2']);
+    await undo(p);
+    assert.deepEqual(await texts(p), ['1', '2', ...trailing]);
+    await redo(p);
+    assert.deepEqual(await texts(p), ['1', '2', '1 + 2']);
+    await p.evaluate(() => {
+      const input = document.querySelector('.rows .row .expr');
+      input.value = '10'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await undo(p); await undo(p);
+    assert.deepEqual(await texts(p), ['1', '2', ...trailing]);
+  });
+}
+
+await check('Combine toast undo preserves newer source edits', async (p) => {
+  await seed(p, ['1', '2']);
+  await dropToast(p);
+  await p.locator('.combine button[aria-label="Add all lines"]').click();
+  await p.evaluate(() => {
+    const input = document.querySelector('.rows .row .expr');
+    input.value = '10'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.toast button').click();
+  });
+  assert.deepEqual(await texts(p), ['10', '2']);
+});
+
+for (const damaged of ['{broken', JSON.stringify({ rows: [null] })]) {
+  await check('damaged working document cannot overwrite a valid named save: ' + damaged, async (p) => {
+    await p.addInitScript((damaged) => {
+      localStorage.setItem(slopKeys.document, damaged);
+      localStorage.setItem(slopKeys.current, 'Homework');
+      localStorage.setItem(slopKeys.sessions, JSON.stringify([{ name: 'Homework', doc: { rows: [{ id: 'old', kind: 'expr', text: '99', color: 0 }] } }]));
+    }, damaged);
+    await p.reload();
+    await p.waitForFunction(() => !!window.slopculator);
+    assert.equal(await p.locator('.sheet-title').textContent(), 'Slopculator');
+    await expr(p).fill('42');
+    await p.waitForFunction(() => {
+      try { return JSON.parse(localStorage.getItem(slopKeys.document)).rows?.[0]?.text === '42'; }
+      catch { return false; }
+    });
+    const saved = await p.evaluate(() => JSON.parse(localStorage.getItem(slopKeys.sessions))[0].doc.rows[0].text);
+    assert.equal(saved, '99');
+  });
+}
+
+await check('repairing duplicate imported IDs cannot collide with another imported row', async (p) => {
+  await p.addInitScript(() => {
+    Date.now = () => 1000;
+    const pending = sessionStorage.getItem('import');
+    if (pending) localStorage.setItem(slopKeys.document, pending);
+  });
+  const load = async (rows) => {
+    await p.evaluate((rows) => sessionStorage.setItem('import', JSON.stringify({ rows })), rows);
+    await p.reload();
+    await p.waitForFunction(() => !!window.slopculator);
+  };
+  // The id the app gives a repaired row, read back from what it saves, so the next import already holds that id.
+  await load([{ id: 'same', text: '2' }, { id: 'same', text: '3' }]);
+  await expr(p).fill('9');
+  const generated = await p.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    return JSON.parse(localStorage.getItem(slopKeys.document)).rows[1].id;
+  });
+  assert.notEqual(generated, 'same');
+  await load([{ id: generated, text: '1' }, { id: 'same', text: '2' }, { id: 'same', text: '3' }]);
+  assert.deepEqual(await texts(p), ['1', '2', '3']);
+  assert.equal(await p.locator('.rows .row').count(), 3);
+  await expr(p).fill('4');
+  assert.deepEqual(await texts(p), ['1', '2', '4']);
+});
+
+await check('editing after undo discards the redo branch', async (p) => {
+  await seed(p, ['']);
+  await expr(p).fill('1');
+  await p.keyboard.press('Enter');
+  await expr(p).fill('2');
+  await undo(p);
+  // Make this a single edit task; the assertion is about redo branching, not native focus selection timing.
+  await p.evaluate(() => {
+    const input = document.querySelector('.rows .row .expr');
+    input.focus(); input.value = '13'; input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await redo(p);
+  assert.deepEqual(await texts(p), ['13', '']);
+});
+
+await check('failed named save reports failure and prevents New from discarding it', async (p) => {
+  await seed(p, ['5']); await save(p, 'Homework');
+  await p.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === slopKeys.sessions) throw new Error('quota');
+      return write.call(this, k, v);
+    };
+  });
+  await p.keyboard.press('Control+Alt+s');
+  assert.match(await p.locator('.toast').textContent(), /couldn't be updated/);
+  await p.keyboard.press('Control+Alt+Shift+n');
+  assert.deepEqual(await texts(p), ['5']);
+  assert.equal(await p.locator('.sheet-title').textContent(), 'Homework');
+  await expr(p).fill('6');
+  await p.waitForFunction(() => /isn't being saved/.test(document.querySelector('.toast')?.textContent ?? ''));
+});
+
+await check('New reports a failure on its second save without throwing or recording a switch', async (p) => {
+  await seed(p, ['1']); await save(p, 'First');
+  await p.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    let writes = 0;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === slopKeys.sessions && ++writes === 2) throw new Error('quota');
+      return write.call(this, k, v);
+    };
+  });
+  await p.keyboard.press('Control+Alt+Shift+n');
+  assert.equal(await p.locator('.sheet-title').textContent(), 'First');
+  assert.deepEqual(await texts(p), ['1']);
+  assert.match(await p.locator('.toast').textContent(), /couldn't be updated/);
+  await undo(p);
+  assert.deepEqual(await texts(p), ['']);
+});
+
+await check('failed saved-sheet deletion keeps the current name attached', async (p) => {
+  await seed(p, ['5']); await save(p, 'Homework');
+  await p.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === slopKeys.sessions) throw new Error('quota');
+      return write.call(this, k, v);
+    };
+  });
+  await p.keyboard.press('Control+Alt+o');
+  await p.locator('.sheet-del').click();
+  assert.equal(await p.locator('.sheet-title').textContent(), 'Homework');
+  assert.equal(await p.locator('.sheet-name').count(), 1);
+  assert.match(await p.locator('.toast').textContent(), /couldn't be updated/);
+});
+
+await check('failed sheet-switch undo and redo keep the document and can be retried', async (p) => {
+  await seed(p, ['1']); await save(p, 'First');
+  await p.keyboard.press('Control+Alt+Shift+n');
+  await save(p, 'Second');
+  await p.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    window.auditFailSave = true;
+    Storage.prototype.setItem = function (k, v) {
+      if (k === slopKeys.sessions && window.auditFailSave) throw new Error('quota');
+      return write.call(this, k, v);
+    };
+  });
+  await undo(p);
+  assert.equal(await p.locator('.sheet-title').textContent(), 'Second');
+  assert.match(await p.locator('.toast').textContent(), /couldn't be updated/);
+  await p.evaluate(() => { window.auditFailSave = false; });
+  await undo(p);
+  assert.equal(await p.locator('.sheet-title').textContent(), 'First');
+  await p.evaluate(() => { window.auditFailSave = true; });
+  await redo(p);
+  assert.equal(await p.locator('.sheet-title').textContent(), 'First');
+  await p.evaluate(() => { window.auditFailSave = false; });
+  await redo(p);
+  assert.equal(await p.locator('.sheet-title').textContent(), 'Second');
+});
+
+await check('undoing Open saves edits to the outgoing named sheet before its timer', async (p) => {
+  await seed(p, ['1']); await save(p, 'First');
+  await p.keyboard.press('Control+Alt+Shift+n');
+  await expr(p).fill('2'); await save(p, 'Second');
+  await p.keyboard.press('Control+Alt+o');
+  await p.locator('.sheet-open', { hasText: 'First' }).click();
+  // The toast can undo Open past newer typing. Put the edit and click in one browser task, before autosave.
+  await p.evaluate(() => {
+    const input = document.querySelector('.rows .row .expr');
+    input.value = '12345'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('.toast button').click();
+  });
+  assert.deepEqual(await texts(p), ['2']);
+  const saved = await p.evaluate(() => JSON.parse(localStorage.getItem(slopKeys.sessions)).find((s) => s.name === 'First').doc.rows[0].text);
+  assert.equal(saved, '12345');
+});
+
+for (const hasTouch of [false, true]) {
+  await check(`phone navigation stays centered across panes, touch=${hasTouch}`, async (p) => {
+    for (const look of ['modern', 'retro']) {
+      await p.selectOption('select.look', look, { force: true });
+      for (const width of [320, 390, 760]) {
+        await p.setViewportSize({ width, height: 844 });
+        for (const name of ['Calculate', 'Graph']) {
+          await p.locator('.nav-view').filter({ hasText: name }).click();
+          const offset = await p.locator('.nav-seg').evaluate((e) => {
+            const r = e.getBoundingClientRect();
+            return r.x + r.width / 2 - innerWidth / 2;
+          });
+          assert.ok(Math.abs(offset) < 1, `${look} ${width} ${name}: offset ${offset}`);
+          const keys = p.locator('.nav-keys');
+          if (await keys.isVisible()) {
+            const tabs = await p.locator('.nav-seg').boundingBox();
+            const action = await keys.boundingBox();
+            assert.ok(tabs.x + tabs.width <= action.x, 'keyboard action overlaps pane switcher');
+          }
+        }
+      }
+    }
+  }, { hasTouch });
+}
+
+await check('laptop starter cards fit above the keypad with usable key targets', async (p) => {
+  await p.setViewportSize({ width: 1280, height: 800 });
+  const room = await p.evaluate(() => ({
+    cards: document.querySelector('.starter').getBoundingClientRect().bottom,
+    keypad: document.querySelector('.keypad').getBoundingClientRect().top,
+    keys: [...document.querySelectorAll('.numpad .key')].map((e) => e.getBoundingClientRect().height),
+  }));
+  assert.ok(room.cards <= room.keypad, 'starter cards extend under the keypad');
+  assert.ok(room.keys.every((h) => h >= 42), 'number pad targets are shorter than 42 px');
+});
+
+await check('desktop combined probabilities keep their answer whole, beside the expression or under it', async (p) => {
+  await seed(p, ['normalcdf(-1,1)+normalcdf(-2,2)']);
+  const layout = () => p.evaluate(() => {
+    const rect = (s) => document.querySelector(s).getBoundingClientRect();
+    const src = rect('.src'), out = rect('.out'), left = rect('.left'), graph = rect('.graph-pane');
+    const beside = out.left >= src.right && out.top < src.bottom;
+    return { beside, whole: beside || (out.top >= src.top && out.right <= left.right + 0.5 && out.left >= left.left), left: left.width, graph: graph.width };
+  });
+  const initial = await layout();
+  assert.ok(initial.whole, 'combined probability answer is cut off or outside the notebook');
+  assert.ok(initial.graph > initial.left && initial.graph >= 280, 'graph lost its default majority');
+  for (const look of ['modern', 'retro']) {
+    await p.setViewportSize({ width: 1440, height: 900 });
+    await p.selectOption('select.look', look, { force: true });
+    for (const fraction of [0.25, 0.75]) {
+      const before = await layout();
+      const splitter = await p.locator('.splitter').boundingBox();
+      const grab = splitter.x + splitter.width * fraction;
+      await p.mouse.move(grab, splitter.y + 100);
+      await p.mouse.down();
+      await p.mouse.move(grab + 64, splitter.y + 100);
+      await p.mouse.up();
+      const dragged = await layout();
+      assert.ok(Math.abs(dragged.left - before.left - 64) < 2, `${look}: splitter did not follow pointer delta: ${before.left} to ${dragged.left}`);
+    }
+    const dragged = await layout();
+    await p.setViewportSize({ width: 1920, height: 1080 });
+    assert.ok(Math.abs((await layout()).left - dragged.left) < 2, `${look}: resizing loses the user splitter width`);
+    await p.locator('.splitter').dblclick();
+    const reset = await layout();
+    assert.ok(reset.graph > reset.left && (look !== 'modern' || reset.whole), `${look}: splitter reset loses useful notebook or graph space`);
+  }
+});
+
+for (const look of ['modern', 'retro']) {
+  await check(`desktop ${look} wraps long list inputs without clipping or splitting numbers`, async (p) => {
+    await p.selectOption('select.look', look, { force: true });
+    await seed(p, ['mean([12,18,24,30,36,42,48,54,60,66,72,78])', 'mean([12,18,24])', '']);
+    await p.evaluate(() => document.fonts.ready);
+    for (const width of [1280, 1366, 1440, 1920]) {
+      await p.setViewportSize({ width, height: 800 });
+      const rows = await p.locator('.row.typeset').evaluateAll((rows) => rows.map((row) => {
+        const tex = row.querySelector('.tex'), src = row.querySelector('.src').getBoundingClientRect();
+        const runs = [...tex.querySelectorAll('.m-run')].map((e) => {
+          const range = document.createRange(); range.selectNodeContents(e);
+          return [...range.getClientRects()].map((r) => ({ left: r.left, right: r.right, top: r.top }));
+        });
+        return { width: src.width, natural: parseFloat(row.querySelector('.src').style.getPropertyValue('--nat')), fits: runs.flat().every((r) => r.left >= src.left - 1 && r.right <= src.right + 1), lines: new Set(runs.flat().map((r) => r.top)).size, split: runs.some((r) => r.length !== 1), answer: row.querySelector('.val').textContent };
+      }));
+      assert.ok(rows[0].fits, `${look} ${width}: list inputs extend beyond the source column`);
+      assert.ok(!rows[0].split, `${look} ${width}: a number or name split across lines`);
+      assert.equal(rows[0].answer, '45');
+      if (rows[0].natural > rows[0].width + 1) assert.ok(rows[0].lines > 1, 'overlong list did not wrap');
+      else assert.equal(rows[0].lines, 1, 'list that fits wrapped unnecessarily');
+      assert.ok(rows[1].fits && !rows[1].split && rows[1].lines === 1, 'short list no longer fits on one line');
+    }
+  });
+}
+
+for (const look of ['modern', 'retro']) {
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    await check(`${look} released keys return to their row with motion ${reducedMotion}`, async (p) => {
+      await p.selectOption('select.look', look, { force: true });
+      await seed(p, ['']);
+      const keys = [p.locator('.key[aria-label="Math"]'), p.locator('.numpad .key[aria-label="7"]')];
+      const before = await Promise.all(keys.map((key) => key.boundingBox()));
+      await keys[0].click();
+      await p.locator('button[aria-label="Close Math"]').click();
+      await keys[1].click();
+      await p.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
+      for (const [i, key] of keys.entries()) {
+        const after = await key.boundingBox();
+        assert.ok(Math.abs(after.y - before[i].y) < 0.1, `${look}: released key ${i} stayed ${after.y - before[i].y}px below its row`);
+      }
+      assert.deepEqual(await texts(p), ['7']);
+    }, { reducedMotion });
+  }
+}
+
+// aria-expanded is script, the same in both looks.
+for (const look of ['modern']) {
+  await check(`${look} Modes button clears its open state when its menu closes`, async (p) => {
+    await p.selectOption('select.look', look, { force: true });
+    const trigger = p.locator('.desk-more'), menu = p.locator('.mode-menu');
+    await trigger.click();
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
+    assert.ok(await menu.isVisible());
+    await p.keyboard.press('Escape');
+    assert.ok(await menu.isHidden());
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false', `${look}: closed Modes still reports expanded`);
+    await trigger.click();
+    await p.locator('.appear-btn').click();
+    assert.ok(await menu.isHidden());
+    assert.equal(await trigger.getAttribute('aria-expanded'), 'false', `${look}: switching to Appearance leaves Modes expanded`);
+  });
+}
+
+for (const look of ['modern', 'retro']) {
+  await check(`${look} Appearance preview keeps every key legend complete`, async (p) => {
+    await p.selectOption('select.look', look, { force: true });
+    await p.locator('.appear-btn').click();
+    await p.evaluate(() => document.fonts.ready);
+    const legends = await p.locator('.appear-sample .key .kl').evaluateAll((labels) => labels.map((e) => {
+      const range = document.createRange(); range.selectNodeContents(e);
+      return { text: e.textContent, width: range.getBoundingClientRect().width, room: e.clientWidth };
+    }));
+    assert.deepEqual(legends.map((l) => l.text), ['7', '8', '9', '×', 'enter']);
+    for (const label of legends) assert.ok(label.width <= label.room + 1, `${look}: ${label.text} needs ${label.width}px but has ${label.room}px`);
+  });
+}
+
+for (const look of ['modern', 'retro']) {
+  await check(`${look} narrow desktop preserves graph space and contains its controls`, async (p) => {
+    await p.selectOption('select.look', look, { force: true });
+    await p.evaluate(() => document.fonts.ready);
+    const layout = () => p.evaluate(() => {
+      const main = document.querySelector('.main'), pane = document.querySelector('.graph-pane');
+      const graph = pane.getBoundingClientRect();
+      const list = document.querySelector('.list-tools');
+      const buttons = [...pane.querySelectorAll('.graph-tools button')].map((e) => {
+        const b = e.getBoundingClientRect();
+        return { name: e.getAttribute('aria-label'), left: b.left, right: b.right, bottom: b.bottom, width: b.width };
+      });
+      return { left: document.querySelector('.left').getBoundingClientRect().width, graph: graph.width,
+        min: parseFloat(getComputedStyle(main).getPropertyValue('--graph-min-w')), stored: parseFloat(main.style.getPropertyValue('--left')),
+        listFits: list.scrollWidth <= list.clientWidth + 1,
+        fits: buttons.every((b) => b.left >= graph.left - 1 && b.right <= graph.right + 1 && b.bottom <= graph.bottom + 1), buttons };
+    });
+    for (const theme of ['paper', 'contrastLight']) {
+      await p.emulateMedia({ colorScheme: 'light' });
+      await p.evaluate((theme) => window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme }), theme);
+      for (const width of [761, 780, 800, 900]) {
+        await p.setViewportSize({ width, height: 768 });
+        const before = await layout();
+        assert.ok(before.graph >= before.min - 0.5, `${look} ${theme} ${width}: graph ${before.graph}px is below ${before.min}px`);
+        assert.equal(before.buttons.length, 6);
+        assert.ok(before.listFits, `${look} ${theme} ${width}: notebook tools need horizontal scrolling`);
+        assert.ok(before.fits, `${look} ${theme} ${width}: graph controls escape their pane`);
+        const splitter = await p.locator('.splitter').boundingBox();
+        await p.mouse.move(splitter.x + splitter.width / 2, splitter.y + 100);
+        await p.mouse.down(); await p.mouse.move(width - 20, splitter.y + 100); await p.mouse.up();
+        const dragged = await layout();
+        assert.ok(Math.abs(dragged.left - dragged.stored) < 1, `${look}: stored splitter width differs from its visible width`);
+        assert.ok(dragged.graph >= dragged.min - 0.5 && dragged.fits, `${look}: dragging leaves insufficient graph space`);
+        await p.locator('.splitter').dblclick();
+      }
+    }
+    await seed(p, ['y=x^2-4']);
+    await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await p.mouse.move(10, 10);
+    await p.locator('.graph-host').focus();
+    await p.locator('.graph-host').hover();
+    await p.waitForFunction(() => document.querySelector('.marks-hint').classList.contains('show'));
+    const hintFits = await p.evaluate(() => document.querySelector('.marks-hint').getBoundingClientRect().bottom <= document.querySelector('.graph-host').getBoundingClientRect().bottom);
+    assert.ok(hintFits, `${look}: point keyboard hint covers controls outside the graph canvas`);
+  });
+}
+
+// Dismissing is script; only the longest menu, File, is sized differently enough by the looks to check in both.
+for (const look of ['modern', 'retro']) {
+  for (const [name, trigger, panel] of [
+    ['File', '.menu-btn', '.menu[role="menu"]'],
+    ...(look === 'modern' ? [['Appearance', '.appear-btn', '.appear-menu'], ['Modes', '.desk-more', '.mode-menu']] : []),
+  ]) {
+    await check(`${look} ${name} dismisses on resize and reopens inside the shorter window`, async (p) => {
+      await p.selectOption('select.look', look, { force: true });
+      await p.locator(trigger).click();
+      assert.ok(await p.locator(panel).isVisible());
+      await p.setViewportSize({ width: 761, height: 560 });
+      await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.ok(await p.locator(panel).isHidden(), `${look}: ${name} keeps stale placement after resize`);
+      assert.equal(await p.locator(trigger).getAttribute('aria-expanded'), 'false');
+      await p.locator(trigger).click();
+      const box = await p.locator(panel).boundingBox();
+      assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 762 && box.y + box.height <= 560, `${look}: reopened ${name} escapes the window`);
+      if (name === 'File') {
+        const last = p.locator(panel).getByRole('menuitem', { name: /Keyboard shortcuts/ });
+        await last.focus();
+        const item = await last.boundingBox();
+        assert.ok(item.y >= box.y && item.y + item.height <= box.y + box.height, `${look}: File's final action cannot scroll into view`);
+      }
+      await p.keyboard.press('Escape');
+      assert.ok(await p.locator(panel).isHidden());
+    });
+  }
+}
+
+for (const look of ['modern', 'retro']) {
+  await check(`${look} short desktop Math pages keep readable tiles and scroll the final action into view`, async (p) => {
+    await p.selectOption('select.look', look, { force: true });
+    for (const viewport of [{ width: 761, height: 560 }, { width: 1280, height: 600 }, { width: 1440, height: 900 }]) {
+      await p.setViewportSize(viewport);
+      await p.locator('.ti-tab[aria-label="Math"]').click();
+      await p.evaluate(() => document.fonts.ready.then(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null)))));
+      const sizes = await p.locator('.ti-tile').evaluateAll((tiles) => tiles.map((tile) => {
+        const rect = tile.getBoundingClientRect(), face = tile.querySelector('.ti-face');
+        const range = document.createRange(); range.selectNodeContents(face);
+        return { name: tile.getAttribute('aria-label'), height: rect.height, ink: range.getBoundingClientRect().height };
+      }));
+      for (const tile of sizes) {
+        assert.ok(tile.height >= 28, `${look} ${viewport.height}: ${tile.name} shrank to ${tile.height}px`);
+        assert.ok(tile.ink <= tile.height + 1, `${look}: formula is taller than its tile`);
+      }
+      const close = await p.locator('.ti-close').boundingBox(), page = await p.locator('.ti-page').boundingBox();
+      const last = p.locator('.ti-tile').last();
+      await last.focus();
+      const tile = await last.boundingBox(), grid = await p.locator('.ti-grid').boundingBox();
+      assert.ok(tile.y >= grid.y - 1 && tile.y + tile.height <= grid.y + grid.height + 1, `${look}: final Math tile cannot scroll into view`);
+      const after = await p.locator('.ti-close').boundingBox();
+      assert.ok(after.y === close.y && after.y >= page.y && after.y + after.height <= page.y + page.height, `${look}: scrolling hid the page header`);
+      await p.locator('.ti-close').click();
+      assert.ok(await p.locator('.ti-page').isHidden());
+    }
+  });
+}
+
+await browser.close();
+process.exitCode = failures ? 1 : 0;
