@@ -36,13 +36,13 @@ Tags are `v` plus the version in `package.json`: `v0.1.0-alpha.2`, `v0.1.0`. A p
    git push origin release v0.1.0-alpha.2
    ```
 
-3. **The release workflow** (`.github/workflows/release.yml`) runs on the tag. It builds the single-file web app and the Windows app and installer, and attaches them to a draft GitHub release.
+3. **The release workflow** (`.github/workflows/release.yml`) runs on the tag. It builds the single-file web app and attaches it to a draft GitHub release.
 4. **Publish the draft.** Paste the version's changelog section into the notes, check the attachments, and publish.
 
 ### Not in the release
 
-- **A signed Windows installer.** The installer is not code-signed yet, so Windows SmartScreen warns before running it.
-- **macOS and Linux apps.** The web app runs in any browser there; only Windows has a packaged app so far.
+- **The Windows app.** Releases are web-only for now. `npm run app:build` still builds the app and an unsigned installer from source, and Windows SmartScreen warns before running that installer.
+- **macOS and Linux apps.** The web app runs in any browser there.
 
 ## What CI runs
 
