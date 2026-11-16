@@ -4,6 +4,10 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.1.2-alpha] - 2026-11-16
+
+- slopculator.com's landing page is shorter: the name, a screenshot, and three short columns in place of six sections.
+
 ## [0.1.1-alpha] - 2026-11-15
 
 - On slopculator.com, the logo in the app's header goes back to the home page. Before, clicking the word Slopculator beside it opened Save.
@@ -41,6 +45,7 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.1.1-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.1.2-alpha...HEAD
+[0.1.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.1-alpha...v0.1.2-alpha
 [0.1.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/Ferro-5G/slopculator/releases/tag/v0.1.0-alpha

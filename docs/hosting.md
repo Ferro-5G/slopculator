@@ -54,7 +54,7 @@ The privacy policy promises no analytics and no scripts beyond the app. Each of 
 - Zaraz
 - On a custom domain's zone: Bot Fight Mode, Rocket Loader, Email Address Obfuscation, Client-side security, and any HTML minification or rewriting
 - Real User Measurements on a custom domain. Cloudflare injects its analytics script into free domains by default, and the domain doesn't show up in Web Analytics until you add it. Open Web Analytics, add the domain (it says "automatic setup"), then open Manage site, choose Disable, and click Update.
-- Network Error Logging, under the domain's Network settings. Pages still sends the `Nel` header on custom domains with that switch off, so `_headers` also tries to remove it, and the privacy policy discloses it.
+- Network Error Logging, under the domain's Network settings. Pages still sends the `Nel` header on custom domains with that switch off. `_headers` can't remove it, because Cloudflare adds it after the site's own headers, so the privacy policy discloses it.
 
 To check for injected scripts, fetch a page the way a browser does, since Cloudflare only injects into browser requests:
 

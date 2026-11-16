@@ -96,10 +96,6 @@ function siteHeaders(script: string): string {
     '  Cross-Origin-Opener-Policy: same-origin',
     '  Cross-Origin-Resource-Policy: same-origin',
     '  X-Frame-Options: DENY',
-    // Cloudflare's Network Error Logging. Pages sends it on custom domains even with the domain's switch off. The
-    // privacy policy discloses it in case these lines don't remove it.
-    '  ! Nel',
-    '  ! Report-To',
     '',
   ].join('\n');
 }

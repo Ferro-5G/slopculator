@@ -21,7 +21,6 @@
     <header class="nav">
       <div class="wrap">
         <a class="brand" href="./"><img src="{{logo}}" alt="" width="24" height="24" />Slopculator</a>
-        <a class="hide-narrow" href="#features">Features</a>
         <a class="hide-narrow" href="https://github.com/Ferro-5G/slopculator">GitHub</a>
         <a class="btn primary small" href="app">Open app</a>
       </div>
@@ -30,130 +29,35 @@
     <main>
       <section class="hero">
         <div class="wrap">
-          <h1>The calculator built for your keyboard.</h1>
-          <p class="lead">Type math the way it's written. Get exact answers, statistics, matrices, calculus, graphs and HVAC in one page that runs in your browser and collects nothing.</p>
-          <div class="cta">
-            <a class="btn primary" href="app">Open Slopculator</a>
-            <a class="btn" href="https://github.com/Ferro-5G/slopculator">View the code on GitHub</a>
+          <div class="pitch">
+            <h1>Slopculator</h1>
+            <p class="lead">A calculator and grapher you type into. It runs in your browser and collects nothing.</p>
+            <div class="cta">
+              <a class="btn primary" href="app">Open Slopculator</a>
+              <a class="btn" href="https://github.com/Ferro-5G/slopculator">Source on GitHub</a>
+            </div>
+            <p class="fine">Free and MIT licensed · {{version}}</p>
           </div>
-          <p class="fine">Free and MIT licensed · {{version}}</p>
-          <img class="shot desktop" src="{{desktop}}" width="1440" height="900" alt="Slopculator on a desktop: a sheet of seven lines with a slider, two curves, a normal probability and a matrix determinant, beside a graph of the curves with their zeros and crossings marked." />
-          <img class="shot phone" src="{{phone}}" width="390" height="844" alt="Slopculator on a phone: the same lines above a calculator keypad." />
-        </div>
-      </section>
-
-      <section class="band">
-        <div class="wrap split">
-          <div>
-            <h2>Write it the way it's written.</h2>
-            <p class="sub"><code>2x</code>, <code>3(4 + 5)</code>, <code>sin 30</code>, <code>√16</code>, <code>|x|</code>, <code>5!</code> and <code>x²</code> all mean what they look like. Missing brackets get filled in, and a line that might not say what you meant, like <code>-3^2</code>, gets a one-click rewrite.</p>
-            <ul class="checks">
-              <li>Exact mode keeps fractions as fractions and shows only proven digits</li>
-              <li>Whole numbers keep every digit, so <code>25!</code> isn't rounded</li>
-              <li>Ctrl+K finds any of 258 functions by name or by what it does</li>
-            </ul>
-          </div>
-          <div class="sheet" aria-label="Lines typed into Slopculator with exact mode on, and their answers">
-            <div class="bar" aria-hidden="true"><span></span><span></span><span></span></div>
-            <ol>
-              <li><code>0.1 + 0.2</code><b>3/10</b></li>
-              <li><code>sin(30°)</code><b>1/2</b></li>
-              <li><code>2^64</code><b>18446744073709551616</b></li>
-              <li><code>normalcdf(-1, 1)</code><b>0.682689492137</b></li>
-              <li><code>integral(x^2, x, 0, 3)</code><b>9</b></li>
-              <li><code>solve(x^2 = 2, x, 1)</code><b>1.41421356237</b></li>
-              <li><code>10% of 50</code><b>5</b></li>
-            </ol>
+          <div class="shots">
+            <img class="shot desktop" src="{{desktop}}" width="1440" height="900" alt="Slopculator on a desktop: a sheet of seven lines with a slider, two curves, a normal probability and a matrix determinant, beside a graph of the curves with their zeros and crossings marked." />
+            <img class="shot phone" src="{{phone}}" width="390" height="844" alt="Slopculator on a phone: the same lines above a calculator keypad." />
           </div>
         </div>
       </section>
 
-      <section class="band" id="features">
+      <section class="facts">
         <div class="wrap">
-          <h2>One page for a whole course.</h2>
-          <p class="sub">From an algebra worksheet to a stats lab to a duct sizing job. Every function is listed in the <a href="https://github.com/Ferro-5G/slopculator/blob/main/docs/functions.md">function reference</a>.</p>
-          <div class="grid">
-            <article>
-              <h3>Lines that share</h3>
-              <p><code>a = 3</code> gets a slider. <code>f(x) = x^2</code> can be called and is graphed. <code>ans</code> is the line above, and line letters refer to earlier answers.</p>
-            </article>
-            <article>
-              <h3>Graphs</h3>
-              <p><code>y = …</code>, <code>x = …</code>, implicit curves, inequalities, points, piecewise and domains. Hover to trace. Zeros, highs, lows and crossings are marked.</p>
-            </article>
-            <article>
-              <h3>Statistics</h3>
-              <p>Normal, binomial, t, χ², F, Poisson and geometric distributions, regressions, and a normal curve with its probability shaded.</p>
-            </article>
-            <article>
-              <h3>Matrices and calculus</h3>
-              <p>Matrices and vectors, derivatives, integrals, sums and <code>solve</code>, plus number theory, geometry, finance, units and bases.</p>
-            </article>
-            <article>
-              <h3>HVAC</h3>
-              <p>Psychrometrics with altitude, loads and coils, 20 refrigerants, ducts, fans, pumps and pipes, checked against PsychroLib and CoolProp.</p>
-            </article>
-            <article>
-              <h3>Keyboard first</h3>
-              <p>Every control works without a mouse and has a label for screen readers. Two looks, Modern and Retro, in light, dark, OLED black and high contrast.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="band">
-        <div class="wrap split">
           <div>
-            <h2>Nothing leaves your browser.</h2>
-            <p class="sub">No account, no analytics, no ads, no cookies. Your sheets and history stay in your browser's storage, and the page makes no network requests once it has loaded.</p>
-            <ul class="checks">
-              <li>Works offline, and opens full screen from a phone's home screen</li>
-              <li>Download it as one HTML file that runs anywhere</li>
-              <li>Read the <a href="privacy">privacy policy</a>. It's short.</li>
-            </ul>
+            <p>In exact mode, <code>0.1 + 0.2</code> is <code>3/10</code>, and <code>25!</code> keeps all 26 digits.</p>
+            <p><code>2x</code>, <code>3(4 + 5)</code>, <code>sin 30</code> and <code>√16</code> mean what they look like, and missing brackets get filled in. Ctrl+K finds any function by name or by what it does.</p>
           </div>
-          <div class="platforms two">
-            <div class="platform live">
-              <h3>Web</h3>
-              <p><a href="app">Open it now</a></p>
-            </div>
-            <div class="platform live">
-              <h3>Single file</h3>
-              <p><a href="https://github.com/Ferro-5G/slopculator/releases/latest">Download</a></p>
-            </div>
-            <div class="platform live">
-              <h3>On your phone</h3>
-              <p><a href="app">Add it to your home screen</a></p>
-            </div>
-            <div class="platform live">
-              <h3>Source code</h3>
-              <p><a href="https://github.com/Ferro-5G/slopculator">On GitHub</a></p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="band">
-        <div class="wrap split">
           <div>
-            <h2>Open source, top to bottom.</h2>
-            <p class="sub">The engine, the app and the tests are on GitHub under the MIT license. Read it, fork it, or send a fix.</p>
-            <a class="btn" href="https://github.com/Ferro-5G/slopculator">Browse the source</a>
+            <p>Graphs, statistics, matrices and calculus on one sheet.</p>
+            <p>Normal, binomial, t, χ² and F distributions, regressions, derivatives, integrals and <code>solve</code>. For HVAC, psychrometrics, 20 refrigerants, ducts and pipes. Every function is in the <a href="https://github.com/Ferro-5G/slopculator/blob/main/docs/functions.md">reference</a>.</p>
           </div>
-          <pre class="term"><span class="p">$ </span>git clone https://github.com/Ferro-5G/slopculator
-<span class="p">$ </span>cd slopculator
-<span class="p">$ </span>npm install
-<span class="p">$ </span>npm run dev</pre>
-        </div>
-      </section>
-
-      <section class="band closing">
-        <div class="wrap">
-          <h2>Your homework deserves a better calculator.</h2>
-          <p class="sub">Slopculator is free, open source and fast. Open it and start typing.</p>
-          <div class="cta">
-            <a class="btn primary" href="app">Open Slopculator</a>
-            <a class="btn" href="https://github.com/Ferro-5G/slopculator/releases/latest">Download the file</a>
+          <div>
+            <p>No account, analytics, ads or cookies.</p>
+            <p>Sheets stay in your browser, and the app works offline. You can <a href="https://github.com/Ferro-5G/slopculator/releases/latest">download it as one HTML file</a>. The source is on <a href="https://github.com/Ferro-5G/slopculator">GitHub</a> under the MIT license. Read the <a href="privacy">privacy policy</a>.</p>
           </div>
         </div>
       </section>
