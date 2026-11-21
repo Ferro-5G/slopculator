@@ -1,10 +1,10 @@
-import { charge, chargeWork, fail, failEdge, failLazy, warningNote } from './errors';
+import { charge, chargeWork, divisionByZeroText, fail, failEdge, failLazy, logDomainText, notRealText, warningNote } from './errors';
 import { TRIG, type Node } from './parser';
 import { children, lettersOf } from './ast';
 import type { Env, Fn } from './evaluator';
 import type { Builtin, Compile } from './builtin-types';
 import { coordsOf, mat, numberFn, one, points2D } from './args';
-import { exactForm } from './format';
+import { exactForm, formatNumber } from './format';
 import {
   type Value, num, nums, list, point, vector, matrix, record, complex, complexSqrt, mapNum, typeName,
   determinant, matInverse, identity, matMulTidy, tidy, arith, pos, prob, whole, weightedTotal, PIVOT_TOL,
@@ -15,6 +15,7 @@ import {
 } from './numeric';
 import { registerMore } from './more';
 import { registerHvac } from './hvac';
+import { registerCompat } from './compat';
 
 export const CONSTANTS: Record<string, Value> = Object.assign(Object.create(null) as Record<string, Value>, {
   π: Math.PI,
@@ -44,17 +45,19 @@ function snapTrig(r: number): number {
 function sqrtNum(v: number, env: Env): Value {
   if (v < 0) {
     if (env.settings.complex) return complexSqrt(v);
-    failEdge(() => `√ of a negative number (${v}) isn't real. Turn on Complex mode to get i`);
+    failEdge(() => notRealText('√', v, true));
   }
   return Math.sqrt(v);
 }
+function sqrtValue(v: Value, env: Env): Value {
+  if (isNum(v)) return sqrtNum(v, env);
+  if (v.t === 'complex') return arith('^', v, 0.5);
+  // In Complex mode a list's items each take their own root, which may be complex: sqrt({-1, -4}) is {i, 2i}.
+  if (v.t === 'list' && env.settings.complex) return list(v.items.map((x) => sqrtValue(x, env)));
+  return mapNum(v, (x) => { if (x < 0) failLazy(() => notRealText('√', x)); return Math.sqrt(x); }, '√');
+}
 def('sqrt', {
-  min: 1, max: 1, fast1: sqrtNum, fn: (a, env) => {
-    const v = a[0];
-    if (isNum(v)) return sqrtNum(v, env);
-    if (v.t === 'complex') return arith('^', v, 0.5);
-    return mapNum(v, (x) => { if (x < 0) failLazy(() => `√ of a negative number (${x}) isn't real`); return Math.sqrt(x); }, '√');
-  },
+  min: 1, max: 1, fast1: sqrtNum, fn: (a, env) => sqrtValue(a[0], env),
 });
 def('cbrt', one(Math.cbrt, '∛'));
 def(['nthroot', 'root'], {
@@ -62,9 +65,10 @@ def(['nthroot', 'root'], {
     const n = num(a[1], 'Root index');
     return mapNum(a[0], (x) => {
       if (n === 0) fail('The 0th root is undefined');
+      if (x === 0 && n < 0) failEdge(divisionByZeroText(' (0 to a negative power)'));
       if (x < 0) {
         if (Number.isInteger(n) && Math.abs(n) % 2 === 1) return -Math.pow(-x, 1 / n);
-        failLazy(() => `Even root of a negative number (${x}) isn't real`);
+        failLazy(() => notRealText('Even root', x));
       }
       return Math.pow(x, 1 / n);
     }, 'nthroot');
@@ -98,19 +102,19 @@ def('mod', {
 });
 def('exp', one(Math.exp, 'exp'));
 def('ln', one((x) => {
-  if (x <= 0) failEdge(() => `ln is only defined for positive numbers, got ${x}`);
+  if (x <= 0) failEdge(() => logDomainText('ln', x));
   return Math.log(x);
 }, 'ln'));
 def('log', {
   min: 1, max: 2, usage: 'log(x), log(b, x), or log_b(x)', fn: (a) => {
     if (a.length === 1) return mapNum(a[0], (x) => {
-      if (x <= 0) failEdge(() => `log is only defined for positive numbers, got ${x}`);
+      if (x <= 0) failEdge(() => logDomainText('log', x));
       return tidy(Math.log10(x));
     }, 'log');
     const b = num(a[0], 'Log base');
     if (b <= 0 || b === 1) fail(`Log base must be positive and not 1, got ${b}`);
     return mapNum(a[1], (x) => {
-      if (x <= 0) failEdge(() => `log is only defined for positive numbers, got ${x}`);
+      if (x <= 0) failEdge(() => logDomainText('log', x));
       return tidy(Math.log(x) / Math.log(b));
     }, 'log');
   },
@@ -118,12 +122,14 @@ def('log', {
 def('gcd', {
   min: 1, max: Infinity, fn: (a) => {
     const xs = a.flatMap((v) => nums(v)).map((x) => Math.abs(whole(x, 'gcd input')));
+    if (xs.length === 0) fail('gcd needs at least one number');
     return xs.reduce((p, q) => gcdOf(p, q));
   },
 });
 def('lcm', {
   min: 1, max: Infinity, fn: (a) => {
     const xs = a.flatMap((v) => nums(v)).map((x) => Math.abs(whole(x, 'lcm input')));
+    if (xs.length === 0) fail('lcm needs at least one number');
     return xs.reduce((p, q) => (p === 0 || q === 0 ? 0 : (p / gcdOf(p, q)) * q));
   },
 });
@@ -176,6 +182,15 @@ function quartileSplit(xs: number[]): { q1: number; q3: number; iqr: number } {
   const q1 = lower.length ? median(lower) : xs[0];
   const q3 = upper.length ? median(upper) : xs[n - 1];
   return { q1, q3, iqr: tidy(q3 - q1, Math.max(Math.abs(q1), Math.abs(q3))) };
+}
+
+/** A list summed up the way mean, stdev, median and quartiles work it out: what a stats block shows. */
+export interface ListSummary { n: number; mean: number; s: number | null; median: number; q1: number; q3: number; min: number; max: number }
+export function listSummary(xs: readonly number[]): ListSummary {
+  if (!xs.length) fail('A summary needs at least one number');
+  const v = sorted(xs.slice());
+  const { q1, q3 } = quartileSplit(v);
+  return { n: v.length, mean: mean(xs as number[]), s: v.length > 1 ? tidy(Math.sqrt(variance(v, true))) : null, median: median(v), q1, q3, min: v[0], max: v[v.length - 1] };
 }
 
 def(['mean', 'avg', 'average'], { min: 1, max: Infinity, fn: (a) => mean(data(a, 'mean')) });
@@ -233,8 +248,8 @@ def('stats', {
     return record('Summary', [
       { label: 'n', value: xs.length },
       { label: 'mean', value: mean(xs) },
-      { label: 'σ (population)', value: tidy(Math.sqrt(variance(xs, false))) },
-      ...(xs.length > 1 ? [{ label: 's (sample)', value: tidy(Math.sqrt(variance(xs, true))) }] : []),
+      { label: 'σ (population)', value: tidy(Math.sqrt(variance(xs, false))), key: 'σ' },
+      ...(xs.length > 1 ? [{ label: 's (sample)', value: tidy(Math.sqrt(variance(xs, true))), key: 's' }] : []),
       { label: 'Σx', value: tidySum(xs) },
     ]);
   },
@@ -257,7 +272,7 @@ def('quartiles', {
     const { q1, q3, iqr } = quartileSplit(xs);
     return record('Quartiles', [
       { label: 'Q1', value: q1 },
-      { label: 'Q2 (median)', value: median(xs) },
+      { label: 'Q2 (median)', value: median(xs), key: 'Q2' },
       { label: 'Q3', value: q3 },
       { label: 'IQR', value: iqr },
     ]);
@@ -311,7 +326,7 @@ def('cumsum', {
 });
 def(['dedupe', 'unique'], {
   min: 1, max: 1, usage: 'dedupe(list): drop repeats, keeping the first of each', fn: (a) => {
-    const v = a[0];
+    const v = typeof a[0] === 'object' && a[0].t === 'vector' ? list(a[0].c) : a[0];
     if (typeof v !== 'object' || v.t !== 'list') return fail(`dedupe needs a list like {1, 2, 2}, got a ${typeName(v)}`);
     const seen = new Set<string>();
     return list(v.items.filter((x) => {
@@ -358,7 +373,9 @@ def('normbetween', { min: 2, max: 4, prob: true, usage: 'normbetween(a, b, μ, �
 def('normoutside', {
   min: 2, max: 4, prob: true, usage: 'normoutside(a, b, μ, σ) = P(X < a or X > b)', fn: (a) => {
     const [m, s] = normArgs(a, 2);
-    const lo = (num(a[0], 'a') - m) / s, hi = (num(a[1], 'b') - m) / s;
+    const x0 = num(a[0], 'a'), x1 = num(a[1], 'b');
+    if (x0 > x1) fail(`Lower bound ${x0} is above upper bound ${x1}`);
+    const lo = (x0 - m) / s, hi = (x1 - m) / s;
     return normCdf(lo) + normCdf(-hi);
   },
 });
@@ -759,6 +776,95 @@ def('integral', {
   },
 });
 
+/**
+ * A function named by its first input, as a function of one number: f for f(x) = …, or a one-input built-in like sin.
+ * tangent and riemann take it this way, as Desmos's own calls do: tangent(f, 2), never tangent(f(x), 2).
+ */
+export function namedFunction(arg: Node, fn: string, locals: string[], env: Env, compile: Compile): Fn {
+  const like = `${fn}(f, ${fn === 'tangent' ? '2' : '0, 2, 4'}) for f(x) = x^2`;
+  if (arg.k !== 'id') fail(`${fn} takes a function's name first, like ${like}`);
+  const name = arg.name;
+  const b = B[name];
+  if (!env.hasFunc(name) && !(b && b.min <= 1 && b.max >= 1 && !b.lazy)) fail(`${name} isn't a function. Define it first, like ${like}`);
+  return compile({ k: 'call', name, args: [{ k: 'id', name: 'x', pos: 0 }], pos: 0 }, [...locals, 'x']);
+}
+
+/** How a line is written as text: y = 2.07x − 4.394, y = 3, y = −x. */
+function lineText(m: number, b: number): string {
+  const n = (v: number) => formatNumber(v, { places: null, exact: false, percent: false }).replace(/^-/, '−');
+  const slope = m === 0 ? '' : m === 1 ? 'x' : m === -1 ? '−x' : `${n(m)}x`;
+  if (!slope) return `y = ${n(b)}`;
+  return b === 0 ? `y = ${slope}` : `y = ${slope} ${b < 0 ? '−' : '+'} ${n(Math.abs(b))}`;
+}
+
+def('tangent', {
+  min: 2, max: 2, usage: 'tangent(f, p): the line touching f at x = p, with slope f′(p)',
+  lazy: (args, locals, env, compile) => {
+    const body = namedFunction(args[0], 'tangent', locals, env, compile);
+    const at = compile(args[1], locals);
+    const name = (args[0] as { name: string }).name;
+    return (s) => {
+      const F = numberFn(body, s), p = num(at(s), 'The point');
+      const y = F(p);
+      if (!Number.isFinite(y)) fail(`${name} isn't defined at x = ${p}`);
+      const { value, err } = ridders(F, p, 1);
+      if (!Number.isFinite(value) || err > 1e-6 * Math.max(1, Math.abs(value)))
+        fail(`The slope of ${name} at x = ${p} doesn't settle. It may have a corner, cusp, jump, or vertical tangent there`);
+      // A corner like |x| at 0 has matching central differences but different one-sided slopes.
+      const gap = (h: number) => Math.abs((F(p + h) - y) / h - (y - F(p - h)) / h), dh = 1e-5 * Math.max(1, Math.abs(p));
+      const g1 = gap(dh);
+      if (g1 > 1e-4 * Math.max(1, Math.abs(value), Math.abs(y)) && gap(dh / 10) > 0.5 * g1)
+        fail(`The slope of ${name} from the left and right differ at x = ${p}, so it has no tangent there (a corner)`);
+      const m = tidy(value, Math.abs(y) + err * 1e14);
+      const b = tidy(y - m * p, Math.abs(y) + Math.abs(m * p));
+      return record(lineText(m, b), [
+        { label: `slope ${name}′(p)`, value: m },
+        { label: 'point', value: point([p, y]) },
+        { label: 'y-intercept', value: b },
+      ]);
+    };
+  },
+});
+
+/** Where in each strip a Riemann sum samples: its left end, its middle, or its right end. */
+export const RIEMANN_RULES = { left: 0, mid: 0.5, right: 1 } as const;
+export type RiemannRule = keyof typeof RIEMANN_RULES;
+const RULE_NAMES: Record<string, RiemannRule> = { left: 'left', mid: 'mid', middle: 'mid', midpoint: 'mid', right: 'right' };
+/** The rule a riemann call's fifth input names, or null when it names none. */
+export const riemannRule = (s: string): RiemannRule | null => RULE_NAMES[s.trim().toLowerCase()] ?? null;
+
+def('riemann', {
+  min: 4, max: 5, usage: 'riemann(f, a, b, n), or with "left", "right" or "mid" (the default) last',
+  lazy: (args, locals, env, compile) => {
+    const body = namedFunction(args[0], 'riemann', locals, env, compile);
+    const [lo, hi, count] = args.slice(1, 4).map((a) => compile(a, locals));
+    const how = args[4] ? compile(args[4], locals) : null;
+    const name = (args[0] as { name: string }).name;
+    return (s) => {
+      const F = numberFn(body, s), a = num(lo(s), 'Lower bound'), b = num(hi(s), 'Upper bound');
+      const n = whole(num(count(s), 'The number of strips'), 'The number of strips');
+      if (n < 1) fail('The number of strips must be at least 1');
+      if (n > 1e6) fail('That is more than a million strips');
+      let rule: RiemannRule = 'mid';
+      if (how) {
+        const v = how(s);
+        const r = typeof v === 'object' && v.t === 'text' ? riemannRule(v.s) : null;
+        if (!r) fail('The last input of riemann is "left", "right" or "mid"');
+        rule = r;
+      }
+      const h = (b - a) / n, off = RIEMANN_RULES[rule];
+      let sum = 0, big = 0;
+      for (let k = 0; k < n; k++) {
+        const x = a + (k + off) * h, y = F(x);
+        if (!Number.isFinite(y)) fail(`${name} isn't defined at x = ${x}`);
+        sum += y;
+        big = Math.max(big, Math.abs(y));
+      }
+      return tidy(sum * h, big * Math.abs(b - a));
+    };
+  },
+});
+
 function seriesArgs(args: Node[], locals: string[], compile: Compile, fn: string) {
   if (args.length !== 4) fail(`${fn} takes (list) or (expression, n, start, end)`);
   const v = boundVar(args, 'n');
@@ -782,12 +888,19 @@ function seriesLoop(s: Value[], body: Fn, from: Fn, to: Fn, each: (v: Value) => 
   }
 }
 
+/** sum(1, 2, 3): numbers to add, not a series. A series names its variable second. */
+const plainTerms = (args: Node[]): boolean => args.length !== 4 || args[1].k !== 'id';
+
 def(['sum', 'Σ'], {
-  min: 1, max: 4, binds: true, usage: 'sum(list) or sum(expression, n, start, end)',
+  min: 1, max: Infinity, binds: true, usage: 'sum(list) or sum(expression, n, start, end)',
   lazy: (args, locals, _env, compile) => {
     if (args.length === 1) {
       const a = compile(args[0], locals);
       return (s) => tidySum(nums(a(s)));
+    }
+    if (plainTerms(args)) {
+      const terms = args.map((a) => compile(a, locals));
+      return (s) => tidySum(terms.flatMap((t) => nums(t(s))));
     }
     const { body, from, to } = seriesArgs(args, locals, compile, 'sum');
     return (s) => {
@@ -801,11 +914,15 @@ def(['sum', 'Σ'], {
   },
 });
 def(['prod', 'Π'], {
-  min: 1, max: 4, binds: true, usage: 'prod(list) or prod(expression, n, start, end)',
+  min: 1, max: Infinity, binds: true, usage: 'prod(list) or prod(expression, n, start, end)',
   lazy: (args, locals, _env, compile) => {
     if (args.length === 1) {
       const a = compile(args[0], locals);
       return (s) => nums(a(s)).reduce((p, q) => p * q, 1);
+    }
+    if (plainTerms(args)) {
+      const terms = args.map((a) => compile(a, locals));
+      return (s) => terms.flatMap((t) => nums(t(s))).reduce((p, q) => p * q, 1);
     }
     const { body, from, to } = seriesArgs(args, locals, compile, 'prod');
     return (s) => {
@@ -935,8 +1052,11 @@ def('angle', {
     if (u.length !== v.length) fail(`angle needs two vectors of the same size, got ${u.length} and ${v.length} entries`);
     const nu = hypotOf(u), nv = hypotOf(v);
     if (nu === 0 || nv === 0) fail('A zero vector has no direction, so it makes no angle');
-    const d = u.reduce((s, x, k) => s + x * v[k], 0) / (nu * nv);
-    return tidy(env.fromRad(Math.acos(Math.max(-1, Math.min(1, d)))));
+    // Kahan's 2·atan2(|û − v̂|, |û + v̂|) on the unit vectors: u·v of [1e200, 0] with itself overflows, and acos loses
+    // small angles to rounding.
+    const hu = u.map((x) => x / nu), hv = v.map((x) => x / nv);
+    const r = 2 * Math.atan2(hypotOf(hu.map((x, k) => x - hv[k])), hypotOf(hu.map((x, k) => x + hv[k])));
+    return tidy(env.fromRad(r));
   },
 });
 
@@ -986,20 +1106,21 @@ def('sec', trig((r) => 1 / Math.cos(r), 'sec', cosZero));
 def('csc', trig((r) => 1 / Math.sin(r), 'csc', sinZero));
 def('cot', trig((r) => Math.cos(r) / Math.sin(r), 'cot', sinZero));
 
-function invTrig(f: (x: number) => number, name: string, range: [string, string], domain?: (x: number) => boolean): Builtin {
+function invTrig(f: (x: number) => number, name: string, range: [string, string], domain?: (x: number) => boolean, needs = 'between −1 and 1'): Builtin {
   return one((x, env) => {
-    if (domain && !domain(x)) failLazy(() => `${name}(${x}) is undefined: input must be between −1 and 1`);
+    if (domain && !domain(x)) failLazy(() => `${name}(${x}) is undefined: input must be ${needs}`);
     env.note(`${name} gives angles in ${env.settings.deg ? range[0] : range[1]}`);
     return tidy(env.fromRad(f(x)));
   }, name);
 }
 const unitDomain = (x: number) => x >= -1 && x <= 1;
 const outsideDomain = (x: number) => x <= -1 || x >= 1;
+const OUTSIDE_TEXT = '−1 or less, or 1 or more';
 def(['asin', 'arcsin'], invTrig(Math.asin, 'asin', ['[−90°, 90°]', '[−π/2, π/2]'], unitDomain));
 def(['acos', 'arccos'], invTrig(Math.acos, 'acos', ['[0°, 180°]', '[0, π]'], unitDomain));
 def(['atan', 'arctan'], invTrig(Math.atan, 'atan', ['(−90°, 90°)', '(−π/2, π/2)']));
-def('acsc', invTrig((x) => Math.asin(1 / x), 'acsc', ['[−90°, 90°], not 0', '[−π/2, π/2], not 0'], outsideDomain));
-def('asec', invTrig((x) => Math.acos(1 / x), 'asec', ['[0°, 180°], not 90°', '[0, π], not π/2'], outsideDomain));
+def('acsc', invTrig((x) => Math.asin(1 / x), 'acsc', ['[−90°, 90°], not 0', '[−π/2, π/2], not 0'], outsideDomain, OUTSIDE_TEXT));
+def('asec', invTrig((x) => Math.acos(1 / x), 'asec', ['[0°, 180°], not 90°', '[0, π], not π/2'], outsideDomain, OUTSIDE_TEXT));
 def('acot', invTrig((x) => (x === 0 ? Math.PI / 2 : Math.atan(1 / x) + (x < 0 ? Math.PI : 0)), 'acot', ['(0°, 180°)', '(0, π)']));
 def('atan2', {
   min: 2, max: 2, usage: 'atan2(y, x)', fn: (a, env) => {
@@ -1104,6 +1225,7 @@ def('unitcircle', {
 
 registerMore(def);
 registerHvac(def);
+registerCompat(def, B);
 
 export const BUILTINS = B;
 

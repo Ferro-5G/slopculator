@@ -84,7 +84,6 @@ function sharedVars(p: Palette): Record<string, string> {
 /** Where the web's colors differ from the phones' today, value by value. Delete an entry and the web takes the phones' color. */
 const WEB_DIFFERS: Record<string, Record<string, string>> = {
   'modern/paper': { '--graph-grid-major': '#c4c4ca' },
-  'modern/ink': { '--graph-grid-major': '#34343c' },
   'modern/contrast': { '--warn': '#ffd400', '--curve-1': '#ffd400', '--curve-2': '#00e1ff', '--curve-3': '#7dff4f', '--curve-4': '#ff6bd6', '--curve-5': '#ff9f1c', '--curve-6': '#b39dff', '--curve-7': '#ff5c5c', '--curve-8': '#ffffff' },
   'modern/paper/pride': { '--accent-soft': '#f3e8f8', '--active-fill': '#f2f3f6', '--key-fn': '#ffffff', '--key-act': '#d6f5e3', '--key-op': '#f5ebf9', '--hero-fill': 'linear-gradient(100deg, var(--rainbow))', '--hero-glow': '#2563eb' },
   'modern/ink/pride': { '--active-fill': '#1f1f23', '--hero-fill': 'linear-gradient(100deg, var(--rainbow))', '--hero-glow': '#2563eb' },

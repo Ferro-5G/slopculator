@@ -267,6 +267,28 @@ export function binomRange(n: number, p: number, a: number, b: number): number {
   return Math.min(1, s);
 }
 
+/**
+ * Smallest whole k in [0, n] with P(X ≤ k) ≥ q for X ~ Binomial(n, p). Binary searches using the regularized
+ * incomplete beta function (P(X > k) = I_p(k + 1, n − k)), comparing the smaller tail with a relative slack so q near
+ * 0 or 1 isn't swallowed by rounding and huge n like 10^12 finish in a few dozen evaluations.
+ */
+export function binomQuantile(n: number, p: number, q: number): number {
+  checkBinomial(n, p);
+  if (!(q >= 0 && q <= 1)) fail(`Probability must be between 0 and 1, got ${q}`);
+  if (n === 0 || p === 0 || q === 0) return 0;
+  if (p === 1 || q === 1) return n;
+  const upper = q > 0.5;
+  const target = upper ? (1 - q) * (1 + 1e-13) : q * (1 - 1e-13);
+  let lo = 0, hi = n;
+  while (lo < hi) {
+    const mid = lo + Math.floor((hi - lo) / 2);
+    const [gt, le] = betaRegPair(mid + 1, n - mid, p, 1 - p);
+    if (upper ? gt <= target : le >= target) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
 // Lanczos approximation, g = 7, n = 9: about 15 significant digits for Γ.
 const LANCZOS_G = 7;
 const LANCZOS = [

@@ -94,9 +94,17 @@ export function autosaveSheet(notify = true): boolean {
 export function rowIndex(id: string): number {
   return doc.rows.findIndex((r) => r.id === id);
 }
+/**
+ * The rows as the sheet is worked out from them: the composer can stand a line it's about to change in for the one on
+ * the sheet (typing r = 6 while r = 4 is there previews the change), so the sheet never reads r as defined twice.
+ */
+let evalRows: (rows: typeof doc.rows) => typeof doc.rows = (rows) => rows;
+export function setEvalRows(fn: typeof evalRows): void {
+  evalRows = fn;
+}
 /** Results as of this moment: a keystroke's recompute waits for the next frame, and Enter can arrive first. */
 export function currentResults(): RowResult[] {
-  if (scheduled) results = evaluateDocument(doc.rows, doc.settings);
+  if (scheduled) results = evaluateDocument(evalRows(doc.rows), doc.settings);
   return results;
 }
 let scheduled = false;
@@ -105,7 +113,7 @@ export function recompute(): void {
   scheduled = true;
   requestAnimationFrame(() => {
     scheduled = false;
-    results = evaluateDocument(doc.rows, doc.settings);
+    results = evaluateDocument(evalRows(doc.rows), doc.settings);
     screen.renderResults();
   });
 }

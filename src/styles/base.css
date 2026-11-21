@@ -806,53 +806,10 @@ dialog table th {
   transform: translate(-50%, 0);
 }
 
-.toast.at-top {
-  transform: translate(-50%, -8px);
-}
-
-.toast.at-top.show {
-  transform: translate(-50%, 0);
-}
-
 .toast.actionable {
   display: flex;
   align-items: center;
   gap: 14px;
-}
-
-/* In the strip under the desktop's keys: the strip's own box, its message on one line, Undo at the right. */
-.toast.in-foot,
-.toast.in-foot.show {
-  transform: none;
-}
-
-.toast.in-foot {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
-  border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--rule-2);
-  backdrop-filter: none;
-  transition: opacity 0.16s;
-}
-
-.toast.in-foot > span {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.toast.in-foot > button {
-  flex: none;
-}
-
-/* Key help waits under a message instead of showing through it. */
-.keypad.has-toast .key-hint {
-  visibility: hidden;
 }
 
 /* Only while it shows: a hidden Undo mustn't catch a tap meant for what's under it. */

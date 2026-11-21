@@ -7,7 +7,7 @@ A keyboard-first calculator and grapher. Type expressions one per line, read eac
 
 ![Slopculator in the Modern look: a sheet of lines on the left, the graph on the right](docs/images/modern.png)
 
-It was built for Algebra 2 homework (Acellus units 7 to 13) and grew past it: exact arithmetic, statistics and distributions, matrices, calculus, regressions, unit conversion, and HVAC engineering. 258 functions in all.
+It was built for Algebra 2 homework (Acellus units 7 to 13) and grew past it: exact arithmetic, statistics and distributions, matrices, calculus, regressions, unit conversion, and HVAC engineering. 296 functions in all.
 
 ## Quick start
 

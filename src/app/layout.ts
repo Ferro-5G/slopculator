@@ -1,16 +1,22 @@
-import { narrow } from './platform';
 import { Graph } from './graph';
 import { h } from './dom';
 
+// The canvas sheet: the top bar, then one stage that holds the canvas (the tape, whose list is the canvas's world on a
+// wide window and a column on a narrow one), the composer docked at its foot, and the keypad. The graph is a block on
+// the canvas (src/app/canvas.ts puts graphPane there); the splitter and the phone's Calculate | Graph switch are gone.
 export const app = document.getElementById('app')!;
+app.classList.add('canvas-ui');
 export const modeBar = h('header', { class: 'modebar' });
 export const listEl = h('div', { class: 'rows', role: 'list', 'data-scroll': 'rest' });
 export const listTools = h('div', { class: 'list-tools' });
 export const coverTop = h('div', { class: 'edge-cover top', 'aria-hidden': 'true' });
 export const coverBottom = h('div', { class: 'edge-cover bottom', 'aria-hidden': 'true' });
 export const keypadEl = h('section', { class: 'keypad', id: 'keypad' });
-export const tape = h('div', { class: 'tape' }, listTools, listEl, coverTop, coverBottom);
-export const leftPane = h('div', { class: 'left' }, modeBar, tape, keypadEl);
+/** The canvas's viewport: it clips the world and takes the pan and zoom gestures. */
+export const tape = h('div', { class: 'tape cv-viewport' }, listEl, coverTop, coverBottom);
+/** Where the composer docks; src/app/composer.ts fills it. */
+export const composerDock = h('div', { class: 'composer-dock' });
+export const leftPane = h('div', { class: 'left' }, modeBar, tape, composerDock, keypadEl);
 export const graphHost = h('div', { class: 'graph-host' });
 export const graphTools = h('div', { class: 'graph-tools' });
 export const graphChips = h('div', { class: 'graph-chips', role: 'toolbar', 'aria-label': 'Plotted lines', hidden: true });
@@ -18,13 +24,22 @@ export const marksHint = h('div', { class: 'marks-hint', 'aria-hidden': 'true' }
 export const graphSliders = h('div', { class: 'graph-sliders', role: 'group', 'aria-label': 'Sliders', hidden: true });
 /** What sits over or under the plot. On a phone it floats, and the graph is told how much it covers. */
 export const graphDock = h('div', { class: 'graph-dock' }, graphChips, graphSliders, graphTools);
-export const graphPane = h('section', { class: 'graph-pane' }, graphHost, graphDock, marksHint);
-export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize' });
-export const main = h('main', { class: 'main' }, leftPane, splitter, graphPane);
+/** The graph block: a move strip along its top, the plot, its tools, and a corner to resize it by. */
+export const graphGrip = h('div', { class: 'blk-grip', title: 'Drag to move the graph', 'aria-hidden': 'true' });
+export const graphResize = h('div', { class: 'blk-resize', title: 'Drag to resize the graph', 'aria-hidden': 'true' });
+export const graphPane = h('section', { class: 'graph-pane blk blk-graph', 'aria-label': 'Graph' }, graphHost, graphDock, marksHint, graphGrip, graphResize);
+export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize', hidden: true });
+export const main = h('main', { class: 'main' }, leftPane);
 export const toast = h('div', { class: 'toast', role: 'status' });
 toast.inert = true;
-export const mobileNav = h('nav', { class: 'mobile-nav', 'aria-label': 'View' });
-app.append(main, mobileNav, toast);
-export const graph = new Graph(graphHost, () => narrow.matches);
+export const mobileNav = h('nav', { class: 'mobile-nav', 'aria-label': 'View', hidden: true });
+app.append(main, toast);
+// The blocks name the curves (each line's rail is its curve's color), so the plot draws no names over them, at any width.
+export const graph = new Graph(graphHost, () => true);
+/** The example's own small graph, in its frame: only the example's curves draw on it. */
+export const exampleGraphHost = h('div', { class: 'example-graph-host' });
+export const exampleGraphPane = h('section', { class: 'blk-example-graph', 'aria-label': 'Example graph' }, exampleGraphHost);
+export const exampleGraph = new Graph(exampleGraphHost, () => true);
+exampleGraph.canvas.className = 'example-graph-canvas';
 export const announcer = h('div', { class: 'sr-only', 'aria-live': 'polite', role: 'status' });
 app.append(announcer);

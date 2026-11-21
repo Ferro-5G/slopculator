@@ -1,4 +1,4 @@
-import { type Key, keyCall, capTone, keyCaption, legendText, LONG_LABEL, keyLegend, CLEAR_ARM_MS, CLEAR_MS, CARET_DELAY_MS, CARET_REPEAT_MS, CARET_SCRUB, LABEL_TWO, LABEL_MIN, padRows, AC, isWordKey } from '../ui/keypad';
+import { type Key, keyCall, capTone, keyCaption, legendText, LONG_LABEL, keyLegend, CLEAR_ARM_MS, CLEAR_MS, CARET_DELAY_MS, CARET_REPEAT_MS, CARET_SCRUB, LABEL_TWO, LABEL_MIN, padRows, isWordKey } from '../ui/keypad';
 import { play } from './sound';
 import { caretStep } from '../ui/lineedit';
 import { backspaceEdit } from '../ui/slots';
@@ -8,11 +8,11 @@ import { buildMenu } from './file';
 import { keypadEl } from './layout';
 import { applyBackspace, editText, commitLine, commaSteps, insertText } from './lineeditor';
 import { openMatrixEditor } from './editors';
-import { kb, narrow } from './platform';
+import { kb } from './platform';
 import { konamiStep, KONAMI_KEYS } from './pride';
 import { views, viewOfInput } from './rowviews';
 import { doc, saveSoon, rowIndex, activeId, currentResults, activeInput } from './sheet';
-import { closeThumb, tiRows, buildThumbRows, tiTabs } from './thumb';
+import { closeThumb, tiRows, buildThumbRows } from './thumb';
 
 let redrawKeys = () => {};
 export function switchPadSide(): void {
@@ -313,7 +313,7 @@ export function buildKeypad(): void {
     buildThumbRows();
     grid.classList.toggle('pad-left', !!doc.ui.padLeft);
     grid.setAttribute('aria-label', 'Keys over the number pad. Arrow keys move; typing goes to the line.');
-    const first = (narrow.matches ? tiRows.querySelector<HTMLButtonElement>('.key') : tiTabs[0]) ?? tiRows.querySelector<HTMLButtonElement>('.key');
+    const first = tiRows.querySelector<HTMLButtonElement>('.key');
     grid.querySelectorAll<HTMLButtonElement>('.key').forEach((k) => (k.tabIndex = k === first ? 0 : -1));
     if (first && (keyFocused || (document.activeElement === document.body && keypadEl.contains(lastKeyFocus)))) first.focus({ preventScroll: true });
     fitKeyLabels();
@@ -362,9 +362,8 @@ export function buildKeypad(): void {
     if (!t.classList.contains('key')) return;
     grid.querySelectorAll<HTMLButtonElement>('.key').forEach((k) => (k.tabIndex = k === t ? 0 : -1));
   });
-  const deskAc = keyButton(AC);
-  deskAc.classList.add('desk-ac');
-  keypadEl.append(h('div', { class: 'pad' }, h('div', { class: 'pad-main' }, grid, keyHelp)), h('div', { class: 'key-foot' }, deskAc, keyHint));
+  // AC and enter are on the composer; the foot of the keys says what the key or tile you point at does.
+  keypadEl.append(h('div', { class: 'pad' }, h('div', { class: 'pad-main' }, grid, keyHelp)), h('div', { class: 'key-foot' }, keyHint));
   show();
 }
 let lastKeyFocus: Element | null = null;

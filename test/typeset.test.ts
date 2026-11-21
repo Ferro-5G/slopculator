@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { assignsLiteral, prettyText, typeset, type MathBox } from '../src/ui/typeset';
+import { assignsLiteral, namesKey, prettyText, sheetNames, typeset, type MathBox } from '../src/ui/typeset';
+import { cleanSettings, evaluateDocument, type RowInput } from '../src/engine/document';
 
 describe('prettyText', () => {
   it.each([
@@ -88,8 +89,9 @@ describe('typeset', () => {
     if (s.t === 'sup') expect(kinds(s.exp)).toEqual(['1', '/', '2']);
   });
 
-  it('shows what the line means: 1/2x is a half of x', () => {
-    expect(kinds(typeset('1/2x'))).toEqual(['frac', 'x']);
+  it('shows what the line means: 1/2x is over 2x, as in Desmos', () => {
+    expect(kinds(typeset('1/2x'))).toEqual(['frac']);
+    expect(kinds(typeset('1/2*x'))).toEqual(['frac', 'x']);
   });
 
   it('draws a matrix of equal rows as a matrix, and anything else as a list', () => {
@@ -132,5 +134,57 @@ describe('assignsLiteral', () => {
     ['price = ', false],
   ])('%s → %s', (src, out) => {
     expect(assignsLiteral(src)).toBe(out);
+  });
+});
+
+describe('words the engine reads as letters', () => {
+  const sheet = (...texts: string[]) => {
+    const rows: RowInput[] = texts.map((text, k) => ({ id: `r${k}`, kind: 'expr', text }));
+    return sheetNames(rows, evaluateDocument(rows, cleanSettings({ deg: true })));
+  };
+  /** Each run of a typeset line with its role, flattened: "k:var x:var". */
+  const runs = (src: string, names = sheet()): string => {
+    const out: string[] = [];
+    const walk = (bs: MathBox[]) => bs.forEach((b) => {
+      if (b.t === 'run') out.push(`${b.s}:${b.role}`);
+      else if (b.t === 'sup') { walk(b.base); walk(b.exp); }
+      else if (b.t === 'sub') { walk(b.base); walk(b.sub); }
+      else if (b.t === 'frac') { walk(b.num); walk(b.den); }
+      else if (b.t === 'sqrt') walk(b.body);
+      else if (b.t === 'fence') walk(b.body);
+    });
+    walk(typeset(src, { names })!);
+    return out.filter((r) => !/^[()=,]:/.test(r) && !r.startsWith('= ')).join(' ');
+  };
+  it('sets kx as italic k times x when k is defined, as the engine splits it', () => {
+    expect(runs('y = 2sin(kx)', sheet('k = 45'))).toBe('y:var 2:num sin:fn k:var x:var');
+  });
+  it('leaves kx one upright name when k is not defined, since the engine reads no letters there', () => {
+    expect(runs('y = 2sin(kx)')).toBe('y:var 2:num sin:fn kx:name');
+  });
+  it('keeps defined names, functions, constants and unknown words whole', () => {
+    const names = sheet('rate = 0.05', 'r = 2', 'a = 1', 't = 3', 'e2 = 1', 'area(s) = s^2');
+    expect(runs('rate * 12', names)).toBe('rate:name ×:op 12:num');
+    expect(runs('area(3) + sin(t)', names)).toBe('area:fn 3:num +:op sin:fn t:var');
+    expect(runs('tag + 1', names)).toBe('tag:name +:op 1:num');
+    expect(runs('tax', names)).toBe('t:var a:var x:var');
+  });
+  it('splits a word made of x, y and constants with no sheet at all (xy, ex)', () => {
+    expect(runs('2xy')).toBe('2:num x:var y:var');
+    expect(prettyText('2xy')).toBe('2xy');
+  });
+  it("counts a function's own inputs: f(t) = kt is k times t", () => {
+    expect(runs('f(t) = kt', sheet('k = 2'))).toBe('f:var t:var k:var t:var');
+    expect(runs('g(s) = kt', sheet('k = 2'))).toBe('g:var s:var kt:name');
+  });
+  it('splits a word before a bracket into letters times the bracket when it names no function', () => {
+    expect(runs('ab(1 + x)', sheet('a = 1', 'b = 2'))).toBe('a:var b:var 1:num +:op x:var');
+    expect(runs('ab(1 + x)', sheet('a = 1', 'b = 2', 'ab(s) = s'))).toBe('ab:fn 1:num +:op x:var');
+  });
+  it('reads sliders and table columns as defined, and keys change with them', () => {
+    const rows: RowInput[] = [{ id: 't', kind: 'table', columns: [{ header: 'n', cells: ['1'] }] }, { id: 'a', kind: 'expr', text: 'm = 3' }];
+    const names = sheetNames(rows, evaluateDocument(rows, cleanSettings({})));
+    expect(runs('mn', names)).toBe('m:var n:var');
+    expect(namesKey(names)).not.toBe(namesKey(sheet('m = 3')));
   });
 });

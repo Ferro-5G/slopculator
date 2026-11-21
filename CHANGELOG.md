@@ -4,6 +4,26 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.0-alpha] - 2026-11-18
+
+- Deg and Rad keep one size when you switch between them.
+- A dot reads a row of a table of results, as `P.x` reads a point: `A.h` and `A.Tdp` of a moist-air state from `psych`, `stats(L).s`, `quartiles(L).Q1`, `linreg(xs, ys).r2` and `coil(…).tons`.
+- Figure blocks: a line that is `unit circle(θ)`, `tangent(f, p)`, `riemann(g, a, b, n)`, `normalcdf(a, b, μ, σ)` or a 2×2 matrix draws its own picture in its block, with points you can drag (the circle's point, the tangent point, the bounds, the basis vectors) that rewrite the line or move the slider it reads. △ and = switch a block between the figure and its numbers. New functions `tangent(f, p)` and `riemann(f, a, b, n)` (with `"left"`, `"right"` or `"mid"`), and `unit circle(θ)` reads as `unitcircle(θ)`.
+- The composer sets what you type as math as you type it (12*7 reads 12 × 7, names in italic), stays one row, and shows the answer, a curve's sparkline or an error on the right.
+- Values on wires: while a slider is held, each wire shows the value it carries and how far it moved, lit where the change reaches; point at a wire to see its full value. **Steps** on a line opens its working, each part with its own value, and shows where a failing line goes wrong.
+- A `/` reads what follows it the way Desmos does: a product written without a sign stays under the fraction, so `1/2x` is 1/(2x), `6/2(1+2)` is 1 and `(-b + √d)/2a` is over 2a. A written `*` ends it: `1/2*x` is x/2 and `4/3*πr^3` is a sphere's volume. Lines saved before may give a different answer; the **Check this** note on them offers the other reading.
+- A new layout: the canvas and the composer. Each line is a block on a canvas you can pan and zoom, wired to the lines it uses, with the graph as one block you can move and resize; on a phone the canvas stays a canvas: each block is only as wide as its line, a line that uses another steps to its right, and the wires drop straight down the open space beside them, so they rarely cross. The composer at the foot is where every line is typed: it shows the answer as you type, lights up when the line works out, and holds the function tabs, AC and enter. Click a block to edit it there; typing a name that's already defined offers to update it. Dragging a slider sends a pulse down its wires. A first run starts with an example you can edit or clear, and the app is dark unless you choose otherwise.
+- On desktop, opening a function page (Math, Stats, Chance, Matrix, HVAC) over a short notebook no longer gives the notebook a scrollbar. The line being typed still moves up above the page when the page would cover it.
+- Regression: `y1 ~ m x1 + b` on a line fits `m` and `b` to the data, shows them with R², draws the fit and defines them for other lines. Any model works (`y1 ~ a x1^2 + b x1 + c`, `y1 ~ a b^x1`), and `y ~ mx + b` reads a table's `x` and `y` columns.
+- Lines copied out of Desmos work as they are, LaTeX and all: `\frac{1}{2}`, `\sqrt[3]{8}`, `\left(1+2\right)\cdot3`, `x_{1}`, `\sum_{n=1}^{10}n`.
+- Desmos lists: ranges `[1...10]` and `[1, 3, ..., 9]`, items `L[2]`, `[n^2 for n = [1...5]]`, `x^2 with x = 3`, and `+ 1` or `^2` on every number of a `[ ]` list. `P.x` reads a point, and `normaldist(0, 1).cdf(1)` a distribution.
+- Calculus in notation: `f'(2)`, `d/dx x^3`, `sum_{n=1}^{10} n^2`, `int_0^3 t^2 dt`, and `∑ ∏ ∫`. They are drawn that way too.
+- A TI's keys: `5 → A`, `3ᴇ5`, `⁻5`, `³√8`, `[[1, 2][3, 4]]`, `nDeriv`, `fnInt`, `iPart`, `fPart`, `randInt`, `randNorm`, `randBin` and more.
+- Now 296 functions, 38 of them new, under the names other calculators and code use: `pow`, `hypot`, `sind`, `asinh`, `clamp`, `if`, `random`, `quantile`, `spearman`, and others. `≠`, `!=`, `and`, `or`, `½`, `0x1F` and `a := 5` are read.
+- A function or constant typed in another case (`Sqrt(16)`, `PI`, `Ans`) is read as itself, where it used to be an error with a hint.
+- Fixed 22 wrong answers and failures an engine audit found. Among them: `(ab)^2` squares the whole product, `1 or 0 and 0` is 1, `ln(0.1 + 0.2 - 0.3)` fails as `ln(0)` does, `tand(90)` is undefined, `normaldist(0, 1).cdf(8, 9)` and `binomdist(…).inversecdf` give the right tails, `0x20000000000001` keeps its last digit, `quadreg` fits years, `inv` and `eigen` handle entries far apart in size, `10 m^2 to ft^2` converts, a regression fits 200,000 points, and `gcd({})`, `acsc(0.5)` and `asec(0.5)` explain themselves plainly.
+- New sounds. The key clicks, the switch, the copy and error sounds and the chime are now short recordings of real taps, wood and glass, in place of the synthesized ones. They are the same on the web and on phones.
+
 ## [0.1.2-alpha] - 2026-11-16
 
 - slopculator.com's landing page is shorter: the name, a screenshot, and three short columns in place of six sections.
@@ -22,7 +42,7 @@ The first public version.
 - Lines that share: `a = 3` gets a slider, `f(x) = x^2` can be called and is graphed, `ans` is the line above, and line letters (`A`, `B`, …) refer to earlier answers.
 - Exact answers: `0.1 + 0.2` is 3/10, `sin(30°)` is 1/2, whole numbers keep every digit (`2^64`, `25!`), and roots, logs and trig show only digits that are proven.
 - Math typed the way it's written: `2x`, `3(4 + 5)`, `sin 30`, `√16`, `|x|`, `5!`, `x²`. Missing closing brackets are filled in, and a line that may not mean what you intended (`-3^2`, `1/2x`) gets a one-click rewrite.
-- 258 functions: statistics and regressions; normal, binomial, t, χ², F, Poisson and geometric distributions; matrices and vectors; derivatives, integrals, sums and `solve`; number theory, geometry, finance, unit and base conversion; and moist-air, refrigerant, duct and fan functions for HVAC.
+- Functions, 258 of them: statistics and regressions; normal, binomial, t, χ², F, Poisson and geometric distributions; matrices and vectors; derivatives, integrals, sums and `solve`; number theory, geometry, finance, unit and base conversion; and moist-air, refrigerant, duct and fan functions for HVAC.
 - Search any function by name or meaning (Ctrl+K, ⌘K on a Mac). History keeps every finished line and its full-precision answer.
 - A matrix answer bigger than 20 × 20 shows its top-left corner and says how big the whole matrix is. Copying it still gets every entry.
 
@@ -45,7 +65,8 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.1.2-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.0-alpha...HEAD
+[0.2.0-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.2-alpha...v0.2.0-alpha
 [0.1.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.1-alpha...v0.1.2-alpha
 [0.1.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/Ferro-5G/slopculator/releases/tag/v0.1.0-alpha

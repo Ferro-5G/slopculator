@@ -12,7 +12,7 @@ import * as X from './exact';
 import { Undecided, type Num } from './exact';
 import * as R from './real';
 import { Lru } from './memo';
-import { ExactlyUndefined, orDouble } from './errors';
+import { divisionByZeroText, ExactlyUndefined, orDouble } from './errors';
 import type { Fingerprints } from './fingerprint';
 
 interface PList { t: 'list'; items: Precise[] }
@@ -284,7 +284,7 @@ function evalId(name: string, locals: Local[], c: Ctx): Precise {
     case 'var': return c.st.varAt(name, c);
     case 'ans': return ans(c);
     case 'i': return give('complex');
-    case 'constant': return constant(name, c);
+    case 'constant': return constant(use.name ?? name, c);
     case 'zeroInput': return give('zero-input built-in');
     case 'function': return give('function without a call');
     case 'builtin': case 'unknown': return give('unknown name');
@@ -365,7 +365,7 @@ function arith(op: string, a: Precise, b: Precise, c: Ctx | null): Precise {
   const p = c?.p ?? 128;
   // A division by a number that is exactly 0 has no value, whatever doubles made of the divisor. A list, vector or
   // matrix over it is the same division, entry by entry.
-  if (op === '/' && isNum(b) && X.isZeroNum(b)) throw new ExactlyUndefined('Division by zero');
+  if (op === '/' && isNum(b) && X.isZeroNum(b)) throw new ExactlyUndefined(divisionByZeroText());
   if (isNum(a) && isNum(b)) return numOp(op, a, b, p);
   if (!isNum(a) && a.t === 'list') {
     if (!isNum(b) && b.t === 'list') {
@@ -429,11 +429,10 @@ function power(a: Precise, b: Precise, c: Ctx): Precise {
 }
 
 function powNum(a: Num, b: Num, p: number): Num {
-  if (X.isInt(b)) {
-    if (X.isZeroNum(a) && X.sign(b) < 0) give('0 to a negative power');
-    return X.powInt(a, (b as X.Rat).n, p);
-  }
-  if (X.isZeroNum(a)) return X.sign(b) > 0 ? X.ZERO : give('0 to a non-positive power');
+  // Exactly 0 to a negative power has no value, however close to 0 the doubles came: (0.1 + 0.2 − 0.3)^−1.
+  if (X.isZeroNum(a) && X.sign(b) < 0) throw new ExactlyUndefined('Division by zero (0 to a negative power)');
+  if (X.isInt(b)) return X.powInt(a, (b as X.Rat).n, p);
+  if (X.isZeroNum(a)) return X.ZERO;
   if (X.sign(a) < 0) give('negative base');
   if (b.k === 'q' && b.d <= 64n) {
     const r = X.root(a, Number(b.d), p + 16);
@@ -585,9 +584,13 @@ function floorNum(x: Num, p: number): bigint {
   return a;
 }
 
+/** The float path's words for a log of 0, used when the input is exactly 0 though its double isn't: ln(0.1 + 0.2 − 0.3). */
+const nonPositiveLog = (name: string): string => `${name} is only defined for positive numbers, got 0`;
+
 function logBase(b: Num, x: Num, c: Ctx): Num {
   const P = c.p;
   if (X.sign(b) <= 0 || (b.k === 'q' && b.n === b.d)) give('log base');
+  if (X.isZeroNum(x)) throw new ExactlyUndefined(nonPositiveLog('log'));
   if (X.sign(x) <= 0) give('log of a non-positive number');
   if (b.k === 'q' && x.k === 'q') {
     const k = X.exactLog(b, x);
@@ -629,11 +632,11 @@ const outsideUnit = (x: Num, c: Ctx): Num => (X.cmp(x, X.ONE, c.p) < 0 && X.cmp(
 
 function sumLike(product: boolean): Impl {
   return (args, locals, c) => {
-    if (args.length === 1) {
-      const xs = nums(evalNode(args[0], locals, c));
+    // sum(list), or terms to add as the float path's plainTerms reads them: sum(1e16, 1, −1e16) is 1, as sum({…}) is.
+    if (args.length !== 4 || args[1].k !== 'id') {
+      const xs = args.flatMap((a) => nums(evalNode(a, locals, c)));
       return xs.reduce<Num>((s, x) => (product ? X.mul(s, x, c.p) : X.add(s, x, c.p)), product ? X.ONE : X.ZERO);
     }
-    if (args.length !== 4 || args[1].k !== 'id') give('series form');
     const v = (args[1] as { name: string }).name;
     const a = wholeBig(num(evalNode(args[2], locals, c))), b = wholeBig(num(evalNode(args[3], locals, c)));
     if (b - a > BigInt(MAX_LOOP)) give('too many terms');
@@ -671,6 +674,7 @@ const TABLE: Record<string, Impl> = {
     const n = num(evalNode(args[1], locals, c));
     if (X.isZeroNum(n)) give('0th root');
     return mapNum(evalNode(args[0], locals, c), (x) => {
+      if (X.isZeroNum(x) && X.sign(n) < 0) throw new ExactlyUndefined('Division by zero (0 to a negative power)');
       if (X.isInt(n)) {
         const k = (n as X.Rat).n;
         const ak = k < 0n ? -k : k;
@@ -707,7 +711,10 @@ const TABLE: Record<string, Impl> = {
     return mapNum(evalNode(args[0], locals, c), (x) => X.sub(x, X.mul(m, X.rat(floorNum(X.div(x, m, c.p + 16), c.p + 16)), c.p), c.p));
   },
   exp: one((x, c) => X.exp(x, c.p)),
-  ln: one((x, c) => (X.sign(x) <= 0 ? give('ln domain') : X.ln(x, c.p))),
+  ln: one((x, c) => {
+    if (X.isZeroNum(x)) throw new ExactlyUndefined(nonPositiveLog('ln'));
+    return X.sign(x) <= 0 ? give('ln domain') : X.ln(x, c.p);
+  }),
   log: (args, locals, c) => {
     if (args.length === 1) return mapNum(evalNode(args[0], locals, c), (x) => logBase(X.rat(10n), x, c));
     const b = num(evalNode(args[0], locals, c));

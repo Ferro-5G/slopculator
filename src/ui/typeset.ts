@@ -1,3 +1,6 @@
+import { isGraphVar, lettersOf } from '../engine/ast';
+import { BUILTINS, CONSTANTS, readsAsValue } from '../engine/builtins';
+import type { RowInput, RowResult } from '../engine/document';
 import { isHeading, parse, type Node } from '../engine/parser';
 
 export type MathRole =
@@ -32,7 +35,52 @@ export type MathBox =
 export interface TypesetOptions {
   /** Stack short fractions. Retro's printer tape keeps them on one line. */
   stack?: boolean;
+  /**
+   * The names the sheet defines, so a word is set the way the engine reads it: kx with k defined is k times x, two
+   * italic letters, while rate, sin and an unknown word stay one name. Without them only x, y and the constants count.
+   */
+  names?: SheetNames;
+  /**
+   * A list of more items than this shows its first BLOCK_LIST_HEAD and an ellipsis, so a block holding 24 readings
+   * stays the width of its figure. Unset, every item shows.
+   */
+  listMax?: number;
 }
+
+/** A block's line shows a list longer than BLOCK_LIST_MAX as its first BLOCK_LIST_HEAD items and "…". */
+export const BLOCK_LIST_MAX = 6;
+export const BLOCK_LIST_HEAD = 4;
+
+/** The variables (sliders, table columns, line letters too) and the functions a sheet defines. */
+export interface SheetNames { vars: ReadonlySet<string>; funcs: ReadonlySet<string> }
+export const NO_NAMES: SheetNames = { vars: new Set(), funcs: new Set() };
+
+/** What a sheet defines, read the way the engine registers definitions. */
+export function sheetNames(rows: readonly RowInput[], results: readonly (RowResult | undefined)[] = [], lineNames = false): SheetNames {
+  const vars = new Set<string>(), funcs = new Set<string>();
+  rows.forEach((row, k) => {
+    const r = results[k];
+    if (row.kind === 'table') {
+      for (const c of row.columns) if (c.header.trim()) vars.add(c.header.trim());
+      return;
+    }
+    if (r?.slider) vars.add(r.slider.name);
+    if (lineNames && r?.lineName) vars.add(r.lineName);
+    let tree: Node;
+    try {
+      tree = parse(row.text);
+    } catch {
+      return;
+    }
+    if (tree.k !== 'rel' || tree.ops.length !== 1 || tree.ops[0] !== '=') return;
+    const lhs = tree.items[0];
+    if (lhs.k === 'id' && !isGraphVar(lhs.name) && !lettersOf(lhs.name, isGraphVar)) vars.add(lhs.name);
+    else if (lhs.k === 'call' && !lhs.base && !isGraphVar(lhs.name)) funcs.add(lhs.name);
+  });
+  return { vars, funcs };
+}
+/** A short key that changes when what a sheet defines does, for caches of typeset lines. */
+export const namesKey = (n: SheetNames): string => `${[...n.vars].sort().join(',')}|${[...n.funcs].sort().join(',')}`;
 
 const enum P {
   Rel = 0,
@@ -45,7 +93,7 @@ const enum P {
 }
 
 const MINUS = '−';
-const REL: Record<string, string> = { '=': '=', '<': '<', '>': '>', '<=': '≤', '>=': '≥' };
+const REL: Record<string, string> = { '=': '=', '<': '<', '>': '>', '<=': '≤', '>=': '≥', '!=': '≠', '~': '~' };
 // Read with Object.hasOwn: a name a line types, like constructor, would otherwise find Object.prototype's.
 const CONST: Record<string, string> = { pi: 'π', inf: '∞', infinity: '∞', tau: 'τ', phi: 'φ' };
 const STACK_MAX = 12;
@@ -65,9 +113,27 @@ function prec(n: Node): P {
     case 'num':
       // A typed negative never parses as one number, but 1e-3 has a minus in it.
       return P.Atom;
+    case 'call':
+      // What these are written as has loose ends, so a power or a product next to them needs brackets around them.
+      if (n.name === '_with' || n.name === '_and' || n.name === '_or' || n.name === '_xor') return P.Rel;
+      return bigOperator(n) || derivativeAlong(n) ? P.Mul : P.Atom;
     default:
       return P.Atom;
   }
+}
+
+type Call = Extract<Node, { k: 'call' }>;
+const sameName = (a: Node | undefined, b: Node | undefined): boolean => !!a && !!b && a.k === 'id' && b.k === 'id' && a.name === b.name;
+/** sum(n^2, n, 1, 10) and its kind: written with the bounds on the sign. */
+const bigOperator = (n: Call): string | null =>
+  n.args.length === 4 && n.args[1].k === 'id' && !n.base ? ({ sum: 'Σ', Σ: 'Σ', prod: 'Π', Π: 'Π', integral: '∫' } as Record<string, string>)[n.name] ?? null : null;
+/** deriv(x^2, x, x), which is what d/dx x^2 means: the derivative along x, at x. */
+const derivativeAlong = (n: Call): boolean => n.name === 'deriv' && n.args.length === 3 && sameName(n.args[1], n.args[2]);
+/** deriv(f(x), x, 2), which is what f'(2) means. The marks to write after f, or null. */
+function primes(n: Call): string | null {
+  if ((n.name !== 'deriv' && n.name !== 'deriv2') || n.args.length !== 3) return null;
+  const f = n.args[0];
+  return f.k === 'call' && !f.base && f.args.length === 1 && sameName(f.args[0], n.args[1]) ? (n.name === 'deriv' ? '′' : '″') : null;
 }
 
 const run = (s: string, role: MathRole): MathBox => ({ t: 'run', s, role });
@@ -91,7 +157,8 @@ function fence(open: string, close: string, body: MathBox[]): MathBox {
 
 function idBoxes(name: string): MathBox[] {
   if (Object.hasOwn(CONST, name)) return [run(CONST[name], 'name')];
-  const sub = /^(\p{L})_([\p{L}\p{N}]+)$/u.exec(name);
+  // x_1 and x1 are both x with a 1 below it.
+  const sub = /^(\p{L})_([\p{L}\p{N}]+)$/u.exec(name) ?? /^(\p{L})(\d+)$/u.exec(name);
   if (sub) return [{ t: 'sub', base: [run(sub[1], 'var')], sub: [run(sub[2], /^\d+$/.test(sub[2]) ? 'num' : 'name')] }];
   return [run(name, [...name].length === 1 ? 'var' : 'name')];
 }
@@ -104,7 +171,7 @@ function numBoxes(n: Extract<Node, { k: 'num' }>): MathBox[] {
 }
 
 function isLetter(n: Node): boolean {
-  return n.k === 'id' && (Object.hasOwn(CONST, n.name) || /^\p{L}(_[\p{L}\p{N}]+)?$/u.test(n.name));
+  return n.k === 'id' && (Object.hasOwn(CONST, n.name) || /^\p{L}(_[\p{L}\p{N}]+|\d+)?$/u.test(n.name));
 }
 
 function startsLetterLike(n: Node): boolean {
@@ -142,7 +209,30 @@ class Setter {
   constructor(
     private stack: boolean,
     private inFrac = false,
+    /** Inside a regression, where mx1 is m times x1 whatever else the sheet holds. */
+    private fit = false,
+    private names: SheetNames = NO_NAMES,
+    /** A function definition's own inputs: in f(t) = kt, t counts as defined. */
+    private locals: ReadonlySet<string> = new Set(),
+    private listMax = Infinity,
   ) {}
+
+  private sub(stack: boolean, inFrac: boolean): Setter {
+    return new Setter(stack, inFrac, this.fit, this.names, this.locals, this.listMax);
+  }
+
+  /** A list's items, its first few and "…" when it's longer than listMax. */
+  private items(items: Node[]): MathBox[] {
+    if (items.length <= this.listMax) return this.list(items);
+    return [...this.list(items.slice(0, BLOCK_LIST_HEAD)), run(',', 'punct'), run('…', 'text')];
+  }
+
+  /** The letters a word reads as, in the engine's order: a name the sheet or the engine knows stays whole. */
+  private letters(name: string): string[] | null {
+    const { vars, funcs } = this.names;
+    if (this.locals.has(name) || vars.has(name) || name === 'ans' || name in CONSTANTS || Object.hasOwn(CONST, name) || readsAsValue(name) || funcs.has(name)) return null;
+    return lettersOf(name, (ch) => isGraphVar(ch) || vars.has(ch) || this.locals.has(ch) || ch in CONSTANTS);
+  }
 
   at(n: Node, min: P): MathBox[] {
     const out = this.node(n);
@@ -164,8 +254,12 @@ class Setter {
         return numBoxes(n);
       case 'str':
         return [run(`"${n.s}"`, 'text')];
-      case 'id':
-        return idBoxes(n.name);
+      case 'id': {
+        const glued = this.fit ? /^(\p{L}+)(\p{L}\d+)$/u.exec(n.name) : null;
+        if (glued) return [...[...glued[1]].map((ch) => run(ch, 'var')), ...idBoxes(glued[2])];
+        const split = this.letters(n.name);
+        return split ? split.flatMap(idBoxes) : idBoxes(n.name);
+      }
       case 'un':
         return [run(MINUS, 'sign'), ...this.at(n.a, P.Unary)];
       case 'post':
@@ -173,7 +267,12 @@ class Setter {
       case 'abs':
         return [fence('|', '|', this.node(n.a))];
       case 'rel': {
-        const out = this.node(n.items[0]);
+        const head = n.items[0];
+        if (n.ops.length === 1 && n.ops[0] === '=' && head.k === 'call' && !head.base && head.args.every((a) => a.k === 'id')) {
+          const inner = new Setter(this.stack, this.inFrac, this.fit, this.names, new Set([...this.locals, ...head.args.map((a) => (a as { name: string }).name)]));
+          return [...inner.node(head), run('=', 'op'), ...inner.node(n.items[1])];
+        }
+        const out = this.node(head);
         n.ops.forEach((op, i) => out.push(run(REL[op], 'op'), ...this.node(n.items[i + 1])));
         return out;
       }
@@ -182,14 +281,14 @@ class Setter {
       case 'vec':
         return [fence('⟨', '⟩', this.list(n.items))];
       case 'list':
-        return [fence('{', '}', this.list(n.items))];
+        return [fence('{', '}', this.items(n.items))];
       case 'bracket':
         if (n.items.length && n.items.every((r) => r.k === 'bracket' && r.items.length > 0)) {
           const width = (n.items[0] as { items: Node[] }).items.length;
           if (n.items.every((r) => (r as { items: Node[] }).items.length === width))
             return [{ t: 'matrix', rows: n.items.map((r) => (r as { items: Node[] }).items.map((c) => this.node(c))) }];
         }
-        return [fence('[', ']', this.list(n.items))];
+        return [fence('[', ']', this.items(n.items))];
       case 'piece':
         return [{ t: 'cases', rows: n.branches.map((b) => ({ val: b.val && this.node(b.val), cond: b.cond && this.node(b.cond) })) }];
       case 'call':
@@ -205,9 +304,56 @@ class Setter {
     if ((n.name === 'nthroot' || n.name === 'root') && n.args.length === 2)
       return [{ t: 'sqrt', body: this.node(n.args[0]), index: this.node(n.args[1]) }];
     if (n.name === 'abs' && n.args.length === 1) return [fence('|', '|', this.node(n.args[0]))];
+    const written = this.written(n);
+    if (written) return written;
+    // A word that names no function, before a bracket, is its letters times the bracket, as the engine reads it.
+    const split = !n.base && !(n.name in BUILTINS) && !this.names.funcs.has(n.name) ? this.letters(n.name) : null;
+    if (split) return [...split.flatMap(idBoxes), fence('(', ')', this.list(n.args))];
     const name: MathBox[] = [run(n.name, [...n.name].length === 1 ? 'var' : 'fn')];
     const head: MathBox[] = n.base ? [{ t: 'sub', base: name, sub: this.node(n.base) }] : name;
     return [...head, fence('(', ')', this.list(n.args))];
+  }
+
+  /** The notation a call was typed in, where it has one of its own: Σ with bounds, d/dx, f′(2), L[2], [1, …, 5]. */
+  private written(n: Call): MathBox[] | null {
+    const a = n.args;
+    const word = (s: string): MathBox => run(s, 'op');
+    const sign = bigOperator(n);
+    if (sign) {
+      const v = this.node(a[1]);
+      const low = sign === '∫' ? this.node(a[2]) : [...v, run('=', 'text'), ...this.node(a[2])];
+      const head: MathBox = { t: 'sup', base: [{ t: 'sub', base: [run(sign, 'fn')], sub: low }], exp: this.sub(false, true).node(a[3]) };
+      return sign === '∫' ? [head, ...this.at(a[0], P.Add), run(' d', 'fn'), ...v] : [head, ...this.at(a[0], P.Mul)];
+    }
+    if (derivativeAlong(n)) {
+      const v = this.node(a[1]);
+      const d: MathBox[] = this.stack && !this.inFrac ? [{ t: 'frac', num: [run('d', 'fn')], den: [run('d', 'fn'), ...v] }] : [run('d', 'fn'), run('/', 'text'), run('d', 'fn'), ...v, run(' ', 'text')];
+      return [...d, ...this.at(a[0], P.Mul)];
+    }
+    const marks = primes(n);
+    if (marks) {
+      const f = a[0] as Call;
+      // The point is what was typed; inside, f's input is only the name the slope is taken along.
+      return [run(f.name, [...f.name].length === 1 ? 'var' : 'fn'), run(marks, 'text'), fence('(', ')', this.node(a[2]))];
+    }
+    switch (n.name) {
+      case '_item':
+        return [...this.at(a[0], P.Post), fence('[', ']', this.list(a.slice(1)))];
+      case '_span':
+        return [fence('[', ']', [...this.list(a.slice(0, -1)), run(',', 'punct'), run('…', 'text'), run(',', 'punct'), ...this.node(a[a.length - 1])])];
+      case '_each':
+        return [fence('[', ']', [...this.node(a[0]), word('for'), ...this.node(a[1]), run('=', 'op'), ...this.node(a[2])])];
+      case '_with':
+        return [...this.node(a[0]), word('with'), ...this.node(a[1]), run('=', 'op'), ...this.node(a[2])];
+      case '_and': case '_or': case '_xor':
+        return [...this.at(a[0], P.Rel), word(n.name.slice(1)), ...this.at(a[1], P.Rel)];
+      case '_x': case '_y': case '_z':
+        return [...this.at(a[0], P.Post), run(`.${n.name.slice(1)}`, 'text')];
+      default:
+        // A part read after a dot, as it was typed: A.h, L.mean.
+        if (n.dot && a.length === 1) return [...this.at(a[0], P.Post), run('.', 'text'), ...(n.name in BUILTINS || this.names.funcs.has(n.name) ? [run(n.name, 'fn')] : idBoxes(n.name))];
+        return null;
+    }
   }
 
   private bin(n: Extract<Node, { k: 'bin' }>): MathBox[] {
@@ -225,12 +371,12 @@ class Setter {
           return [{ t: 'sup', base: [head], exp: numBoxes(n.b) }, args];
         }
         // The exponent never stacks: a fraction up there is too small to read.
-        const exp = new Setter(false, true).node(n.b);
+        const exp = this.sub(false, true).node(n.b);
         return [{ t: 'sup', base: this.at(n.a, P.Atom), exp }];
       }
       case '/': {
         if (this.stack && !this.inFrac && plainLength(n.a) <= STACK_MAX && plainLength(n.b) <= STACK_MAX) {
-          const inner = new Setter(this.stack, true);
+          const inner = this.sub(this.stack, true);
           return [{ t: 'frac', num: inner.node(n.a), den: inner.node(n.b) }];
         }
         return [...this.at(n.a, P.Mul), run('/', 'text'), ...this.at(n.b, P.Unary)];
@@ -278,7 +424,7 @@ export function typeset(src: string, opts: TypesetOptions = {}): MathBox[] | nul
   } catch {
     return null;
   }
-  const boxes = new Setter(opts.stack ?? true).node(tree);
+  const boxes = new Setter(opts.stack ?? true, false, tree.k === 'rel' && tree.ops.includes('~'), opts.names, new Set(), opts.listMax ?? Infinity).node(tree);
   return nesting(boxes) > NESTING_MAX ? null : boxes;
 }
 
@@ -301,7 +447,7 @@ function prettyBoxes(boxes: MathBox[]): string {
       case 'sub': {
         const sub = prettyBoxes(b.sub);
         const low = [...sub].every((c) => SUB[c]) ? [...sub].map((c) => SUB[c]).join('') : null;
-        out += prettyBoxes(b.base) + (low ?? `_${sub}`);
+        out += prettyBoxes(b.base) + (low ?? ([...sub].length > 1 && /[^\p{L}\p{N}]/u.test(sub) ? `_(${sub})` : `_${sub}`));
         break;
       }
       case 'frac': {

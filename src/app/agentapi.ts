@@ -62,7 +62,8 @@ const api = {
     if (r.value === undefined) return { ok: true, result: r.graph.length ? '[graph]' : '', value: undefined };
     return { ok: true, result: plainValue(r.value, o, r.prob, r.precise), value: r.value, notes: r.notes };
   },
-  lines: () => doc.rows.map((_, k) => lineInfo(k)),
+  // The sheet's lines; the composer's new line isn't one until something is typed in it.
+  lines: () => doc.rows.flatMap((r, k) => (k === doc.rows.length - 1 && r.kind === 'expr' && !r.text.trim() && doc.rows.length > 1 ? [] : [lineInfo(k)])),
   addLine(text: string) {
     appendLine(text);
     return lineInfo(doc.rows.length - 1);

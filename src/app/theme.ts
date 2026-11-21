@@ -1,7 +1,8 @@
 import modernCss from '../styles/modern.css?inline';
 import retroCss from '../styles/retro.css?inline';
+import canvasCss from '../styles/canvas.css?inline';
 import { type AppearanceChoice, appearancePatch, appearanceOf, GRAPH_RATE_NAMES, GRAPH_RATE_NOTE, graphFrameGap, type GraphRatePref, MODE_NAMES, MOTION_NAMES, type MotionPref, type ColorPref, COLOR_NAMES, type WebTheme, themeOfChoice, luminance, contrast, atLeast, type ThemeValue, LOOK_NAMES, THEME_NAMES } from '../ui/appearance';
-import { PAD, capTone, isWordKey } from '../ui/keypad';
+import { ENTER, PAD, capTone, isWordKey } from '../ui/keypad';
 import { tabHues } from '../ui/palettes';
 import { colorTokens } from '../ui/webtokens';
 import { play } from './sound';
@@ -126,7 +127,7 @@ export function syncAppearanceSlots(): void {
     h('span', {}, 'Pride colors'), knob())] : []));
 }
 function appearSample(): HTMLElement {
-  const keys = ['7', '8', '9', '×', 'enter'].map((l) => PAD.flat().find((k) => k.label === l)!);
+  const keys = [...['7', '8', '9', '×'].map((l) => PAD.flat().find((k) => k.label === l)!), ENTER];
   return h('div', { class: 'appear-sample', role: 'img', 'aria-label': 'Sample: the line 7 + 5 with its answer 12, and the keys 7, 8, 9, times and enter, in the chosen appearance' },
     h('div', { class: 'as-line' }, h('span', { class: 'as-idx' }, '2'), h('span', { class: 'as-expr' }, '7+5'), h('span', { class: 'as-ans' }, '12')),
     h('div', { class: 'as-keys' }, ...keys.map((k) => h('span', { class: `key ${capTone(k)}${isWordKey(k) ? ' word' : ''}` }, h('span', { class: 'kl' }, k.label)))));
@@ -171,7 +172,7 @@ export function applyTheme(): void {
   document.documentElement.toggleAttribute('data-pride', prideOn());
   const look = doc.ui.look ?? 'modern';
   document.documentElement.dataset.look = look;
-  lookSheet.textContent = look === 'retro' ? retroCss : modernCss;
+  lookSheet.textContent = (look === 'retro' ? retroCss : modernCss) + canvasCss;
   lookSel.value = look;
   applyColor(look, resolvedTheme());
   applyMotion();

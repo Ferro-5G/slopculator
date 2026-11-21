@@ -178,7 +178,7 @@ function placeBar(): void {
   else if (modeBar.parentElement !== app) app.insertBefore(modeBar, main);
   refitBar();
 }
-const headFind = h('button', { type: 'button', class: 'head-find', 'aria-label': 'Find a function', 'aria-keyshortcuts': isMac ? 'Meta+K' : 'Control+K', title: kb('Find a function or command (Ctrl+K)'), onclick: () => openPalette() }, ...iconLabel('search', 'Find'));
+const headFind = h('button', { type: 'button', class: 'head-find', 'aria-label': 'Find a function', 'aria-keyshortcuts': isMac ? 'Meta+K' : 'Control+K', title: kb('Find a function or command (Ctrl+K)'), onclick: () => openPalette() }, ...iconLabel('search', 'Find'), h('kbd', { class: 'find-key', 'aria-hidden': 'true' }, isMac ? '⌘K' : 'Ctrl K'));
 export const headPill = h('div', { class: 'head-pill', role: 'group', 'aria-label': 'Find and file' });
 export const SLIDERS_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h7M12.5 4.5H14M2 11.5h1.5M7 11.5h7"/><circle cx="10.75" cy="4.5" r="1.75"/><circle cx="5.25" cy="11.5" r="1.75"/></svg>';
 const modesMore = h('button', { type: 'button', class: 'pill more', 'aria-label': 'Modes', 'aria-haspopup': 'dialog', title: 'Modes' });
@@ -321,7 +321,8 @@ export function initSettings(): void {
   placeBar();
   modeBar.insertBefore(headPill, menuWrap);
   headPill.append(headFind, menuWrap);
-  modesMore.innerHTML = SLIDERS_ICON;
+  // A phone's bar says Modes in words, as the phone apps do; the icon is for narrow windows outside the canvas.
+  modesMore.innerHTML = `${SLIDERS_ICON}<span class="more-word">Modes</span>`;
   modesMore.addEventListener('click', (e) => {
     e.stopPropagation();
     if (narrow.matches) openModeSheet();

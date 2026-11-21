@@ -13,6 +13,8 @@ import { doc, saveSoon } from './sheet';
 import { closeThumb } from './thumb';
 import { finishPresence, initialPresence, presenceOpen, requestPresence } from '../ui/presence';
 import { registerMotionSettler } from './motion';
+import { layoutCanvas } from './canvas';
+import { composerHead } from './composer';
 
 /** The graph is always up beside the notebook, so the window never has a blank half; Hide graph in File is the only way off. */
 export function graphOn(): boolean {
@@ -88,32 +90,14 @@ registerMotionSettler(() => {
   settleGraphEntry(!graphPane.hidden);
 });
 export function applyUI({ glide = false } = {}): void {
-  const onGraph = narrow.matches && doc.ui.view === 'graph';
+  // The graph is a block on the canvas (src/app/canvas.ts shows it when something draws); nothing here slides it in.
+  graphPane.hidden = false;
+  splitter.hidden = true;
+  main.classList.remove('no-graph', 'view-graph');
+  settleGraphEntry(true);
+  void leftPane;
   const show = graphOn();
-  const from = glide && show && main.classList.contains('no-graph') && !narrow.matches && motionNow() === 'full' ? leftPane.getBoundingClientRect().left : null;
-  graphPane.hidden = !show && !onGraph;
-  splitter.hidden = !show;
-  main.classList.toggle('no-graph', !show);
-  main.classList.toggle('view-graph', onGraph);
-  if (!show || !glide || narrow.matches || motionNow() !== 'full') settleGraphEntry(!graphPane.hidden);
-  if (from !== null) {
-    cancelGraphEntry();
-    graphPresence = requestPresence(graphPresence, true, true);
-    const generation = graphPresence.generation;
-    graphPane.dataset.presence = graphPresence.phase;
-    const dx = from - leftPane.getBoundingClientRect().left;
-    const ease = { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
-    main.style.overflow = 'clip';
-    if (Math.abs(dx) > 1) graphEntry.push(leftPane.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], ease));
-    graphEntry.push(graphPane.animate([{ transform: 'translateX(100%)' }, { transform: 'none' }], ease));
-    void Promise.allSettled(graphEntry.map((a) => a.finished)).then(() => {
-      if (graphPresence.generation !== generation) return;
-      graphPresence = finishPresence(graphPresence, generation);
-      graphPane.dataset.presence = graphPresence.phase;
-      graphEntry = [];
-      main.style.overflow = '';
-    });
-  }
+  const onGraph = false;
   const sysKeyboard = !!doc.ui.sysKeyboard;
   foldKeypad(keypadOn() && !(coarse.matches && sysKeyboard), glide);
   keysToggle.setAttribute('aria-expanded', String(keypadOn()));
@@ -125,6 +109,7 @@ export function applyUI({ glide = false } = {}): void {
   refreshModeBar();
   syncMobileNav();
   buildMenu();
+  if (views.size) layoutCanvas();
 }
 const navCalc = h('button', { type: 'button', class: 'nav-view', 'aria-pressed': 'true' }, 'Calculate');
 const navGraph = h('button', { type: 'button', class: 'nav-view' }, 'Graph');
@@ -148,10 +133,21 @@ function syncMobileNav(): void {
 }
 
 export function initShell(): void {
-  mobileNav.append(h('div', { class: 'nav-seg', role: 'group', 'aria-label': 'Pane' }, navCalc, navGraph), h('span', { class: 'spacer' }), navKeys);
+  mobileNav.append(h('div', { class: 'nav-seg', role: 'group', 'aria-label': 'Pane' }, navCalc, navGraph));
+  // On a touch screen, the switch between the keypad and the system keyboard sits on the composer's top edge.
+  composerHead.append(navKeys);
   navCalc.addEventListener('click', () => setView('calc'));
   navGraph.addEventListener('click', () => setView('graph'));
-  navKeys.addEventListener('click', () => {
+  navKeys.addEventListener('click', () => toggleSysKeyboard());
+  narrow.addEventListener('change', () => {
+    if (!narrow.matches) doc.ui.view = 'calc';
+    applyUI();
+  });
+  coarse.addEventListener('change', () => applyUI());
+}
+/** Between the app's keypad and the system keyboard, on a touch screen. */
+export function toggleSysKeyboard(): void {
+  {
     doc.ui.sysKeyboard = !doc.ui.sysKeyboard;
     play('toggle');
     saveSoon();
@@ -160,10 +156,5 @@ export function initShell(): void {
     const active = document.activeElement as HTMLElement | null;
     if (isLineField(active)) { active.blur(); active.focus(); }
     else focusLine();
-  });
-  narrow.addEventListener('change', () => {
-    if (!narrow.matches) doc.ui.view = 'calc';
-    applyUI();
-  });
-  coarse.addEventListener('change', () => applyUI());
+  }
 }

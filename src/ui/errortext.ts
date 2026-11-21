@@ -1,6 +1,7 @@
 // The engine's own message stays the record: show it as the title or accessibility text, and keep matching on it.
 
 import { readError, varErrorText, type ErrorForm } from '../engine/errors';
+import { lineDefines } from '../engine/document';
 import { unitKind, unitPhrase } from '../engine/units';
 import { CLOSERS, OPENERS, TYPED_CLOSERS, TYPED_OPENERS } from './brackets';
 import { escapeRegExp } from './text';
@@ -241,3 +242,31 @@ export function spokenError(text: string, error: string, calm: boolean, isUnit: 
 }
 
 export const UNFINISHED_HINT = 'Unfinished: add what comes next';
+
+/**
+ * An error short enough for a step's box or a block's row, from its form (never its wording): "Not real" for a root
+ * of a negative number, "÷ 0" for a division by zero, "q isn't defined", and the engine's own text for anything else.
+ */
+export function shortError(form: ErrorForm, text: string): string {
+  switch (form.k) {
+    case 'notReal': return 'Not real';
+    case 'divZero': return '÷ 0';
+    case 'logDomain': return `${form.name} of ≤ 0`;
+    case 'inVar': return `${form.name}: ${shortError(form.inner, '')}`.replace(/: $/, ' fails');
+    case 'unknown': return `${form.name} isn't defined`;
+    default: return text;
+  }
+}
+
+/**
+ * What a line shows for its error, short and whole (never cut off): the short form where there is one (a line's
+ * own definition unwrapped, so r = √−3 says "Not real", not "r has an error"), else the line's plain words
+ * (lineErrorText). The engine's full text goes in its title, for hover, focus or a tap.
+ */
+export function shortLineError(text: string, error: string, isUnit: (name: string) => boolean, other?: (name: string) => string | null): string {
+  const said = lineErrorText(text, error, isUnit, other);
+  if (thousandsFix(text, error) || unitMessage(text, error, isUnit, other)) return said;
+  let form = readError(error);
+  if (form.k === 'inVar' && form.name === lineDefines(text)) form = form.inner;
+  return form.k === 'notReal' || form.k === 'divZero' || form.k === 'logDomain' || form.k === 'unknown' || form.k === 'inVar' ? shortError(form, said) : said;
+}

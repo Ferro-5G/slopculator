@@ -18,6 +18,17 @@ import '@fontsource/geist-sans/latin-600.css';
 import '@fontsource/geist-mono/latin-400.css';
 import '@fontsource/geist-mono/latin-500.css';
 import '@fontsource/geist-mono/latin-600.css';
+// The canvas design's faces: Schibsted Grotesk for the interface and answers, STIX Two Text for typeset math.
+import '@fontsource/schibsted-grotesk/latin-400.css';
+import '@fontsource/schibsted-grotesk/latin-500.css';
+import '@fontsource/schibsted-grotesk/latin-600.css';
+import '@fontsource/schibsted-grotesk/latin-700.css';
+import '@fontsource/stix-two-text/latin-400.css';
+import '@fontsource/stix-two-text/latin-500.css';
+import '@fontsource/stix-two-text/latin-400-italic.css';
+import '@fontsource/stix-two-text/latin-500-italic.css';
+import '@fontsource/stix-two-text/greek-500.css';
+import '@fontsource/stix-two-text/greek-500-italic.css';
 import './styles/fonts.css';
 import './styles/appearance.css';
 import './styles/thumbindex.css';

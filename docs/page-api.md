@@ -5,7 +5,7 @@ The web page exposes `window.slopculator`, so scripts and AI agents can use the 
 ```js
 slopculator.evaluate('normalcdf(350, 500, 400, 50)')   // { ok: true, result: '0.81859461412', ... }
 slopculator.addLine('zscore(180, 280, 40)')            // adds a line, returns its result
-slopculator.lines()                                    // every line with result or error
+slopculator.lines()                                    // every line with result or error (not the composer's empty new line)
 slopculator.setSettings({ deg: false, theme: 'oled' })
 slopculator.usage('invNorm')                           // how to call it
 slopculator.graph.png()                                // data URL of the graph

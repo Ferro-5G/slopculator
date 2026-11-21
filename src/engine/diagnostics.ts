@@ -145,16 +145,21 @@ function numbersSideBySide(l: Line): LineWarning | null {
 function divisionRunsOn(l: Line): LineWarning | null {
   for (let i = 1; i < l.toks.length; i++) {
     if (!isOp(l.toks[i], '/')) continue;
-    const atom = l.afterAtom(i + 1);
+    // d/dx x^2 is a derivative, not a fraction that runs on.
+    const over = l.toks[i - 1], under = l.toks[i + 1];
+    if (over.type === 'ident' && over.value === 'd' && under?.type === 'ident' && /^d\p{L}/u.test(under.value)) continue;
+    // 1/2x is 1/(2x), as Desmos reads it, while a TI reads x/2: say so and offer 1/2*x.
+    const atom = l.afterPowered(i + 1);
     if (atom < 0 || !l.implicit(atom)) continue;
-    const rest = l.afterPowered(atom);
+    let rest = atom;
+    while (rest > 0 && l.implicit(rest)) rest = l.afterPowered(rest);
     if (rest < 0) continue;
     const below = brief(l.source(i + 1, atom));
     const after = brief(l.source(atom, rest));
     return {
       ...l.span(i + 1, rest),
-      message: `Only ${below} is under the fraction, and ${after} multiplies the result. Use brackets if ${after} belongs below too.`,
-      fix: l.wrapped(i + 1, rest),
+      message: `${after} is under the fraction too. Put * before ${after} if only ${below} belongs below.`,
+      fix: `${l.text.slice(0, l.end(atom - 1))}*${l.text.slice(l.toks[atom].pos)}`,
     };
   }
   return null;
@@ -166,6 +171,8 @@ function powerRunsOn(l: Line): LineWarning | null {
     // "x^2y" is a normal way to write a term, so this is only for number and e bases.
     const base = l.toks[i - 1];
     if (base.type !== 'num' && !(base.type === 'ident' && base.value === 'e')) continue;
+    // ∫_0^1 x dx: the 1 is the top of the integral, and x is what it covers.
+    if (isOp(l.toks[i - 2], '_')) continue;
     const from = isOp(l.toks[i + 1], '-') ? i + 2 : i + 1;
     const atom = l.afterAtom(from);
     if (atom < 0 || !l.implicit(atom)) continue;
@@ -265,7 +272,8 @@ export function lineWarnings(text: string, settings: { deg: boolean }): LineWarn
 
 function findWarnings(text: string, deg: boolean): LineWarning[] {
   const trimmed = text.trim();
-  if (!trimmed || isHeading(trimmed)) return [];
+  // A LaTeX line is rewritten before it is read, so nothing here knows where on the typed line a token sits.
+  if (!trimmed || isHeading(trimmed) || trimmed.includes('\\')) return [];
   const toks = tokens(trimmed);
   if (!toks) return [];
   const offset = text.length - text.trimStart().length;
@@ -285,7 +293,7 @@ function findWarnings(text: string, deg: boolean): LineWarning[] {
 /** The part of the line an error is about. Null when it's about the whole line. */
 export function errorSpan(text: string, error: string, pos?: number): Span | null {
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  if (!trimmed || trimmed.includes('\\')) return null;
   const offset = text.length - text.trimStart().length;
   const shift = (s: Span): Span => ({ start: s.start + offset, end: s.end + offset });
   const toks = tokens(trimmed);

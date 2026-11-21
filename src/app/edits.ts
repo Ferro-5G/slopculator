@@ -35,9 +35,15 @@ function writeLine(row: Extract<Row, { kind: 'expr' }>, text: string): void {
   dragEnds();
   putLine(row, text);
 }
+/** Told of each value drag (a slider, a point on the graph), so the canvas can send its pulse down the wires. */
+let onDrag: (rowId: string) => void = () => {};
+export function setDragListener(fn: (rowId: string) => void): void {
+  onDrag = fn;
+}
 export function dragLine(row: Extract<Row, { kind: 'expr' }>, text: string): void {
   dragBegins(row.id, row.text);
   putLine(row, text);
+  onDrag(row.id);
 }
 export function applyFix(row: Extract<Row, { kind: 'expr' }>, text: string, end = true): void {
   const before = row.text;
@@ -177,7 +183,13 @@ export function replaceLines(texts: string[]): void {
   put(rows);
   pushStep({ label: 'Replaced lines', undo: () => put(before, beforeActive), redo: () => put(rows) }, false);
 }
+/** The composer's Enter: true when it handled the line (sent the draft, finished an edit, updated a name). */
+let enterHandler: (id: string) => boolean = () => false;
+export function setEnterHandler(fn: (id: string) => boolean): void {
+  enterHandler = fn;
+}
 export function nextLine(id: string): void {
+  if (enterHandler(id)) return;
   const next = doc.rows[rowIndex(id) + 1];
   if (next && isEmptyLine(next)) screen.focusRow(next.id);
   else addRow(id, { kind: 'expr', text: '' });
@@ -258,6 +270,11 @@ export function addRow(afterId: string | null, init: Partial<Row> & { kind: Row[
   committed.set(row.id, '');
   let i = afterId ? rowIndex(afterId) : -1;
   if (i < 0) i = doc.rows.length - 1;
+  // The composer's new line stays the sheet's last: anything added after it (a table, a normal curve, a pasted line)
+  // goes in just before it. Only the composer's own Enter adds an empty line after it.
+  const draft = doc.rows[doc.rows.length - 1];
+  const addsDraft = row.kind === 'expr' && !row.text;
+  if (!addsDraft && i === doc.rows.length - 1 && draft?.kind === 'expr' && !draft.text.trim()) i--;
   doc.rows.splice(i + 1, 0, row);
   rowsChanged(focus ? row.id : undefined);
   return row.id;

@@ -18,8 +18,14 @@ export const KEYS = {
   history: constFrom('src/ui/history.ts', 'HISTORY_KEY'),
 };
 
-/** A page's scripts can read the keys as `slopKeys`, which is why this runs before the page does. */
-export const exposeKeys = (context) => context.addInitScript((keys) => { window.slopKeys = keys; }, KEYS);
+/**
+ * A page's scripts can read the keys as `slopKeys`, which is why this runs before the page does. A fresh profile
+ * would get the first run's example on its sheet; checks start from a blank one unless they clear this flag first.
+ */
+export const exposeKeys = (context) => context.addInitScript((keys) => {
+  window.slopKeys = keys;
+  try { if (localStorage.getItem(keys.firstRun) === null && !sessionStorage.getItem('e2e-first-run')) localStorage.setItem(keys.firstRun, 'e2e'); } catch { /* storage blocked: nothing to set */ }
+}, KEYS);
 
 /** Open the app and wait for its first frame: boot focuses on the next animation frame, before the first user edit. */
 export async function openApp(page) {

@@ -7,12 +7,12 @@ import { isDist, type UnitCircleFigure, Value } from '../engine/values';
 import { isLongAnswer, matrixCells, matrixFitFont, UNIT_CIRCLE, unitCircleDrawing } from '../ui/answerlayout';
 import { asList } from '../ui/complete';
 import { DIST_OFF, type DistBounds, distPresets, distStatement } from '../ui/distview';
-import { leadingOperator, errorFixes, UNFINISHED_HINT, isStrayComma, lineErrorText, thousandsFix } from '../ui/errortext';
+import { leadingOperator, errorFixes, UNFINISHED_HINT, isStrayComma, lineErrorText, shortLineError, thousandsFix } from '../ui/errortext';
 import { warningFixes } from '../ui/linestate';
 import { mathNode, mapSource } from './mathdom';
 import { type SliderRange, wholeAwareRange } from '../ui/slider';
 import { play } from './sound';
-import { typeset, assignsLiteral } from '../ui/typeset';
+import { typeset, assignsLiteral, BLOCK_LIST_MAX, type SheetNames } from '../ui/typeset';
 import type { Row } from './docmodel';
 import { h } from './dom';
 import { dragEnds, dragLine, applyFix, nextLine } from './edits';
@@ -25,13 +25,14 @@ import { setActive } from './rows';
 import { type RowView, views } from './rowviews';
 import { doc, setKeepSelection, rowIndex, results, setTarget, sheetChanged } from './sheet';
 
-export function renderTex(v: RowView, row: Extract<Row, { kind: 'expr' }>, r: RowResult): void {
+/** `names` is what the sheet defines (and `namesKey` its key), so a word sets as letters where the engine splits it. */
+export function renderTex(v: RowView, row: Extract<Row, { kind: 'expr' }>, r: RowResult, names?: SheetNames, namesKey = ''): void {
   if (!v.tex) return;
   const look = doc.ui.look ?? 'modern';
-  const key = r.error ? '' : `${look}\n${row.text}`;
+  const key = r.error ? '' : `${look}\n${namesKey}\n${row.text}`;
   if (key === v.texKey) return;
   v.texKey = key;
-  const boxes = key ? typeset(row.text, { stack: look !== 'retro' }) : null;
+  const boxes = key ? typeset(row.text, { stack: look !== 'retro', names, listMax: BLOCK_LIST_MAX }) : null;
   v.el.classList.toggle('typeset', !!boxes);
   if (!boxes) {
     v.tex.replaceChildren();
@@ -158,12 +159,19 @@ export function renderOut(v: RowView, r: RowResult, o: DisplayOpts): void {
   } else if (r.error) {
     const span = r.errorSpan;
     const lineText = rowOf?.kind === 'expr' ? rowOf.text : '';
-    const said = lineErrorText(lineText, r.error, isUnit, otherUnit);
+    // Short and whole on the line; its plain words in full on hover, focus or a tap, the engine's in the title.
+    const said = shortLineError(lineText, r.error, isUnit, otherUnit);
+    const full = lineErrorText(lineText, r.error, isUnit, otherUnit);
+    const more = full !== said ? { 'data-full': full } : {};
     if (span && rowOf?.kind === 'expr') {
-      const err = h('button', { type: 'button', class: 'err marked', title: `${r.error}\nClick to show this in the line` }, said);
-      err.addEventListener('click', () => selectSpan(rowOf, span));
+      const err = h('button', { type: 'button', class: 'err marked', title: `${r.error}\nClick to show this in the line`, ...more }, said);
+      err.addEventListener('click', () => { err.classList.toggle('full'); selectSpan(rowOf, span); });
       parts.push(err);
-    } else parts.push(h('span', { class: 'err', title: r.error }, said));
+    } else {
+      const err = h('span', { class: 'err', title: r.error, ...more }, said);
+      if (full !== said) { err.tabIndex = 0; err.addEventListener('click', () => err.classList.toggle('full')); }
+      parts.push(err);
+    }
     // Never for a number with thousands commas (1,250): wrapping it in { } gives a wrong value; it gets "Use 1250".
     const list = rowOf?.kind === 'expr' && isStrayComma(r.error) && !thousandsFix(rowOf.text, r.error) ? asList(rowOf.text) : null;
     if (list && rowOf?.kind === 'expr') {
@@ -262,6 +270,12 @@ export function fitRange(range: HTMLInputElement, rg: SliderRange, value: number
   range.max = String(Math.max(rg.max, value));
   range.step = String(rg.step);
   if (document.activeElement !== range) range.value = String(value);
+  paintRange(range);
+}
+/** The filled part of a slider's track, as --p, for a track drawn in the stylesheet. */
+export function paintRange(range: HTMLInputElement): void {
+  const min = Number(range.min), max = Number(range.max), v = Number(range.value);
+  range.style.setProperty('--p', `${max > min ? ((v - min) / (max - min)) * 100 : 0}%`);
 }
 
 function buildSlider(row: Extract<Row, { kind: 'expr' }>): HTMLElement {
@@ -269,6 +283,7 @@ function buildSlider(row: Extract<Row, { kind: 'expr' }>): HTMLElement {
   const mk = (cls: string, label: string) => h('input', { class: `lim ${cls}`, inputmode: 'decimal', 'aria-label': label, spellcheck: 'false' });
   const lo = mk('lo', 'Slider minimum'), hi = mk('hi', 'Slider maximum'), step = mk('step', 'Slider step');
   range.addEventListener('input', () => {
+    paintRange(range);
     const name = sliderName(row.text);
     dragLine(row, `${name} = ${Number(range.value)}`);
     sheetChanged();

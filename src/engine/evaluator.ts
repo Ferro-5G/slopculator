@@ -4,7 +4,7 @@ import {
 import type { Node } from './parser';
 import { isGraphVar } from './ast';
 import { canonicalName } from './lexer';
-import { arith, negate, num, type Value, list, point, vector, matrix, complex, typeName, mapNum, text } from './values';
+import { arith, negate, num, type Value, list, point, vector, matrix, complex, typeName, mapNum, recordField, text } from './values';
 import { factorial, nCr, nPr } from './numeric';
 import { BUILTINS, CONSTANTS } from './builtins';
 import { MAX_CALL_DEPTH, bracketKind, isConstantE, oddRootOf, resolveCall, resolveId, rewritePower } from './resolve';
@@ -75,6 +75,8 @@ interface VarDef {
   name: string;
   node?: Node;
   value?: Value;
+  /** Works the value out where a line does more than evaluate node, as a regression does for its unknowns. node still says what it depends on. */
+  compute?: () => Value;
   row: number;
   letter?: boolean;
 }
@@ -207,7 +209,7 @@ export class Env {
 
   private workOut(name: string, def: VarDef): Value {
     try {
-      let v = compile(def.node!, this, [], def.row)([]);
+      let v = def.compute ? def.compute() : compile(def.node!, this, [], def.row)([]);
       v = orDouble(() => this.hooks.improve(name, v)) ?? v;
       this.cache.set(name, v);
       return v;
@@ -346,7 +348,7 @@ function compileId(name: string, env: Env, locals: string[], row: number): Fn {
       return () => iv;
     }
     case 'constant': {
-      const v = CONSTANTS[name];
+      const v = CONSTANTS[use.name ?? name];
       return () => v;
     }
     case 'zeroInput': return compileCall({ k: 'call', name, args: [], pos: 0 }, env, locals, row);
@@ -453,12 +455,52 @@ function compare(op: string, a: Value, b: Value): boolean {
     case '<=': return x <= y;
     case '>=': return x >= y;
     case '=': return x === y || (Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - y) <= 1e-12 * Math.max(1, Math.abs(x), Math.abs(y)));
+    case '!=': return !compare('=', a, b);
+    case '~': return fail('A regression stands alone on its line, like y1 ~ m x1 + b');
   }
   return false;
 }
 
+/**
+ * A name after a dot with nothing after it (A.h, stats(L).mean, P.x): a record's field of that name when what it hangs
+ * off is a record that has one, else the function of that name on it, as Desmos reads L.mean. A name that is neither
+ * a function nor a field is an error when the line runs, since only then is it known what the dot hangs off.
+ */
+function compileField(n: Extract<Node, { k: 'call' }>, env: Env, locals: string[], row: number): Fn {
+  const { name } = n;
+  const base = compile(n.args[0], env, locals, row);
+  const use = resolveCall(name, 1, env, locals);
+  let call: ((v: Value) => Value) | null = null;
+  if (use.k === 'user' && use.def.params.length === 1) {
+    call = (v) => {
+      const body = env.getFunc(name);
+      env.enterCall(name);
+      try {
+        return body([v]);
+      } finally {
+        env.leaveCall();
+      }
+    };
+  } else if (use.k === 'builtin' && !use.b.lazy && use.b.min <= 1 && use.b.max >= 1) {
+    const fn = use.b.fn!;
+    call = (v) => fn([v], env);
+  }
+  return (s) => {
+    const v = base(s);
+    if (typeof v === 'object' && v.t === 'record') {
+      const f = recordField(v, name);
+      if (f !== undefined) return f;
+      if (!call) fail(`${v.title} has no ${name}`);
+    }
+    if (!call) fail(`A ${typeName(v)} has no ${name}`);
+    return call(v);
+  };
+}
+
 function compileCall(n: Extract<Node, { k: 'call' }>, env: Env, locals: string[], row: number): Fn {
   const { name } = n;
+  // A lazy built-in after a dot (rare) keeps its own reading; every other one-input dot can read a field.
+  if (n.dot && n.args.length === 1 && !(BUILTINS[name]?.lazy && !env.hasFunc(name))) return compileField(n, env, locals, row);
   const use = resolveCall(name, n.args.length, env, locals);
   if (use.k === 'value') {
     if (n.args.length !== 1) fail(`${name} is a value, not a function`);
@@ -511,7 +553,8 @@ function compileCall(n: Extract<Node, { k: 'call' }>, env: Env, locals: string[]
     const log = BUILTINS.log.fn!;
     return (s) => log([base(s), arg(s)], env);
   }
-  if (n.args.length < b.min || n.args.length > b.max) fail(arityText(name, b.min, b.max, n.args.length, b.usage));
+  // A form with no name of its own (L[2], P.x) goes by a name that starts with _, which no line can type.
+  if (n.args.length < b.min || n.args.length > b.max) fail(arityText(name.replace(/^_/, ''), b.min, b.max, n.args.length, b.usage));
   if (b.lazy) return b.lazy(n.args, locals, env, (node, loc) => compile(node, env, loc, row));
   const fn = b.fn!;
   const args = n.args.map((a) => compile(a, env, locals, row));

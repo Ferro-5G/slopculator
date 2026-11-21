@@ -271,7 +271,10 @@ function snap(r: number, scale: number): number {
  * is unknown or ambiguous. Lines like this are worked out as the convert call they name.
  */
 export function unitPhrase(text: string, known: (name: string) => boolean = isUnit): string | null {
-  const m = /^\s*(?:convert\s+)?(-?(?:\d[\d,]*(?:\.\d*)?|\.\d+))\s*([^\s\d(),"=+*/^-][^\s(),"=+*^]*)\s+(?:to|in|into|as|->|→)\s+([^\s(),"=+*^]+)\s*$/i.exec(text);
-  if (!m || !known(m[2]) || !known(m[3])) return null;
-  return `convert(${m[1].replace(/,/g, '')}, "${m[2]}", "${m[3]}")`;
+  const m = /^\s*(?:convert\s+)?(-?(?:\d[\d,]*(?:\.\d*)?|\.\d+))\s*([^\s\d(),"=+*/^-][^\s(),"=+*^]*(?:\^\d)?)\s+(?:to|in|into|as|->|→)\s+([^\s(),"=+*^]+(?:\^\d)?)\s*$/i.exec(text);
+  if (!m) return null;
+  // m^2 is how a keyboard writes m², which the table knows as m2.
+  const from = m[2].replace('^', ''), to = m[3].replace('^', '');
+  if (!known(from) || !known(to)) return null;
+  return `convert(${m[1].replace(/,/g, '')}, "${from}", "${to}")`;
 }

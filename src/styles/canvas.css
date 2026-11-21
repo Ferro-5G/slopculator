@@ -1,0 +1,2606 @@
+/*
+ * The canvas sheet: blocks on a dot-grid world that pans and zooms (wide) or a column with wires in its gutter
+ * (narrow), the lit composer docked at the foot with raised tabs on its edge, and the keypad. Loaded after the look's
+ * stylesheet, so it lays out and finishes what the look paints; colors come from the palette (src/ui/palettes.ts).
+ */
+@property --cv-ang {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+:root[data-look='modern'] {
+  --sans: 'Superscripts', 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Superscripts', 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --math: 'STIX Two Text', 'Times New Roman', serif;
+}
+
+.canvas-ui {
+  --cv-dot: color-mix(in srgb, var(--ink) 11%, var(--bg));
+  --cv-block: var(--panel);
+  --cv-raised: var(--active-fill, var(--well));
+  --cv-edge: var(--rule);
+  --cv-edge-2: var(--rule-2);
+  /* The accent follows Appearance › Color: a swatch sets --led, and the theme's own cobalt is the hero key's glow. */
+  --cv-accent: var(--led, var(--hero-glow, var(--accent)));
+  --cv-accent-soft: color-mix(in srgb, var(--cv-accent) 16%, transparent);
+  --cv-sky: color-mix(in srgb, var(--cv-accent) 55%, #58c4f5);
+  --cv-iris: color-mix(in srgb, var(--cv-accent) 55%, #8e7bff);
+  --cv-wire: color-mix(in srgb, var(--ink-3) 52%, var(--bg));
+  --cv-gutter: 34px;
+  /* One corner radius for blocks, the graph and the composer (CASCADE_RADIUS in src/ui/cascade.ts). */
+  --cv-radius: 22px;
+  --cv-ac: var(--key-ac-ink, var(--err));
+  position: relative;
+}
+
+/* ---------- the stage ---------- */
+.canvas-ui .main {
+  display: block;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.canvas-ui .main > .left {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--bg);
+  container: none;
+}
+.canvas-ui .tape.cv-viewport {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--cv-dot) 1.2px, transparent 1.4px);
+  background-size: 22px 22px;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.canvas-ui .tape.cv-viewport.panning {
+  cursor: grabbing;
+}
+.canvas-ui .tape > .edge-cover,
+.canvas-ui .tape::after,
+.canvas-ui .mobile-nav,
+.canvas-ui .splitter,
+.canvas-ui .bar-tog:not([aria-controls='keypad']) {
+  display: none !important;
+}
+
+/* ---------- the top bar: no bar, the brand and a few controls over the canvas ---------- */
+#app.canvas-ui > .modebar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 30;
+  height: auto;
+  padding: 14px 22px 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+  align-items: center;
+  gap: 10px;
+}
+#app.canvas-ui > .modebar > * {
+  pointer-events: auto;
+}
+#app.canvas-ui > .modebar .brand-home {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+#app.canvas-ui > .modebar .sheet-title {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-2);
+  padding-left: 12px;
+  border-left: 1px solid var(--cv-edge-2);
+}
+/* The bar's groups are the mockup's segmented controls: a surface, a fine edge, the chosen one raised. */
+#app.canvas-ui > .modebar .desk-modes .seg,
+#app.canvas-ui > .modebar .cv-tools,
+#app.canvas-ui > .modebar .head-pill,
+#app.canvas-ui > .modebar .bar-tog,
+#app.canvas-ui > .modebar .desk-more,
+#app.canvas-ui > .modebar .appear-btn,
+#app.canvas-ui > .modebar .help-btn {
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: 10px;
+  padding: 3px;
+  min-height: 0;
+  height: auto;
+  box-shadow: none;
+}
+#app.canvas-ui > .modebar .desk-modes .seg button,
+#app.canvas-ui > .modebar .cv-tools .cv-btn,
+#app.canvas-ui > .modebar .head-pill > button,
+#app.canvas-ui > .modebar .head-pill .menu-btn {
+  padding: 6px 11px;
+  height: auto;
+  min-height: 0;
+  border-radius: 7px;
+  font-size: 14px;
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+#app.canvas-ui > .modebar .desk-modes .seg button[aria-pressed='true'] {
+  background: var(--cv-raised);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--cv-edge-2);
+}
+#app.canvas-ui > .modebar .bar-tog,
+#app.canvas-ui > .modebar .desk-more,
+#app.canvas-ui > .modebar .help-btn,
+#app.canvas-ui > .modebar .appear-btn {
+  padding: 6px 11px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+#app.canvas-ui > .modebar .bar-tog::before {
+  display: none;
+}
+#app.canvas-ui > .modebar .bar-tog[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--cv-raised);
+  border-color: var(--cv-edge-2);
+}
+#app.canvas-ui > .modebar .head-find kbd,
+#app.canvas-ui > .modebar .head-find .kbd {
+  font-size: 12px;
+  color: var(--ink-3);
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 5px;
+  padding: 0 5px;
+  margin-left: 6px;
+  background: var(--bg);
+}
+.canvas-ui .desk-modes > .bar-mode:not([data-fold='7']),
+.canvas-ui .desk-modes > .bar-gap {
+  display: none !important;
+}
+.canvas-ui .cv-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0;
+}
+.canvas-ui .cv-tools .cv-btn {
+  cursor: pointer;
+}
+.canvas-ui .cv-tools .cv-btn:hover,
+#app.canvas-ui > .modebar .desk-modes .seg button:hover {
+  color: var(--ink);
+}
+.canvas-ui .cv-zoom {
+  min-width: 46px;
+  padding: 6px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- the world (wide) ---------- */
+.canvas-ui .cv-wide > .rows {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  transform-origin: 0 0;
+  scroll-snap-type: none;
+}
+.canvas-ui .cv-wide > .rows.cv-glide {
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.canvas-ui .cv-wide > .rows > .row.blk,
+.canvas-ui .cv-wide > .rows > .blk-graph,
+.canvas-ui .cv-wide > .rows > .blk-example-graph {
+  position: absolute;
+}
+
+/* ---------- blocks ---------- */
+.canvas-ui .rows > .row.blk {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 560px;
+  width: max-content;
+  min-height: 0;
+  padding: 11px 18px 11px 24px;
+  margin: 0;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: var(--cv-radius);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: none;
+  transition: border-color 0.15s;
+}
+.canvas-ui .rows > .row.blk::before,
+.canvas-ui .rows > .row.blk + .row::before {
+  display: none;
+}
+.canvas-ui .cv-wide > .rows > .row.blk .reorder {
+  display: none;
+}
+.canvas-ui .rows > .row.blk:hover {
+  border-color: var(--cv-edge-2);
+  background: var(--cv-block);
+}
+.canvas-ui .rows > .row.blk.dragging {
+  z-index: 5;
+  cursor: grabbing;
+  border-color: var(--cv-accent);
+}
+.canvas-ui .rows > .row.blk-blank {
+  display: none !important;
+}
+.canvas-ui .rows > .row.blk .gutter {
+  position: absolute;
+  left: 9px;
+  top: 11px;
+  bottom: 11px;
+  width: 4px;
+  padding: 0;
+  margin: 0;
+  display: block;
+}
+.canvas-ui .rows > .row.blk .gutter .idx {
+  display: none;
+}
+.canvas-ui .rows > .row.blk .gutter .idx.letter {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: -10px;
+  font: 500 11px var(--sans);
+  color: var(--ink-3);
+}
+/* A line that draws keeps its show-or-hide chip as the rail down its left edge, in its curve's color. */
+.canvas-ui .rows > .row.blk .gutter .chip {
+  position: absolute;
+  inset: 0;
+  width: 4px;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: var(--c);
+  opacity: 1;
+}
+.canvas-ui .rows > .row.blk .gutter .chip::before,
+.canvas-ui .rows > .row.blk .gutter .chip::after {
+  display: none;
+}
+.canvas-ui .rows > .row.blk .gutter .chip[aria-pressed='false'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--c);
+}
+.canvas-ui .rows > .row.blk .body {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+}
+.canvas-ui .rows > .row.blk .line {
+  min-height: 0;
+  gap: 2px 16px;
+}
+.canvas-ui .rows > .row.blk .tex,
+.canvas-ui .rows > .row.blk .expr {
+  font-size: 21px;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.canvas-ui .rows > .row.blk .del {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--cv-raised);
+  border: 1px solid var(--cv-edge-2);
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 18px;
+  opacity: 0;
+  display: block;
+}
+.canvas-ui .rows > .row.blk:hover .del {
+  opacity: 1;
+}
+/* A value: what was asked small on top, the answer large under it. */
+.canvas-ui .rows > .row.blk-value {
+  border-radius: var(--cv-radius);
+  padding: 12px 18px 13px;
+  min-width: 210px;
+}
+.canvas-ui .rows > .row.blk-value .gutter {
+  display: none;
+}
+.canvas-ui .rows > .row.blk-value .line {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  align-content: flex-start;
+}
+.canvas-ui .rows > .row.blk-value .line > * {
+  align-self: flex-start;
+  margin-left: 0;
+  flex: none;
+}
+.canvas-ui .rows > .row.blk-value .tex,
+.canvas-ui .rows > .row.blk-value .expr {
+  font-size: 18px;
+  color: var(--ink-2);
+  padding: 0;
+}
+.canvas-ui .rows > .row.blk-value .out,
+.canvas-ui .rows > .row.blk-value .out .result {
+  font: 600 31px/1.15 var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  justify-content: flex-start;
+  text-align: left;
+  max-width: none;
+  font-variant-numeric: lining-nums;
+}
+.canvas-ui .rows > .row.blk-value .out .result::before {
+  content: '=';
+  color: var(--ink-3);
+  font-weight: 400;
+  margin-right: 0.22em;
+}
+/* A slider: the one control on the canvas. */
+.canvas-ui .rows > .row.blk-slider {
+  border-radius: var(--cv-radius);
+  border-color: var(--cv-edge);
+  background: var(--cv-block);
+  padding: 9px 20px 9px 22px;
+  min-width: 320px;
+}
+.canvas-ui .rows > .row.blk-slider .body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.canvas-ui .rows > .row.blk-slider .line {
+  flex: none;
+  min-width: 64px;
+  /* Room for a value to grow while the slider is held: the label keeps its width then (src/app/canvas.ts). */
+  padding-right: 1.6ch;
+}
+.canvas-ui .rows > .row.blk-slider .tex,
+.canvas-ui .rows > .row.blk-slider .expr {
+  font-size: 22px;
+}
+.canvas-ui .rows > .row.blk-slider .out {
+  display: none;
+}
+.canvas-ui .rows > .row.blk-slider .extra {
+  flex: 1;
+  min-width: 200px;
+  padding: 0;
+}
+.canvas-ui .rows > .row.blk-slider .slider-row {
+  grid-template-columns: auto 1fr auto auto 3ch;
+  gap: 14px;
+  padding: 0;
+}
+.canvas-ui .rows > .row.blk-slider .slider-row .lim {
+  font: 13px var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  padding: 0;
+  width: auto;
+  min-width: 2ch;
+}
+/* The step is kept for whoever wants it: it shows while the slider is pointed at, in room it always has, so the
+   block never changes size under the pointer. */
+.canvas-ui .rows > .row.blk-slider .slider-row .step-label,
+.canvas-ui .rows > .row.blk-slider .slider-row .lim.step {
+  visibility: hidden;
+}
+.canvas-ui .rows > .row.blk-slider:is(:hover, :focus-within) .slider-row .step-label,
+.canvas-ui .rows > .row.blk-slider:is(:hover, :focus-within) .slider-row .lim.step {
+  visibility: visible;
+}
+.canvas-ui .rows > .row.blk-slider .gutter {
+  display: none;
+}
+.canvas-ui input.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 28px;
+  margin: 0;
+  cursor: pointer;
+  min-width: 60px;
+}
+.canvas-ui input.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--cv-accent) var(--p, 10%), color-mix(in srgb, var(--ink-3) 30%, var(--bg)) var(--p, 10%));
+}
+.canvas-ui input.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink-3) 30%, var(--bg));
+}
+.canvas-ui input.slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cv-accent);
+}
+.canvas-ui input.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  margin-top: -8px;
+  border: 0;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cv-accent) 25%, transparent);
+}
+.canvas-ui input.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 0;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cv-accent) 25%, transparent);
+}
+.canvas-ui input.slider:active::-webkit-slider-thumb {
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--cv-accent) 38%, transparent);
+}
+.canvas-ui .rows > .row.blk-curve .out:empty {
+  display: none;
+}
+.canvas-ui .rows > .row.has-error.blk {
+  border-color: color-mix(in srgb, var(--err) 55%, var(--cv-edge));
+}
+
+.canvas-ui .cv-wide > .rows > .row.blk-example {
+  min-width: 330px;
+}
+
+/* The editing ghost: where a block waits while it's in the composer. */
+.canvas-ui .blk-ghost {
+  position: absolute;
+  border-radius: var(--cv-radius);
+  border: 1.5px dashed color-mix(in srgb, var(--cv-accent) 70%, transparent);
+  box-shadow: 0 0 0 2px var(--cv-accent), 0 0 0 7px var(--cv-accent-soft);
+  pointer-events: none;
+}
+.canvas-ui .cv-narrow .blk-ghost {
+  display: none;
+}
+
+/* The example's group and the editing ghost. Positioned by the layout, so no list margins move them off their blocks. */
+.canvas-ui .rows > .example-frame,
+.canvas-ui .rows > .blk-ghost,
+.canvas-ui .rows > .blk-example-graph {
+  margin: 0;
+}
+.canvas-ui .example-frame {
+  position: absolute;
+  z-index: 2;
+  border: 1.5px dashed color-mix(in srgb, var(--ink-3) 30%, var(--bg));
+  border-radius: calc(var(--cv-radius) + 8px);
+  pointer-events: none;
+}
+/* The example's own graph: a small figure with no tools, inside the frame. */
+.canvas-ui .rows > .blk-example-graph {
+  display: block;
+  overflow: hidden;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: var(--cv-radius);
+  width: 330px;
+  height: 196px;
+}
+.canvas-ui .blk-example-graph .example-graph-host {
+  position: absolute;
+  inset: 0;
+}
+.canvas-ui .blk-example-graph .example-graph-canvas {
+  display: block;
+}
+.canvas-ui .example-clear {
+  position: absolute;
+  right: 16px;
+  top: 10px;
+  pointer-events: auto;
+  font: 14px var(--sans);
+  color: var(--ink-2);
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--cv-wire);
+  cursor: pointer;
+}
+.canvas-ui .example-clear:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+/* ---------- the graph block ---------- */
+.canvas-ui .main .rows > .blk-graph {
+  display: block;
+  overflow: hidden;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: var(--cv-radius);
+  min-width: 0;
+  min-height: 0;
+}
+.canvas-ui .graph-pane::before {
+  display: none;
+}
+.canvas-ui .rows > .blk-graph .graph-host {
+  position: absolute;
+  inset: 0;
+}
+.canvas-ui .rows > .blk-graph .graph-chips,
+.canvas-ui .rows > .blk-graph .graph-sliders,
+.canvas-ui .rows > .blk-graph .marks-hint {
+  display: none !important;
+}
+.canvas-ui .rows > .blk-graph .graph-dock {
+  display: block;
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 10px;
+  left: auto;
+  bottom: auto;
+  width: auto;
+  padding: 0;
+  background: none;
+  border: 0;
+  pointer-events: none;
+}
+.canvas-ui .rows > .blk-graph .graph-tools {
+  position: static;
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cv-block) 92%, transparent);
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 8px;
+  box-shadow: none;
+  pointer-events: auto;
+}
+.canvas-ui .rows > .blk-graph .graph-tools .gt-group {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.canvas-ui .rows > .blk-graph .graph-tools button {
+  min-height: 0;
+  height: auto;
+  min-width: 0;
+  width: auto;
+  padding: 5px 10px;
+  border: 0;
+  border-left: 1px solid var(--cv-edge-2);
+  border-radius: 0;
+  background: none;
+  font: 13px var(--sans);
+  color: var(--ink-2);
+}
+.canvas-ui .rows > .blk-graph .graph-tools .gt-group:first-child button:first-child {
+  border-left: 0;
+}
+.canvas-ui .rows > .blk-graph .graph-tools button:hover {
+  background: var(--cv-raised);
+  color: var(--ink);
+}
+.canvas-ui .rows > .blk-graph .graph-tools .gt-labeled .gl {
+  display: none;
+}
+.canvas-ui .blk-grip {
+  position: absolute;
+  left: 0;
+  right: 160px;
+  top: 0;
+  height: 16px;
+  cursor: grab;
+  z-index: 2;
+}
+.canvas-ui .blk-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  z-index: 2;
+  background: linear-gradient(135deg, transparent 52%, var(--ink-3) 52%, var(--ink-3) 57%, transparent 57%, transparent 68%, var(--ink-3) 68%, var(--ink-3) 73%, transparent 73%);
+}
+.canvas-ui .cv-narrow .blk-grip,
+.canvas-ui .cv-narrow .blk-resize {
+  display: none;
+}
+
+/* ---------- wires ---------- */
+.canvas-ui .cv-wires {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+.canvas-ui .cv-wires path.w {
+  fill: none;
+  stroke: var(--cv-wire);
+  stroke-width: 1.5;
+}
+.canvas-ui .cv-wires path.pulse {
+  fill: none;
+  stroke: var(--cv-accent);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px var(--cv-accent));
+}
+.canvas-ui .cv-wires circle.port-out {
+  fill: var(--cv-wire);
+}
+.canvas-ui .cv-wires circle.port-in {
+  fill: var(--bg);
+  stroke: var(--cv-wire);
+  stroke-width: 1.5;
+}
+
+/* A wire lights while a drag runs down it, dims while a drag or a pointed-at wire leaves it out. */
+.canvas-ui .cv-wires path.w,
+.canvas-ui .cv-wires circle {
+  transition: stroke 0.2s, fill 0.2s, opacity 0.25s;
+}
+.canvas-ui .cv-wires path.w:is(.lit, .focus) {
+  stroke: var(--cv-accent);
+}
+.canvas-ui .cv-wires circle.port-out:is(.lit, .focus) {
+  fill: var(--cv-accent);
+}
+.canvas-ui .cv-wires circle.port-in:is(.lit, .focus) {
+  stroke: var(--cv-accent);
+}
+.canvas-ui .cv-wires :is(path, circle).dim {
+  opacity: 0.4;
+}
+.canvas-ui .cv-wires path.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+}
+/* After a failing step, a wire carries nothing: dashed coral. */
+.canvas-ui .cv-wires path.w.err {
+  stroke: color-mix(in srgb, var(--err) 55%, transparent);
+  stroke-dasharray: 4 5;
+}
+.canvas-ui .cv-wires circle.port-out.err {
+  fill: color-mix(in srgb, var(--err) 65%, transparent);
+}
+.canvas-ui .cv-wires circle.port-in.err {
+  stroke: color-mix(in srgb, var(--err) 65%, transparent);
+}
+
+/* ---------- the tag a wire carries ---------- */
+.canvas-ui .rows > .cv-tags {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: visible;
+  z-index: 4;
+  pointer-events: none;
+}
+.canvas-ui .cv-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 9px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--cv-edge-2);
+  white-space: nowrap;
+  font: 500 13px var(--sans);
+  color: var(--ink-2);
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, color 0.2s, border-color 0.2s, background-color 0.3s;
+}
+.canvas-ui .cv-tag.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.canvas-ui .cv-tag.gone {
+  display: none;
+}
+.canvas-ui .cv-tag:focus-visible {
+  outline: 2px solid var(--cv-accent);
+  outline-offset: 2px;
+}
+.canvas-ui .cv-tag .tn {
+  font: italic 15px/1 var(--math);
+  color: var(--cv-accent);
+}
+.canvas-ui .cv-tag .tn .m-math {
+  font-size: inherit;
+}
+.canvas-ui .cv-tag .tv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.canvas-ui .cv-tag .tu {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin-left: -2px;
+}
+.canvas-ui .cv-tag .tu:empty,
+.canvas-ui .cv-tag .td:empty {
+  display: none;
+}
+.canvas-ui .cv-tag .bars rect {
+  fill: currentColor;
+}
+/* A drag's change, at the tag's end. */
+.canvas-ui .cv-tag .td {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cv-accent);
+}
+.canvas-ui .cv-tag.lit {
+  border-color: color-mix(in srgb, var(--cv-accent) 60%, transparent);
+  color: var(--ink);
+}
+.canvas-ui .cv-tag.dim {
+  color: color-mix(in srgb, var(--ink-3) 70%, var(--bg));
+  border-color: color-mix(in srgb, var(--cv-edge) 80%, var(--bg));
+}
+.canvas-ui .cv-tag.dim .tn {
+  color: color-mix(in srgb, var(--cv-accent) 45%, var(--bg));
+}
+.canvas-ui .cv-tag.focus {
+  background: var(--cv-raised);
+  border-color: var(--cv-accent);
+  color: var(--ink);
+  z-index: 2;
+}
+.canvas-ui .cv-tag.tick {
+  background-color: color-mix(in srgb, var(--cv-accent) 22%, var(--bg));
+  border-color: var(--cv-accent);
+  transition: none;
+}
+.canvas-ui .cv-tag.err .tv {
+  color: var(--err);
+}
+
+/* ---------- unfold: a line's steps ---------- */
+.canvas-ui .rows > .row.blk .cv-steps {
+  flex: none;
+  align-self: flex-start;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 0 16px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 8px;
+  background: transparent;
+  font: 500 13.5px var(--sans);
+  color: var(--ink-2);
+}
+.canvas-ui .rows > .row.blk .cv-steps[hidden],
+.canvas-ui .rows > .row.in-composer .cv-steps,
+.canvas-ui .rows > .row.in-composer .cv-dl {
+  display: none;
+}
+.canvas-ui .rows > .row.blk .cv-steps:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--cv-edge-2) 60%, var(--ink-3));
+}
+.canvas-ui .rows > .row.blk .cv-steps svg {
+  display: block;
+  transition: transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.canvas-ui .rows > .row.blk .cv-steps[aria-expanded='true'] {
+  background: var(--cv-raised);
+  color: var(--ink);
+}
+.canvas-ui .rows > .row.blk .cv-steps[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.canvas-ui .rows > .row.blk .cv-steps .flag {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--err);
+  box-shadow: 0 0 0 2px var(--cv-block);
+  display: none;
+}
+.canvas-ui .rows > .row.blk .cv-steps.bad[aria-expanded='false'] .flag {
+  display: block;
+}
+/* The line's change during a drag, under its Steps button. */
+.canvas-ui .rows > .row.blk .cv-dl {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  font: 600 13px var(--sans);
+  color: var(--cv-accent);
+}
+.canvas-ui .rows > .row.blk .cv-dl:empty {
+  display: none;
+}
+.canvas-ui .tex .m-run.cv-hl {
+  background: color-mix(in srgb, var(--cv-accent) 22%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cv-accent) 22%, transparent);
+  border-radius: 3px;
+}
+.canvas-ui .rows > .cv-tray {
+  position: absolute;
+  margin: 0;
+  border: 1.5px dashed color-mix(in srgb, var(--ink-3) 30%, var(--bg));
+  border-radius: var(--cv-radius);
+  background: color-mix(in srgb, var(--cv-block) 34%, transparent);
+  z-index: 1;
+}
+.canvas-ui .cv-tree {
+  display: none;
+}
+.canvas-ui .cv-step {
+  position: absolute;
+  width: max-content;
+  background: var(--bg);
+  border: 1px solid var(--cv-edge);
+  border-radius: 10px;
+  padding: 6px 12px 7px;
+  cursor: default;
+  white-space: nowrap;
+  transition: opacity 0.25s, border-color 0.25s;
+  z-index: 2;
+}
+.canvas-ui .cv-step:hover,
+.canvas-ui .cv-step:focus-visible {
+  border-color: color-mix(in srgb, var(--cv-edge-2) 60%, var(--ink-3));
+  outline: none;
+}
+.canvas-ui .cv-step .sm {
+  font: 400 16.5px/1.25 var(--math);
+  color: var(--ink);
+}
+.canvas-ui .cv-step .sv {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 1px;
+}
+.canvas-ui .cv-step .v {
+  font: 600 17px var(--sans);
+  color: var(--ink);
+}
+.canvas-ui .cv-step .v.eq::before {
+  content: '= ';
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.canvas-ui .cv-step .d {
+  font: 600 13px var(--sans);
+  color: var(--cv-accent);
+}
+.canvas-ui .cv-step .d:empty {
+  display: none;
+}
+.canvas-ui .cv-step.same {
+  opacity: 0.42;
+}
+.canvas-ui .cv-step.bad {
+  border-color: color-mix(in srgb, var(--err) 62%, transparent);
+}
+.canvas-ui .cv-step.bad .v {
+  color: var(--err);
+  font-size: 14px;
+  font-weight: 500;
+}
+.canvas-ui .cv-step.bad.full {
+  white-space: normal;
+  max-width: 260px;
+  z-index: 3;
+}
+.canvas-ui .cv-step.void .v {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.canvas-ui .cv-step.hit {
+  animation: cv-hit 0.55s ease-out;
+}
+@keyframes cv-hit {
+  from {
+    box-shadow: 0 0 0 2px var(--cv-accent), 0 0 0 8px var(--cv-accent-soft);
+  }
+  to {
+    box-shadow: 0 0 0 2px transparent, 0 0 0 14px transparent;
+  }
+}
+.canvas-ui .cv-tray.settle {
+  animation: cv-tray-in 0.2s ease-out both;
+}
+@keyframes cv-tray-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-ui .cv-step.hit,
+  .canvas-ui .cv-tray.settle {
+    animation: none;
+  }
+  .canvas-ui .cv-tag {
+    transition: none;
+  }
+}
+[data-motion='off'] .canvas-ui :is(.cv-step.hit, .cv-tray.settle),
+[data-motion='reduced'] .canvas-ui :is(.cv-step.hit, .cv-tray.settle) {
+  animation: none;
+}
+
+/* ---------- the composer ---------- */
+.canvas-ui .composer-dock {
+  position: absolute;
+  bottom: 22px;
+  left: calc((100% - var(--cv-keys-w, 352px)) / 2);
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - var(--cv-keys-w, 352px) - 48px));
+  z-index: 22;
+}
+.canvas-ui .composer-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  height: 34px;
+  padding: 0 16px;
+}
+.canvas-ui .composer-head > .spacer {
+  flex: 1;
+}
+.canvas-ui .composer-head > .list-tools {
+  display: none;
+}
+.canvas-ui .composer-tabs {
+  display: flex;
+  gap: 4px;
+  align-self: flex-end;
+}
+.canvas-ui .composer-tabs .key.ti-tab {
+  flex: none;
+  position: relative;
+  top: 1px;
+  height: auto;
+  min-height: 0;
+  width: auto;
+  padding: 7px 13px 8px;
+  border-radius: 11px 11px 0 0;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-bottom: 0;
+  box-shadow: none;
+  color: var(--ink-2);
+  flex-direction: row;
+  gap: 0;
+}
+.canvas-ui .composer-tabs .ti-tab .ti-glyph,
+.canvas-ui .composer-tabs .ti-tab::before,
+.canvas-ui .composer-tabs .ti-tab::after {
+  display: none;
+}
+.canvas-ui .composer-tabs .key.ti-tab .kl {
+  font: 500 14px/1.2 var(--sans);
+  max-width: none;
+  overflow: visible;
+  color: inherit;
+}
+.canvas-ui .composer-tabs .key.ti-tab:hover {
+  color: var(--ink);
+}
+.canvas-ui .composer-tabs .key.ti-tab.lit {
+  background: var(--cv-raised);
+  color: var(--ink);
+  border-color: var(--cv-edge-2);
+}
+.canvas-ui .composer-head .composer-ac {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  width: auto;
+  padding: 6px 12px;
+  margin-bottom: 3px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
+  border: 0;
+}
+.canvas-ui .composer-head .composer-ac .kl {
+  font: 600 14px var(--sans);
+  color: var(--cv-ac);
+}
+.canvas-ui .composer-head .composer-ac:hover {
+  background: color-mix(in srgb, var(--cv-ac) 10%, transparent);
+}
+.canvas-ui .composer-head .nav-keys {
+  margin-bottom: 3px;
+}
+.canvas-ui .composer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 12px 12px 12px 22px;
+  background: var(--cv-raised);
+  border-radius: var(--cv-radius);
+}
+/* The edge: a fine rim, and once the line works out, a light that runs round it with a soft halo. */
+.canvas-ui .composer::before,
+.canvas-ui .composer::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--cv-radius) + 1px);
+  padding: 1.25px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.canvas-ui .composer::before {
+  background: var(--cv-edge-2);
+  transition: background 0.25s;
+}
+.canvas-ui .composer::after {
+  background: conic-gradient(from var(--cv-ang), transparent 0deg, var(--cv-sky) 30deg, var(--cv-accent) 70deg, var(--cv-iris) 110deg, transparent 150deg, transparent 360deg);
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.canvas-ui .composer-halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: calc(var(--cv-radius) + 6px);
+  pointer-events: none;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.35s;
+  background: conic-gradient(from var(--cv-ang), transparent 0deg, var(--cv-sky) 30deg, var(--cv-accent) 70deg, var(--cv-iris) 110deg, transparent 150deg, transparent 360deg);
+  filter: blur(16px);
+}
+.canvas-ui .composer[data-state='typing']::before {
+  background: color-mix(in srgb, var(--cv-accent) 30%, var(--cv-edge-2));
+}
+.canvas-ui .composer[data-state='ok']::before {
+  background: color-mix(in srgb, var(--cv-accent) 22%, var(--cv-edge-2));
+}
+.canvas-ui .composer[data-state='ok']::after {
+  opacity: 1;
+}
+.canvas-ui .composer[data-state='ok'] .composer-halo {
+  opacity: 0.3;
+}
+.canvas-ui .composer[data-state='ok'] {
+  animation: cv-orbit 2.6s linear infinite;
+}
+.canvas-ui .composer[data-state='err']::before {
+  background: color-mix(in srgb, var(--err) 45%, var(--cv-edge-2));
+}
+.canvas-ui .composer.editing::before {
+  background: var(--cv-accent);
+}
+@keyframes cv-orbit {
+  to {
+    --cv-ang: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-ui .composer[data-state='ok'] {
+    animation: none;
+    --cv-ang: 20deg;
+  }
+}
+[data-motion='off'] .canvas-ui .composer[data-state='ok'],
+[data-motion='reduced'] .canvas-ui .composer[data-state='ok'] {
+  animation: none;
+  --cv-ang: 20deg;
+}
+.canvas-ui .composer-slot,
+.canvas-ui .composer-slot.rows {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 0;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+.canvas-ui .composer-slot.rows > * {
+  margin-inline: 0;
+}
+.canvas-ui .composer-slot > .row {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.canvas-ui .composer-slot > .row::before,
+.canvas-ui .composer-slot > .row .gutter,
+.canvas-ui .composer-slot > .row .del,
+.canvas-ui .composer-slot > .row .extra,
+.canvas-ui .composer-slot > .row .reorder {
+  display: none !important;
+}
+.canvas-ui .composer-slot > .row .body {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+.canvas-ui .composer-slot > .row .line {
+  min-height: 48px;
+  align-items: center;
+  gap: 14px;
+}
+.canvas-ui .composer-slot > .row .tex,
+.canvas-ui .composer-slot > .row .expr,
+.canvas-ui .composer-slot > .row .slots {
+  font-size: 26px;
+  line-height: 34px;
+  color: var(--ink);
+}
+.canvas-ui .composer-slot > .row .expr::placeholder {
+  font: 400 21px var(--math);
+  color: var(--ink-3);
+  opacity: 1;
+}
+.canvas-ui .composer-slot > .row .out,
+.canvas-ui .composer-slot > .row .out .result {
+  font: 600 22px var(--sans);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.canvas-ui .composer-slot > .row .out .result::before {
+  content: '=';
+  color: var(--ink-3);
+  font-weight: 400;
+  margin-right: 0.3em;
+}
+.canvas-ui .composer-slot > .row .out .err {
+  font: 500 15px var(--sans);
+  color: var(--cv-ac);
+}
+/* The hint line (completions, a function's inputs) opens above the composer, over the canvas. */
+.canvas-ui .composer-slot > .row .hint-line {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% + 44px);
+  z-index: 30;
+}
+.canvas-ui .composer-slot > .row .line {
+  flex-wrap: nowrap;
+}
+/* A long line scrolls inside the composer rather than wrapping; an error after a pause wraps in its own column, so
+   the composer grows upward to show it whole. */
+.canvas-ui .composer-slot > .row .src {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.canvas-ui .composer-slot > .row .tex {
+  white-space: nowrap;
+}
+.canvas-ui .composer-slot > .row .out {
+  flex: 0 1 auto;
+  max-width: 55%;
+  white-space: normal;
+}
+.canvas-ui .composer-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 15px var(--sans);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.canvas-ui .composer-preview .swatch {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c);
+}
+.canvas-ui .composer-enter {
+  flex: none;
+  height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--cv-accent);
+  color: var(--hero-ink);
+  font: 650 17px var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.canvas-ui .composer-enter:hover {
+  background: color-mix(in srgb, var(--cv-accent) 88%, white);
+}
+.canvas-ui .composer-cancel {
+  flex: none;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-2);
+  font: 500 14px var(--sans);
+  cursor: pointer;
+}
+.canvas-ui .composer-cancel:hover {
+  background: var(--cv-block);
+  color: var(--ink);
+}
+/* The line as it's typed, set as math (src/app/composermirror.ts): the field draws nothing; the mirror draws its text,
+   caret, selection and slot hints. */
+.canvas-ui .composer-slot > .row .src {
+  position: relative;
+}
+.canvas-ui .composer-slot > .row.mirrored .expr,
+.canvas-ui .composer-slot > .row.mirrored .expr::placeholder {
+  color: transparent;
+  caret-color: transparent;
+}
+.canvas-ui .composer-slot > .row.mirrored .expr::selection {
+  background: transparent;
+}
+.canvas-ui .composer-slot > .row.mirrored :is(.tex, .slots) {
+  display: none !important;
+}
+.canvas-ui .cv-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  font: 500 26px/34px var(--math);
+  color: var(--ink);
+  white-space: pre;
+}
+.canvas-ui .cv-mirror .cv-track {
+  display: flex;
+  align-items: baseline;
+  flex: none;
+}
+.canvas-ui .cv-mirror .g-var {
+  font-style: italic;
+}
+.canvas-ui .cv-mirror .g-op:not(.g-sup) {
+  padding: 0 0.22em;
+}
+.canvas-ui .cv-mirror .g-sup {
+  font-size: 0.68em;
+  transform: translateY(-0.55em);
+}
+.canvas-ui .cv-mirror .sel {
+  background: color-mix(in srgb, var(--cv-accent) 32%, transparent);
+}
+.canvas-ui .cv-mirror .slot {
+  color: var(--ink-3);
+  font-style: italic;
+  font-size: 0.8em;
+}
+.canvas-ui .cv-mirror .slot.current {
+  color: color-mix(in srgb, var(--cv-accent) 70%, var(--ink-2));
+}
+.canvas-ui .cv-mirror .ph {
+  font: 400 21px var(--math);
+  color: var(--ink-3);
+  /* Clear of the caret, which sits before it. */
+  margin-left: 6px;
+}
+.canvas-ui .cv-mirror .cv-caret {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1.5px;
+  height: 1.05em;
+  margin-top: -0.55em;
+  background: var(--cv-accent);
+}
+.canvas-ui .cv-mirror .cv-caret.raised {
+  height: 0.75em;
+  margin-top: -0.85em;
+}
+.canvas-ui .cv-mirror .cv-caret.blink {
+  /* Blinks a while after each move, then stays lit: a caret that blinks forever is an animation that never ends. */
+  animation: cv-blink 1.05s steps(1) 12;
+}
+@keyframes cv-blink {
+  50% {
+    opacity: 0;
+  }
+}
+/* One row, always: an answer or an error sits on the right in the same row (the whole error on hover). */
+.canvas-ui .composer-slot > .row .line,
+.canvas-ui .composer-slot > .row.has-error .line {
+  flex-wrap: nowrap !important;
+}
+/* While typing, nothing: the error shows only once typing pauses (composerError), short and whole. */
+.canvas-ui .composer:not(.shows-error) .composer-slot > .row .out :is(.err, .fix:not(.calm-fix)) {
+  display: none !important;
+}
+.canvas-ui .composer-slot > .row.has-error .line > .out {
+  flex: 0 1 auto !important;
+  max-width: 55% !important;
+  white-space: normal !important;
+}
+/* A line's full error, over it, on hover, focus or a tap (the short form stays on the row). */
+.canvas-ui .out .err[data-full] {
+  position: relative;
+}
+.canvas-ui .out .err[data-full]:is(:hover, :focus-visible, .full)::after {
+  content: attr(data-full);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 340px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--cv-raised);
+  border: 1px solid var(--cv-edge-2);
+  color: var(--ink);
+  font: 500 13.5px/1.35 var(--sans);
+  white-space: normal;
+  text-align: left;
+  z-index: 40;
+  pointer-events: none;
+}
+.canvas-ui .composer-slot > .row.has-error .line > .out::before {
+  display: none;
+}
+.canvas-ui .composer-slot > .row.has-error .src {
+  flex-basis: auto !important;
+}
+/* A figure line's table or grid (src/ui/composerline.ts composerQuietFigure) takes no room in the composer's row. */
+.canvas-ui .composer.quiet-figure .composer-slot > .row .out {
+  display: none;
+}
+/* Hidden, not removed: a matrix answer is still measured to fit while it's typed, so it fits its block once sent. */
+.canvas-ui .composer.no-answer .composer-slot > .row .out .result {
+  visibility: hidden;
+}
+.canvas-ui .composer-preview svg path {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.canvas-ui .composer-preview,
+.canvas-ui .composer-cancel {
+  flex: none;
+}
+
+/* A tab's page rises over the canvas from the composer's edge. */
+.canvas-ui .ti-page {
+  background: var(--cv-raised);
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+/* ---------- the keypad, floating at the bottom right (wide) ---------- */
+.canvas-ui .main > .left > .keypad {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  width: 330px;
+  z-index: 20;
+  padding: 10px;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: 18px;
+  --kgap: 6px;
+}
+.canvas-ui .main > .left > .keypad[hidden] {
+  display: none;
+}
+/* The panel is as tall as its keys. What a pointed-at key or tile does shows in a strip that rises over the panel,
+   and only while there is something to say. */
+.canvas-ui .main > .left > .keypad .key-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  height: auto;
+  margin: 0;
+  pointer-events: none;
+}
+.canvas-ui .main > .left > .keypad .key-hint {
+  height: auto;
+  min-height: 34px;
+  padding: 8px 12px;
+  background: var(--cv-raised);
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 12px;
+}
+.canvas-ui .main > .left > .keypad .key-hint:empty {
+  visibility: hidden;
+}
+.canvas-ui .keypad .key:not(.ti-tab) {
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 0 var(--cap-lip, #14171d);
+}
+.canvas-ui .keypad .key .kl {
+  font: 400 17px/1 var(--sans);
+}
+.canvas-ui .keypad .key.num .kl {
+  font: 500 19px/1 var(--sans);
+}
+.canvas-ui .keypad .key.op .kl {
+  font-size: 21px;
+}
+.canvas-ui .keypad .key:is([data-key='x'], [data-key='y'], [data-key='e'], [data-key='π']) .kl {
+  font: italic 400 20px/1 var(--math);
+}
+.canvas-ui .keypad .key.fn .kl {
+  color: var(--ink-2);
+}
+.canvas-ui {
+  --pad-h: calc(5 * 44px + 4 * var(--kgap));
+}
+.canvas-ui .keypad .ti-rows {
+  flex: 1 0 0;
+}
+.canvas-ui .keypad .numpad {
+  flex: 4 0 calc(var(--kgap) * 3);
+}
+
+/* ---------- typeset math in STIX Two Text ---------- */
+:root[data-look='modern'] .canvas-ui .tex,
+:root[data-look='modern'] .canvas-ui .expr,
+:root[data-look='modern'] .canvas-ui .slots,
+:root[data-look='modern'] .canvas-ui .m-var,
+:root[data-look='modern'] .canvas-ui .ti-face {
+  font-family: var(--math);
+}
+:root[data-look='modern'] .canvas-ui .tex,
+:root[data-look='modern'] .canvas-ui .expr {
+  font-weight: 500;
+}
+
+/* ---------- narrow: one column, wires in the gutter, the composer over the keys ---------- */
+@media (--phone) {
+  #app.canvas-ui > .modebar {
+    position: relative;
+    padding: 0;
+    pointer-events: auto;
+  }
+  .canvas-ui .cv-tools {
+    display: none;
+  }
+  .canvas-ui .main > .left {
+    display: flex;
+    flex-direction: column;
+  }
+  .canvas-ui .tape.cv-viewport {
+    position: relative;
+    inset: auto;
+    flex: 1;
+    min-height: 0;
+    touch-action: auto;
+    /* A toast's room: the column ends above it (src/app/toast.ts). */
+    margin-bottom: var(--toast-room, 0px);
+  }
+  .canvas-ui .cv-narrow > .rows {
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* Cascade sets each block's gap above it, its step right and its width (src/app/canvas.ts). */
+    gap: 0;
+    padding: 46px 12px 16px var(--cv-gutter);
+    transform: none !important;
+  }
+  .canvas-ui .cv-narrow > .rows:not(.has-example) {
+    padding-top: 12px;
+  }
+  /* A pill as wide as its line, no wider than the column. */
+  .canvas-ui .cv-narrow > .rows > .row.blk {
+    max-width: 100%;
+    width: max-content;
+    flex: none;
+  }
+  /* A slider gives way by its track (src/ui/cascade.ts caps it at sliderMax of the column), never by its label. */
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider,
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .extra {
+    min-width: 0;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .line {
+    flex: none;
+  }
+  /* Sized from its content, so the pill's own width is its line's. */
+  .canvas-ui .cv-narrow > .rows > .row.blk > .body {
+    flex: 1 1 auto;
+  }
+  .canvas-ui .cv-narrow > .rows > :is(.blk-graph, .blk-example-graph, .blk-psych, .row.blk.blk-figure, .cv-tray) {
+    align-self: stretch;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-graph {
+    display: block;
+    position: relative;
+    flex: none;
+    height: 220px;
+    width: auto;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-example-graph {
+    position: relative;
+    flex: none;
+    height: 170px;
+    width: auto;
+  }
+  .canvas-ui .composer-dock {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    width: auto;
+    padding: 0 10px 8px;
+  }
+  .canvas-ui .composer-head {
+    padding: 0 8px;
+    height: 32px;
+  }
+  .canvas-ui .composer-tabs {
+    gap: 3px;
+  }
+  .canvas-ui .composer-tabs .key.ti-tab {
+    padding: 6px 9px 7px;
+  }
+  .canvas-ui .composer-tabs .key.ti-tab .kl {
+    font-size: 13.5px;
+  }
+  .canvas-ui .composer {
+    min-height: 58px;
+    padding: 6px 6px 6px 16px;
+  }
+  .canvas-ui .composer-slot > .row .tex,
+  .canvas-ui .composer-slot > .row .expr,
+  .canvas-ui .composer-slot > .row .slots {
+    font-size: 23px;
+    line-height: 30px;
+  }
+  .canvas-ui .composer-slot > .row .expr::placeholder {
+    font-size: 18px;
+  }
+  .canvas-ui .composer-enter {
+    height: 44px;
+    padding: 0 18px;
+  }
+  .canvas-ui .main > .left > .keypad {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    padding: 8px 8px 12px;
+    border: 0;
+    border-top: 1px solid var(--cv-edge);
+    border-radius: 0;
+    background: var(--bg);
+  }
+  .canvas-ui .keypad .key .kl {
+    font-size: 19px;
+  }
+  .canvas-ui .keypad .key.num .kl {
+    font-size: 22px;
+  }
+  .canvas-ui {
+    --pad-h: calc(var(--bank-row) + 4 * var(--pad-row) + 4 * var(--kgap));
+  }
+  .canvas-ui .keypad .ti-rows {
+    flex: 0 0 var(--bank-row);
+  }
+  .canvas-ui .keypad .numpad {
+    flex: 0 0 calc(4 * var(--pad-row) + 3 * var(--kgap));
+  }
+}
+
+@media (--phone) {
+  #app.canvas-ui > .modebar {
+    position: relative;
+  }
+}
+
+/* The bar's order, as the mockup has it: the name and the sheet on the left; Deg | Rad, the canvas's zoom, Find,
+   Keypad and the menus on the right. */
+@media not print {
+  #app.canvas-ui > .modebar .brand { order: 0; flex: none; }
+  #app.canvas-ui > .modebar .brand-name { display: inline; }
+  #app.canvas-ui > .modebar .spacer { order: 2; flex: 1; }
+  #app.canvas-ui > .modebar .desk-modes { order: 3; }
+  #app.canvas-ui > .modebar .cv-tools { order: 4; }
+  #app.canvas-ui > .modebar .head-pill { order: 5; }
+  #app.canvas-ui > .modebar .bar-tog { order: 6; }
+  #app.canvas-ui > .modebar .desk-more { order: 7; }
+  #app.canvas-ui > .modebar .appear-wrap { order: 8; }
+  #app.canvas-ui > .modebar .help-btn { order: 9; }
+}
+#app.canvas-ui > .modebar .head-pill {
+  display: flex;
+  gap: 0;
+}
+#app.canvas-ui > .modebar .head-find .gi {
+  display: none;
+}
+#app.canvas-ui > .modebar .head-find .find-key {
+  font: 500 12px/17px var(--sans);
+  color: var(--ink-3);
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 5px;
+  padding: 0 5px;
+  margin-left: 8px;
+  background: var(--bg);
+}
+#app.canvas-ui > .modebar .appear-btn .appear-word {
+  display: none !important;
+}
+#app.canvas-ui > .modebar .bar-tog .gi,
+#app.canvas-ui > .modebar .bar-tog::after {
+  display: none;
+}
+
+#app.canvas-ui > .modebar .brand {
+  min-width: max-content;
+  gap: 10px;
+}
+#app.canvas-ui > .modebar .sheet-title {
+  max-width: none;
+  overflow: visible;
+}
+#app.canvas-ui > .modebar .wordmark {
+  display: none;
+}
+#app.canvas-ui > .modebar .appear-btn svg {
+  display: block;
+}
+.canvas-ui .composer-head .nav-keys {
+  display: none !important;
+}
+@media (--phone) {
+  .canvas-ui .modebar .find-key {
+    display: none;
+  }
+}
+#app.canvas-ui > .modebar .bar-tog::before,
+#app.canvas-ui > .modebar .bar-tog[aria-pressed]::before {
+  display: none !important;
+}
+@media (--phone) {
+  .canvas-ui .modebar .brand-name,
+  .canvas-ui .modebar .sheet-title.unnamed {
+    display: none;
+  }
+}
+
+/* A narrower window drops what it can do without, so the bar never runs past the edge. */
+@media (max-width: 1060px) {
+  #app.canvas-ui > .modebar .cv-tools .cv-btn:not(:last-child),
+  #app.canvas-ui > .modebar .cv-zoom,
+  #app.canvas-ui > .modebar .find-key {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  #app.canvas-ui > .modebar .brand-name {
+    display: none;
+  }
+}
+/* A long answer (a wide matrix) scrolls inside its block rather than running out of it. */
+.canvas-ui .rows > .row.blk .out {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.canvas-ui .main > .left > .ti-page {
+  position: absolute;
+  z-index: 25;
+}
+
+/* A line with an error shows it whole, under what was typed: in the composer (which grows upward) and in its block. */
+.canvas-ui .composer-slot > .row.has-error:not(.calm, .typing, .completing) .line,
+.canvas-ui .rows > .row.blk.has-error .line {
+  flex-wrap: wrap;
+}
+.canvas-ui .composer-slot > .row.has-error:not(.calm, .typing, .completing) .line > .out,
+.canvas-ui .rows > .row.blk.has-error .line > .out {
+  flex: 1 0 100%;
+  max-width: 100%;
+  margin-left: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+.canvas-ui .composer-slot > .row.has-error:not(.calm, .typing, .completing) .src {
+  flex-basis: 100%;
+}
+
+/* The bar's menus open over the composer and the keys. */
+@media (--phone) {
+  .canvas-ui .modebar {
+    position: relative;
+    z-index: 30;
+  }
+}
+
+/* A phone on its side: the canvas and the composer on the left, the keys down the right. */
+@media (max-height: 460px) and (pointer: coarse) {
+  .canvas-ui .main > .left {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 50%;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .canvas-ui .main > .left > .modebar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .canvas-ui .main > .left > .tape {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .canvas-ui .main > .left > .composer-dock {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .canvas-ui .main > .left > .keypad {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    align-self: stretch;
+    border-top: 0;
+    border-left: 1px solid var(--cv-edge);
+  }
+  .canvas-ui {
+    --pad-h: calc(100dvh - 24px);
+  }
+  .canvas-ui .keypad .ti-rows {
+    flex: 1 0 0;
+  }
+  .canvas-ui .keypad .numpad {
+    flex: 4 0 calc(var(--kgap) * 3);
+  }
+}
+
+#app.canvas-ui > .modebar .head-pill .head-find,
+#app.canvas-ui > .modebar .head-pill .menu-btn {
+  height: 31px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.canvas-ui .modes .more .more-word {
+  display: none;
+}
+
+/* The narrow bar, as the phone apps draw it: the mark, then Deg | Rad, Modes, Find and File, each a word. */
+@media (--phone) {
+  #app.canvas-ui .left > .modebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    height: 50px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--bg);
+  }
+  #app.canvas-ui .left > .modebar .brand { order: 0; min-width: 0; gap: 0; flex: none; }
+  #app.canvas-ui .left > .modebar .spacer { order: 1; flex: 1; }
+  #app.canvas-ui .left > .modebar .desk-modes { order: 2; }
+  #app.canvas-ui .left > .modebar .modes { order: 3; display: flex !important; flex: none; gap: 0; margin: 0; }
+  #app.canvas-ui .left > .modebar .head-pill { order: 4; }
+  #app.canvas-ui .left > .modebar .modes .pill:not(.more),
+  #app.canvas-ui .left > .modebar .modes .more svg,
+  #app.canvas-ui .left > .modebar .desk-more,
+  #app.canvas-ui .left > .modebar .appear-wrap,
+  #app.canvas-ui .left > .modebar .help-btn,
+  #app.canvas-ui .left > .modebar .bar-tog {
+    display: none !important;
+  }
+  #app.canvas-ui .left > .modebar .desk-modes {
+    display: flex !important;
+    flex: none;
+    margin: 0;
+  }
+  #app.canvas-ui .left > .modebar .desk-modes .seg,
+  #app.canvas-ui .left > .modebar .modes .more {
+    height: 33px;
+    box-sizing: border-box;
+    background: var(--cv-block);
+    border: 1px solid var(--cv-edge);
+    border-radius: 10px;
+    box-shadow: none;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  #app.canvas-ui .left > .modebar .desk-modes .seg {
+    display: flex;
+    align-items: center;
+    padding: 2px;
+  }
+  #app.canvas-ui .left > .modebar .desk-modes .seg button {
+    height: 27px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  #app.canvas-ui .left > .modebar .desk-modes .seg button[aria-pressed='true'] {
+    background: var(--cv-raised);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--cv-edge-2);
+  }
+  #app.canvas-ui .left > .modebar .modes .more {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0 11px;
+    position: relative;
+  }
+  #app.canvas-ui .left > .modebar .modes .more[aria-expanded='true'] {
+    background: var(--cv-raised);
+  }
+  /* 33 px pills, 45 px to a thumb. */
+  #app.canvas-ui .left > .modebar .modes .more::after,
+  #app.canvas-ui .left > .modebar .head-pill .head-find::after,
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn::after {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-find,
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn {
+    position: relative;
+  }
+  #app.canvas-ui .left > .modebar .more-word {
+    display: inline;
+  }
+  #app.canvas-ui .left > .modebar .head-pill {
+    gap: 6px;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-find,
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn {
+    width: auto;
+    height: 33px;
+    padding: 0 11px;
+    font-size: 14px;
+    color: var(--ink-2);
+    background: var(--cv-block);
+    border: 1px solid var(--cv-edge);
+    border-radius: 10px;
+  }
+  #app.canvas-ui .left > .modebar .head-find .gi {
+    display: none !important;
+  }
+  #app.canvas-ui .left > .modebar .head-find .gl {
+    display: inline !important;
+  }
+}
+
+/* ---------- narrow: steps as an indented tree ---------- */
+@media (--phone) {
+  .canvas-ui .cv-narrow > .rows > .cv-tray {
+    position: relative;
+    left: auto;
+    top: auto;
+    flex: none;
+    margin-top: 6px;
+    padding: 7px 7px 7px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .canvas-ui .cv-narrow .cv-tree {
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .canvas-ui .cv-narrow .cv-tree path.w {
+    fill: none;
+    stroke: var(--cv-wire);
+    stroke-width: 1.5;
+  }
+  .canvas-ui .cv-narrow .cv-tree path.w.err {
+    stroke: color-mix(in srgb, var(--err) 55%, transparent);
+    stroke-dasharray: 4 5;
+  }
+  .canvas-ui .cv-narrow .cv-tree circle.port-in {
+    fill: var(--cv-wire);
+  }
+  .canvas-ui .cv-narrow .cv-tree circle.port-in.err {
+    fill: color-mix(in srgb, var(--err) 65%, transparent);
+  }
+  .canvas-ui .cv-narrow .cv-step {
+    position: relative;
+    width: auto;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-left: calc(var(--depth, 0) * 20px + 22px);
+    padding: 4px 11px 5px;
+  }
+  .canvas-ui .cv-narrow .cv-step .sm {
+    font-size: 15.5px;
+  }
+  .canvas-ui .cv-narrow .cv-step .sv {
+    margin-top: 0;
+    flex-direction: row-reverse;
+  }
+  .canvas-ui .cv-narrow .cv-step .v {
+    font-size: 16px;
+  }
+  .canvas-ui .cv-narrow .cv-step.bad.full {
+    max-width: none;
+  }
+}
+
+@media (--phone) {
+  .canvas-ui .cv-mirror {
+    font-size: 23px;
+    line-height: 30px;
+  }
+  .canvas-ui .cv-mirror .ph {
+    font-size: 18px;
+  }
+  /* The composer's row on a phone: the line keeps room beside Cancel and Update. */
+  .canvas-ui .composer {
+    gap: 8px;
+  }
+  .canvas-ui .composer-slot {
+    min-width: 96px;
+  }
+  .canvas-ui .composer-cancel {
+    padding: 0 8px;
+  }
+  .canvas-ui .composer.editing .composer-preview {
+    display: none;
+  }
+  /* A slider's step field is for a wide canvas, where it shows on hover; the column has no room for it. */
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .slider-row :is(.step-label, .lim.step) {
+    display: none;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .slider-row {
+    grid-template-columns: auto 1fr auto;
+  }
+}
+.canvas-ui .composer-enter .kl {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- figure blocks: a line's own picture under its line (src/ui/figures.ts decides the marks) ---------- */
+.canvas-ui {
+  --fig-well: color-mix(in srgb, var(--bg) 55%, var(--cv-block));
+  --fig-edge: color-mix(in srgb, var(--ink) 7%, var(--fig-well));
+  --fig-grid: color-mix(in srgb, var(--ink) 5%, var(--fig-well));
+  --fig-grid2: color-mix(in srgb, var(--ink) 9%, var(--fig-well));
+  --fig-axis: color-mix(in srgb, var(--ink-3) 62%, var(--fig-well));
+  --fig-tick: color-mix(in srgb, var(--ink-2) 72%, var(--fig-well));
+  --fig-ink: var(--ink);
+  --fig-ink2: var(--ink-2);
+  --fig-muted: color-mix(in srgb, var(--ink-3) 85%, var(--fig-well));
+  --fig-accent: var(--cv-accent);
+  --fig-coral: var(--curve-1);
+  --fig-teal: var(--curve-2);
+  --fig-amber: var(--curve-3);
+  --fig-violet: var(--curve-4);
+  --fig-c0: var(--curve-1);
+  --fig-c1: var(--curve-2);
+  --fig-c2: var(--curve-3);
+  --fig-c3: var(--curve-4);
+  --fig-c4: var(--curve-5);
+  --fig-c5: var(--curve-6);
+  --fig-c6: var(--curve-7);
+  --fig-c7: var(--curve-8);
+}
+/* A grid, so the block is as wide as the wider of its head (line, answer, switch) and its figure. */
+.canvas-ui .rows > .row.blk.blk-figure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: start;
+  max-width: none;
+  border-radius: var(--cv-radius);
+  padding: 12px 14px 14px 18px;
+}
+.canvas-ui .rows > .row.blk.blk-figure > .body {
+  grid-row: 2;
+  grid-column: 1;
+  min-width: 0;
+}
+.canvas-ui .rows > .row.blk.blk-figure > .cv-steps,
+.canvas-ui .rows > .row.blk.blk-figure > .cv-seg {
+  grid-row: 2;
+}
+/* Clear of the block's × in its corner. */
+.canvas-ui .rows > .row.blk.blk-figure > .cv-seg {
+  margin-right: 14px;
+}
+.canvas-ui .rows > .row.blk.blk-figure > .cv-fig {
+  grid-row: 3;
+  grid-column: 1 / -1;
+}
+/* The answer over a figure is a step smaller than a value block's: the figure is what the block shows. */
+.canvas-ui .rows > .row.blk-value.blk-figure .out,
+.canvas-ui .rows > .row.blk-value.blk-figure .out .result {
+  font-size: 26px;
+}
+.canvas-ui .rows > .row.blk.blk-figure.fig-quiet .line > .out {
+  display: none;
+}
+/* One style for a block's corner controls: the figure/numbers switch, Steps and Riemann's rule. */
+.canvas-ui .rows > .row.blk .cv-ctl {
+  flex: none;
+  align-self: flex-start;
+  margin: 0 0 0 16px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 8px;
+  background: transparent;
+}
+.canvas-ui .cv-seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 8px;
+  height: 28px;
+  box-sizing: border-box;
+}
+.canvas-ui .cv-seg button {
+  min-width: 30px;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: 500 15px/1 var(--sans);
+  cursor: pointer;
+}
+.canvas-ui .cv-seg button + button {
+  border-left: 1px solid var(--cv-edge-2);
+}
+.canvas-ui .cv-seg button:hover {
+  color: var(--ink);
+}
+.canvas-ui .cv-seg button[aria-pressed='true'] {
+  background: var(--cv-raised);
+  color: var(--ink);
+}
+.canvas-ui .cv-seg button:focus-visible {
+  outline: 2px solid var(--cv-accent);
+  outline-offset: -2px;
+}
+.canvas-ui .rows > .row.blk .cv-steps {
+  height: 28px;
+  box-sizing: border-box;
+}
+.canvas-ui .rows > .row.in-composer .cv-seg,
+.canvas-ui .rows > .row.in-composer .cv-fig {
+  display: none;
+}
+.canvas-ui .cv-fig {
+  flex: 0 0 100%;
+  order: 5;
+  position: relative;
+  margin-top: 12px;
+  min-width: 0;
+}
+.canvas-ui .cv-fig[hidden] {
+  display: none;
+}
+.canvas-ui .cv-fig-svg {
+  display: block;
+  overflow: visible;
+  touch-action: none;
+}
+.canvas-ui .cv-fig .fw {
+  fill: var(--fig-well);
+  stroke: var(--fig-edge);
+  stroke-width: 1;
+}
+.canvas-ui .cv-fig line,
+.canvas-ui .cv-fig path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.canvas-ui .cv-fig .fs-none { stroke: none; }
+.canvas-ui .cv-fig .ff-none { fill: none; }
+.canvas-ui .cv-fig .fs-grid { stroke: var(--fig-grid); }
+.canvas-ui .cv-fig .fs-grid2 { stroke: var(--fig-grid2); }
+.canvas-ui .cv-fig .fs-axis { stroke: var(--fig-axis); }
+.canvas-ui .cv-fig .fs-tick { stroke: var(--fig-tick); }
+.canvas-ui .cv-fig .fs-ink { stroke: var(--fig-ink); }
+.canvas-ui .cv-fig .fs-ink2 { stroke: var(--fig-ink2); }
+.canvas-ui .cv-fig .fs-muted { stroke: var(--fig-muted); }
+.canvas-ui .cv-fig .fs-accent { stroke: var(--fig-accent); }
+.canvas-ui .cv-fig .fs-coral { stroke: var(--fig-coral); }
+.canvas-ui .cv-fig .fs-teal { stroke: var(--fig-teal); }
+.canvas-ui .cv-fig .fs-amber { stroke: var(--fig-amber); }
+.canvas-ui .cv-fig .fs-violet { stroke: var(--fig-violet); }
+.canvas-ui .cv-fig .ff-grid { fill: var(--fig-grid); }
+.canvas-ui .cv-fig .ff-tick { fill: var(--fig-tick); }
+.canvas-ui .cv-fig .ff-ink { fill: var(--fig-ink); }
+.canvas-ui .cv-fig .ff-ink2 { fill: var(--fig-ink2); }
+.canvas-ui .cv-fig .ff-muted { fill: var(--fig-muted); }
+.canvas-ui .cv-fig .ff-accent { fill: var(--fig-accent); }
+.canvas-ui .cv-fig .ff-coral { fill: var(--fig-coral); }
+.canvas-ui .cv-fig .ff-teal { fill: var(--fig-teal); }
+.canvas-ui .cv-fig .ff-amber { fill: var(--fig-amber); }
+.canvas-ui .cv-fig .ff-violet { fill: var(--fig-violet); }
+.canvas-ui .cv-fig .fs-c0 { stroke: var(--fig-c0); }
+.canvas-ui .cv-fig .ff-c0 { fill: var(--fig-c0); }
+.canvas-ui .cv-fig .fs-c1 { stroke: var(--fig-c1); }
+.canvas-ui .cv-fig .ff-c1 { fill: var(--fig-c1); }
+.canvas-ui .cv-fig .fs-c2 { stroke: var(--fig-c2); }
+.canvas-ui .cv-fig .ff-c2 { fill: var(--fig-c2); }
+.canvas-ui .cv-fig .fs-c3 { stroke: var(--fig-c3); }
+.canvas-ui .cv-fig .ff-c3 { fill: var(--fig-c3); }
+.canvas-ui .cv-fig .fs-c4 { stroke: var(--fig-c4); }
+.canvas-ui .cv-fig .ff-c4 { fill: var(--fig-c4); }
+.canvas-ui .cv-fig .fs-c5 { stroke: var(--fig-c5); }
+.canvas-ui .cv-fig .ff-c5 { fill: var(--fig-c5); }
+.canvas-ui .cv-fig .fs-c6 { stroke: var(--fig-c6); }
+.canvas-ui .cv-fig .ff-c6 { fill: var(--fig-c6); }
+.canvas-ui .cv-fig .fs-c7 { stroke: var(--fig-c7); }
+.canvas-ui .cv-fig .ff-c7 { fill: var(--fig-c7); }
+.canvas-ui .cv-fig .ft {
+  font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+  font-variant-numeric: lining-nums proportional-nums;
+  stroke: none;
+}
+.canvas-ui .cv-fig .ft.math {
+  font-family: var(--math);
+  font-style: italic;
+  font-variant-numeric: lining-nums;
+}
+/* A label over lines reads through a halo of the well's color, not a box. */
+.canvas-ui .cv-fig .ft.plate {
+  stroke: var(--fig-well);
+  stroke-width: 4px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+.canvas-ui .cv-fig .fd {
+  stroke: var(--fig-well);
+  stroke-width: 2;
+}
+/* A handle: the dot, a soft ring, and a target wider than both. */
+.canvas-ui .cv-fig .fh {
+  cursor: grab;
+  outline: none;
+}
+.canvas-ui .cv-fig .fh-hit {
+  fill: transparent;
+  stroke: none;
+}
+.canvas-ui .cv-fig .fh-halo {
+  fill: color-mix(in srgb, var(--fh, var(--fig-accent)) 24%, transparent);
+  stroke: none;
+  transition: r 0.15s;
+}
+.canvas-ui .cv-fig .fh-dot {
+  fill: var(--fig-ink);
+  stroke: var(--fig-well);
+  stroke-width: 1.5;
+}
+.canvas-ui .cv-fig .fh.on .fh-halo,
+.canvas-ui .cv-fig .fh:hover .fh-halo {
+  r: 15px;
+  fill: color-mix(in srgb, var(--fh, var(--fig-accent)) 34%, transparent);
+}
+.canvas-ui .cv-fig .fh:focus-visible .fh-halo {
+  r: 15px;
+  stroke: var(--fig-accent);
+  stroke-width: 2;
+}
+.canvas-ui .cv-fig .fh.fixed {
+  cursor: inherit;
+  pointer-events: none;
+}
+.canvas-ui .cv-fig .fh.fixed .fh-halo {
+  display: none;
+}
+.canvas-ui .cv-fig .fh.fixed .fh-dot {
+  r: 4.5px;
+  fill: var(--fh, var(--fig-ink));
+}
+.canvas-ui .cv-fig.over-handle .cv-fig-svg {
+  cursor: grab;
+}
+.canvas-ui .cv-fig.grabbing .cv-fig-svg,
+.canvas-ui .cv-fig.grabbing .fh {
+  cursor: grabbing;
+}
+.canvas-ui .rows > .row.blk .cv-fig-rule {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  height: 26px;
+  margin: 0;
+  background: var(--fig-well);
+}
+.canvas-ui .cv-fig-rule button {
+  font-size: 12.5px;
+  min-width: 0;
+  padding: 0 9px;
+}
+.canvas-ui .cv-readouts {
+  display: flex;
+  margin-top: 8px;
+  border: 1px solid var(--fig-edge);
+  border-radius: 6px;
+  background: var(--fig-well);
+}
+.canvas-ui .cv-readouts[hidden] {
+  display: none;
+}
+.canvas-ui .cv-readouts .ro {
+  flex: 1 1 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 14px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.canvas-ui .cv-readouts .ro + .ro {
+  border-left: 1px solid var(--fig-edge);
+}
+.canvas-ui .cv-readouts .rl {
+  font: italic 500 17px var(--math);
+  color: var(--ink-2);
+}
+.canvas-ui .cv-readouts .eq {
+  color: var(--ink-3);
+  font: 400 17px var(--sans);
+}
+.canvas-ui .cv-readouts .rv {
+  font: 600 20px var(--sans);
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (--phone) {
+  .canvas-ui .cv-narrow > .rows > .row.blk.blk-figure {
+    padding: 10px 10px 10px 14px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value.blk-figure .out,
+  .canvas-ui .cv-narrow > .rows > .row.blk-value.blk-figure .out .result {
+    font-size: 22px;
+  }
+  .canvas-ui .cv-narrow .cv-fig {
+    margin-top: 10px;
+  }
+  .canvas-ui .cv-narrow .cv-readouts .ro {
+    padding: 6px 10px;
+  }
+  .canvas-ui .cv-narrow .cv-readouts .rl,
+  .canvas-ui .cv-narrow .cv-readouts .eq {
+    font-size: 15px;
+  }
+  .canvas-ui .cv-narrow .cv-readouts .rv {
+    font-size: 17px;
+  }
+}
+
+/* ---------- readouts: a block's named results beside its figure, each with a port on the block's edge ---------- */
+.canvas-ui .cv-wires circle.port-free {
+  fill: var(--cv-block);
+  stroke: color-mix(in srgb, var(--cv-wire) 80%, var(--cv-block));
+  stroke-width: 1.2;
+}
+.canvas-ui .cv-reads {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+}
+.canvas-ui .cv-reads .rd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--cv-edge);
+}
+.canvas-ui .cv-reads .rd:last-child {
+  border-bottom: 0;
+}
+.canvas-ui .cv-reads .k {
+  font: italic 500 18px var(--math);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.canvas-ui .cv-reads .k.w {
+  font: 500 14px var(--sans);
+  color: var(--ink-3);
+}
+.canvas-ui .cv-reads .k sub,
+.canvas-ui .cv-reads .k sup {
+  font-size: 0.66em;
+  font-style: normal;
+  line-height: 0;
+}
+.canvas-ui .cv-reads .k sub {
+  vertical-align: -0.2em;
+}
+.canvas-ui .cv-reads .k sup {
+  font-style: normal;
+  vertical-align: 0.55em;
+}
+.canvas-ui .cv-reads .v {
+  font: 600 17px var(--sans);
+  font-variant-numeric: lining-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.canvas-ui .cv-reads .u {
+  font: 400 12.5px var(--sans);
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+.canvas-ui .cv-reads.flat {
+  flex-direction: row;
+  flex-wrap: wrap;
+  column-gap: 26px;
+}
+.canvas-ui .cv-reads.flat .rd {
+  border: 0;
+  justify-content: flex-start;
+  gap: 10px;
+}
+/* A stats block: the figure on the left, its readouts in a column beside it. */
+.canvas-ui .rows > .row.blk.blk-figure.blk-reads > .cv-fig {
+  grid-column: 1;
+}
+.canvas-ui .rows > .row.blk.blk-figure.blk-reads > .cv-reads {
+  grid-row: 3;
+  grid-column: 2 / -1;
+  align-self: start;
+  margin: 12px 0 0 18px;
+}
+.canvas-ui .rows > .row.blk.blk-figure.blk-reads > .cv-reads.flat {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+}
+@media (--phone) {
+  .canvas-ui .cv-narrow > .rows > .row.blk.blk-figure.blk-reads > .cv-fig {
+    grid-column: 1 / -1;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk.blk-figure.blk-reads > .cv-reads {
+    grid-row: 4;
+    grid-column: 1 / -1;
+    margin: 10px 0 0;
+  }
+}
+
+/* ---------- the psychrometric chart: one block per sheet, its states' lines and readouts beside the chart ---------- */
+.canvas-ui .rows > .blk-psych {
+  display: grid;
+  width: max-content;
+  grid-template-columns: auto 214px;
+  column-gap: 18px;
+  align-items: start;
+  padding: 14px 16px 16px;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: var(--cv-radius);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.canvas-ui .cv-wide > .rows > .blk-psych {
+  position: absolute;
+}
+.canvas-ui .rows > .blk-psych.dragging {
+  z-index: 5;
+  cursor: grabbing;
+  border-color: var(--cv-accent);
+}
+.canvas-ui .rows > .blk-psych > .cv-psych-view {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  margin: 0;
+}
+.canvas-ui .rows > .blk-psych > .cv-fig {
+  grid-column: 1;
+  grid-row: 1;
+  margin-top: 0;
+}
+.canvas-ui .rows > .blk-psych > .cv-states {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 40px;
+}
+.canvas-ui .rows > .blk-psych.flat {
+  grid-template-columns: auto;
+}
+.canvas-ui .rows > .blk-psych.flat > .cv-states {
+  grid-column: 1;
+  flex-direction: row;
+  gap: 28px;
+  padding: 0 84px 0 0;
+}
+.canvas-ui .rows > .blk-psych.flat .blk-pstate {
+  min-width: 200px;
+}
+/* A state inside the chart: its swatch and line, then its readouts. */
+.canvas-ui .blk-psych .row.blk-pstate {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 4px 8px 0;
+  margin-left: -8px;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  min-height: 0;
+  cursor: pointer;
+  box-shadow: none;
+}
+.canvas-ui .blk-psych .row.blk-pstate:hover {
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+.canvas-ui .blk-psych .row.blk-pstate::before,
+.canvas-ui .blk-psych .row.blk-pstate .gutter,
+.canvas-ui .blk-psych .row.blk-pstate .del,
+.canvas-ui .blk-psych .row.blk-pstate .line > .out,
+.canvas-ui .blk-psych .row.blk-pstate .extra,
+.canvas-ui .blk-psych .row.blk-pstate .warn-line,
+.canvas-ui .blk-psych .row.blk-pstate .hint-line {
+  display: none;
+}
+.canvas-ui .blk-psych .row.blk-pstate .body {
+  padding: 0;
+}
+.canvas-ui .blk-psych .row.blk-pstate .line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 0;
+  padding-bottom: 2px;
+}
+.canvas-ui .blk-psych .row.blk-pstate .line::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sc, var(--fig-coral));
+}
+.canvas-ui .blk-psych .row.blk-pstate .tex,
+.canvas-ui .blk-psych .row.blk-pstate .expr {
+  font-size: 17px;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+.canvas-ui .blk-psych .row.blk-pstate .cv-reads .rd {
+  padding: 4px 0;
+}
+@media (--phone) {
+  .canvas-ui .cv-narrow > .rows > .blk-psych {
+    position: relative;
+    width: auto;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px 12px 12px;
+    cursor: default;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-psych > .cv-fig {
+    margin-top: 34px;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-psych > .cv-states {
+    grid-column: 1;
+    grid-row: 2;
+    padding-top: 12px;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-psych.flat > .cv-states {
+    flex-direction: column;
+    padding: 36px 0 0;
+  }
+}
+
+/* ---------- Cascade: while a slider is held, it and every block its change reaches light up ---------- */
+.canvas-ui .rows > :is(.row.blk, .blk-graph, .blk-example-graph).cv-lit {
+  border-color: color-mix(in srgb, var(--cv-accent) 70%, var(--cv-edge));
+}
+
+/* Deg | Rad keeps one size whichever is chosen: each label reserves the room its bold takes. */
+.seg button > .seg-l {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+.seg button > .seg-l::after {
+  content: attr(data-label);
+  font-weight: 600;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  user-select: none;
+  pointer-events: none;
+}

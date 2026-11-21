@@ -8,7 +8,7 @@ describe('Appearance: the old theme preference read as Mode, Pure black and High
     expect(appearanceOf({ theme: 'oled' })).toEqual({ mode: 'dark', pureBlack: true, contrast: false });
     expect(appearanceOf({ theme: 'contrast' })).toEqual({ mode: 'system', pureBlack: false, contrast: true });
     expect(appearanceOf({ theme: 'system' })).toEqual({ mode: 'system', pureBlack: false, contrast: false });
-    expect(appearanceOf({})).toEqual({ mode: 'system', pureBlack: false, contrast: false });
+    expect(appearanceOf({})).toEqual({ mode: 'dark', pureBlack: false, contrast: false });
   });
 
   it('gives every old theme back unchanged', () => {
@@ -27,7 +27,7 @@ describe('Appearance: the old theme preference read as Mode, Pure black and High
     expect(on.theme).toBe('contrast');
     expect(appearancePatch(on, { contrast: false }).theme).toBe('paper');
     // System in pure black has no old value of its own; it stays system, and themeFor gets pureBlack.
-    expect(appearancePatch({}, { pureBlack: true })).toEqual({ mode: 'system', pureBlack: true, contrast: false, theme: 'system' });
+    expect(appearancePatch({}, { pureBlack: true })).toEqual({ mode: 'dark', pureBlack: true, contrast: false, theme: 'oled' });
   });
 
   it('sets the interface style from the mode, High contrast included; System follows the phone', () => {

@@ -12,17 +12,19 @@ import { moveRow, addRow, deleteRow, dragEnds, recordTyping, pushStep, setLineTe
 import { pulse, copy } from './feedback';
 
 import { syncGraphChips, syncGraphSliders } from './graphpane';
-import { graph, listEl, listTools, announcer } from './layout';
+import { graph, listEl, announcer } from './layout';
 import { updateHint, drawSlots, lineCalm, CLOSERS, complete, jumpToNextSlot, autoPair, rowKeys, applyBackspace } from './lineeditor';
 import { lineFixes, measureTex } from './lineoutput';
 import { syncListEdges, revealRow } from './listscroll';
 import { coarse, kb } from './platform';
 import { renderResults } from './render';
-import { type RowView, views, viewOfInput, focusRow } from './rowviews';
+import { type RowView, views, viewOfInput, focusRow, isHostedRow } from './rowviews';
 import { doc, activeId, setActiveId, rowIndex, results, opts, currentResults, keepSelection, setTarget, sheetChanged, rowsChanged } from './sheet';
 import { makeTableView } from './tableview';
+import { composerHead, composerRowId, composerSlot, draftId } from './composer';
 
 export function rebuildRows(): void {
+  draftId();
   const keep = new Set(doc.rows.map((r) => r.id));
   for (const [id, v] of views) if (!keep.has(id)) { v.el.remove(); views.delete(id); }
   if (activeId && !keep.has(activeId)) {
@@ -49,15 +51,27 @@ export function rebuildRows(): void {
       fresh.push(v.el);
     }
     v.idx.textContent = String(k + 1);
-    if (listEl.children[k] !== v.el) listEl.insertBefore(v.el, listEl.children[k] ?? null);
   });
+  // The line being written lives in the composer; every other line is a block on the canvas, in the sheet's order
+  // after the canvas's own layers (its wires, the editing ghost, the example's frame).
+  const cid = composerRowId();
+  const inComposer = views.get(cid)?.el;
+  if (inComposer && inComposer.parentElement !== composerSlot) composerSlot.replaceChildren(inComposer);
+  let at = [...listEl.children].findIndex((el) => el.classList.contains('row') || el.classList.contains('blk-graph'));
+  if (at < 0) at = listEl.children.length;
+  for (const row of doc.rows) {
+    if (row.id === cid || isHostedRow(row.id)) continue;
+    const el = views.get(row.id)!.el;
+    if (listEl.children[at] !== el) listEl.insertBefore(el, listEl.children[at] ?? null);
+    at++;
+  }
   if (had > 0 && fresh.length <= 3) for (const el of fresh) pulse(el, 'enter');
   syncListEdges();
   if (reordering) syncReorder();
 }
 let closeLineMenu = () => {};
 
-function openLineMenu(row: Row, x: number, y: number): void {
+export function openLineMenu(row: Row, x: number, y: number): void {
   closePopovers();
   const id = row.id;
   const i = rowIndex(id);
@@ -151,9 +165,12 @@ export function setReorder(on: boolean): void {
 }
 function syncReorder(): void {
   const ids = doc.rows.map((r) => r.id);
+  const typing = composerRowId();
   for (const [id, v] of views) {
     let box = v.el.querySelector<HTMLElement>(':scope > .reorder');
-    if (!reordering) { box?.remove(); continue; }
+    // The line in the composer isn't on the canvas to move; blank lines aren't shown.
+    const blank = v.row.kind === 'expr' && !v.row.text.trim();
+    if (!reordering || id === typing || blank) { box?.remove(); continue; }
     const k = ids.indexOf(id);
     if (!box) {
       const btn = (d: number, label: string, path: string) => {
@@ -173,6 +190,12 @@ let delHeld = false;
 
 export function lineInputMode(): 'none' | 'text' {
   return coarse.matches && !doc.ui.sysKeyboard && doc.ui.keypad ? 'none' : 'text';
+}
+
+/** Told when typing in a line pauses: the composer shows an error only then. */
+let typingPaused: (id: string) => void = () => {};
+export function setTypingPauseListener(fn: (id: string) => void): void {
+  typingPaused = fn;
 }
 
 function makeExprView(row: Extract<Row, { kind: 'expr' }>): RowView {
@@ -223,6 +246,7 @@ function makeExprView(row: Extract<Row, { kind: 'expr' }>): RowView {
     typingTimer = window.setTimeout(() => {
       el.classList.remove('typing');
       if (el.querySelector('.out .calm-hint')) el.classList.add('calm-held');
+      typingPaused(row.id);
     }, TYPING_PAUSE_MS);
     if (row.kind === 'expr' && row.note) row.note = undefined;
     const before = row.text;
@@ -416,7 +440,8 @@ export function setActive(id: string): void {
 
 export function initRows(): void {
   addPopover({ close: () => closeLineMenu(), exclusive: true });
-  listTools.append(reorderDone);
+  // Done for reordering sits on the composer's edge, beside the tabs.
+  composerHead.insertBefore(reorderDone, composerHead.lastElementChild);
   document.addEventListener('pointermove', (e) => { if (delHeld && (e.movementX || e.movementY)) delHeld = false; });
   document.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') delHeld = false; });
 }

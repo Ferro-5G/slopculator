@@ -125,6 +125,7 @@ export const TABS: Tab[] = [
           t('Calculus', 'deriv', 'f′(a)', 'derivative at a point', { insert: 'deriv(¦, x, )' }), t('Calculus', 'deriv2', 'f″(a)', 'second derivative', { insert: 'deriv2(¦, x, )' }), t('Calculus', '∫', '∫ₐᵇ f dx', 'integral, the area', { insert: 'integral(¦, x, , )' }), t('Calculus', 't', 't', 'the variable t'),
           t('Calculus', 'roots', 'p(x) = 0', 'every root of a polynomial'), t('Calculus', 'polyval', 'p(x)', 'value of a polynomial'), t('Algebra', 'quad', 'ax²+bx+c = 0', 'roots of a quadratic'), t('Calculus', 'sum', 'Σ', 'sum of a list or a series'),
           t('Calculus', 'seq', '{f(n)}', 'a list from a rule'), t('Calculus', 'gamma', 'Γ(x)', 'gamma function'),
+          t('Calculus', 'tangent', 'tangent(f, p)', 'the line touching f at p'), t('Calculus', 'riemann', 'Σ f·Δx', 'Riemann sum in n strips'),
         ],
       },
       {

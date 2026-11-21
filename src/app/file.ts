@@ -5,8 +5,12 @@ import { setSound, play } from './sound';
 import { showHelp, COMMANDS } from './commands';
 import { syncers } from './controls';
 import { type Doc, normalizeDoc, type Row, blankRow } from './docmodel';
+import { SHOW_EXAMPLE } from '../ui/canvas';
+import { hasExample, showExample } from './example';
+import { openExamples } from './listtools';
 import { h } from './dom';
-import { undos, runUndo, runRedo, clearAll, dragEnds, pushStep, leaveSheet } from './edits';
+import { undos, runUndo, runRedo, clearAll, dragEnds, pushStep, leaveSheet, addTable, addNormalCurve, combineAll } from './edits';
+import { COMBINE_OPS } from '../ui/combine';
 import { copy } from './feedback';
 import { exportSVG, copyGraphImage } from './graphpane';
 import { openHistoryDialog } from './historydialog';
@@ -18,7 +22,7 @@ import { coarse, kb } from './platform';
 import { setReorder, rebuildRows } from './rows';
 import { focusRow, focusLine } from './rowviews';
 import { currentSheet, doc, saveSoon, autosaveSheet, setDoc, setCurrentSheetName, opts, results, sheetChanged, sheetFromAnotherTab, storedNameIsOurs, recompute } from './sheet';
-import { keypadOn, graphOn, applyUI } from './shell';
+import { keypadOn, graphOn, applyUI, toggleSysKeyboard } from './shell';
 import { applyTheme, syncAppearanceSlots } from './theme';
 import { hideToast, showToast } from './toast';
 
@@ -57,7 +61,12 @@ export function buildMenu(): void {
       item('Copy as text', '', () => copy(sheetAsText())),
       item('History…', '', openHistoryDialog),
       item('Reorder lines', '', () => setReorder(true)),
+      item('Add a table', '', addTable),
+      item('Add a normal curve', '', addNormalCurve),
+      item(doc.ui.sysKeyboard ? 'Use the keypad' : 'Use the system keyboard', '', toggleSysKeyboard),
       item('Clear all', '', clearAll),
+      item('Start with an example…', '', openExamples),
+      ...(hasExample() ? [] : [item(SHOW_EXAMPLE, '', showExample)]),
       item('Privacy', '', showPrivacy),
       h('hr'),
       h('div', { class: 'menu-row file-row', role: 'group', 'aria-label': 'Sheet file' }, h('span', { 'aria-hidden': 'true' }, 'Sheet file'),
@@ -77,6 +86,11 @@ export function buildMenu(): void {
     item('Clear all', COMMANDS.clearAll.keys, COMMANDS.clearAll.run),
     ...recentSheetItems(item),
     h('hr'),
+    item('Add a table', '', addTable),
+    item('Add a normal curve', '', addNormalCurve),
+    h('div', { class: 'menu-row combine-row', role: 'group', 'aria-label': 'Combine every line with a number into a new line' }, h('span', { 'aria-hidden': 'true' }, 'Combine all lines'),
+      h('div', { class: 'menu-btns' }, ...COMBINE_OPS.map(([op, label, word]) => small(label, `${word} all lines`, 'in a new line', () => combineAll(op))))),
+    h('hr'),
     item('Copy sheet as text', '', () => copy(sheetAsText())),
     item('Export…', '', exportJSON, '.json'),
     item('Import…', '', importJSON, '.json'),
@@ -94,6 +108,8 @@ export function buildMenu(): void {
     h('hr'),
     item('Find a function or command', COMMANDS.palette.keys, COMMANDS.palette.run),
     item('Keyboard shortcuts', COMMANDS.help.keys, COMMANDS.help.run),
+    item('Start with an example…', '', openExamples),
+    ...(hasExample() ? [] : [item(SHOW_EXAMPLE, '', showExample)]),
     item('Privacy', '', showPrivacy),
   );
   syncAppearanceSlots();
@@ -170,11 +186,12 @@ function setCurrentSheet(name: string | null, persist = true): void {
   syncSheetTitle();
 }
 export function syncSheetTitle(): void {
-  sheetTitle.textContent = currentSheet ?? (doc.ui.look === 'retro' ? 'Sheet' : 'Slopculator');
+  // Modern's bar reads "Slopculator | Untitled sheet", as the canvas design has it; Retro's keeps its own words.
+  const retro = doc.ui.look === 'retro';
+  sheetTitle.textContent = currentSheet ?? (retro ? 'Sheet' : 'Untitled sheet');
   sheetTitle.classList.toggle('unnamed', !currentSheet);
-  const brandShowsName = !!brandHome && !currentSheet && doc.ui.look !== 'retro';
-  brandName.hidden = !brandShowsName;
-  sheetTitle.hidden = brandShowsName;
+  brandName.hidden = retro;
+  sheetTitle.hidden = false;
 }
 /** The answer is handled when the button is pressed, not when the dialog finishes closing, so an Open straight after sees it. */
 function nameDialog(title: string, initial: string, ok: string, note: string, done: (name: string) => void, keep?: string): void {
@@ -228,7 +245,7 @@ export function duplicateSheet(): void {
   const n = copyName(currentSheet ?? 'Sheet', loadSessions().map((x) => x.name));
   if (!writeSheet(n, doc)) return showToast(SAVED_SHEETS_FAILED);
   setCurrentSheet(n);
-  showToast(`Duplicated as "${n}". Rename it from File`);
+  showToast(`Duplicated as "${n}"`);
   buildMenu();
 }
 export function newSheet(): void {
@@ -368,7 +385,7 @@ export function initFile(): void {
   modeBar.append(
     brandHome
       ? h('div', { class: 'brand' }, brandHome, sheetTitle)
-      : h('div', { class: 'brand' }, appMark(), wordmark(), sheetTitle),
+      : h('div', { class: 'brand' }, appMark(), wordmark(), brandName, sheetTitle),
     h('div', { class: 'spacer' }),
     menuWrap,
     h('button', { type: 'button', class: 'help-btn', title: 'Keyboard shortcuts and typing tips', 'aria-label': 'Help', onclick: () => showHelp() }, '?'),

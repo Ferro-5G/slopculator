@@ -30,6 +30,8 @@ Exact mode (Ctrl+Alt+E) shows `3/8`, `√3/2`, and `π/6` instead of decimals. G
 - Expected value: `EV({x}, {p})` warns when the probabilities don't add to 1. `netgain({values}, {probs}, cost)` subtracts a cost. A table with an `x` column and a `P` column shows E(X) and ΣP.
 - Proportions: `moe(n)` is 1/√n, `phat(successes, n)`, and `sep(p, n)` is √(p(1 − p)/n).
 - Regression on two lists: `linreg(xs, ys)` gives a, b, r, and r² for y = ax + b. Also `quadreg`, `expreg` (y = a·b^x), `powreg` (y = a·x^b), and `lnreg` (y = a + b·ln x). `corr` is r. `covp` and `covs` are population and sample covariance, and `cov` follows the Pop/Sample switch.
+- Regression as a line of its own: `y1 ~ m x1 + b` fits `m` and `b` to the lists `x1` and `y1`, shows them with R², draws the fit, and defines them, so `m` and `b` work on other lines. The unknowns are the names nothing else defines, and the model can be anything: `y1 ~ a x1^2 + b x1 + c`, `y1 ~ a b^x1`, `y1 ~ a sin(b x1) + c`. With a table whose columns are headed `x` and `y`, write `y ~ mx + b`.
+- Random numbers: `random()` from 0 to 1, `random(5)` for a list, `randInt(1, 6)`, `randNorm(μ, σ)`, `randBin(n, p)`, `shuffle(list)`. A line keeps its numbers while you type on other lines; they are new each time the page loads.
 
 ## Normal distributions
 
@@ -37,7 +39,7 @@ Exact mode (Ctrl+Alt+E) shows `3/8`, `√3/2`, and `π/6` instead of decimals. G
 | --- | --- |
 | `normalcdf(z)` | P(Z ≤ z) |
 | `normalcdf(a, b)` | P(a ≤ Z ≤ b) |
-| `normalcdf(a, b, μ, σ)` | P(a ≤ X ≤ b), with `-inf` for an open end |
+| `normalcdf(a, b, μ, σ)` | P(a ≤ X ≤ b), with `-inf` for an open end. On its own line its block draws the curve with the area shaded, and the bounds can be dragged |
 | `invNorm(p)`, `invNorm(p, μ, σ)` | z (or x) with that much area to the left |
 | `zscore(x, μ, σ)`, `x_from_z(z, μ, σ)` | (x − μ)/σ and μ + zσ |
 | `normleft`, `normright`, `normbetween`, `normoutside` | the four tail shapes |
@@ -58,18 +60,21 @@ Ctrl+Alt+N adds a normal curve. The CDF uses erf computed from its series and co
 - `deriv(t^3, t, 2)` is the slope at t = 2, and `deriv2` is the second derivative. Both use central differences with Richardson extrapolation and refuse corners like `|t|` at 0.
 - `integral(t^2, t, 0, 3)` uses adaptive Gauss–Kronrod and takes `-inf` and `inf` as bounds.
 - `sum(n^2, n, 1, 10)`, `prod`, and `seq(2n + 1, n, 1, 4)`.
+- `tangent(f, p)` is the line touching f at x = p, with slope f′(p), for a function defined on the sheet (`f(x) = x^3 - 3x`) or a built-in one like `sin`. Its block draws f with the line and f′ under it, and its point can be dragged.
+- `riemann(f, a, b, n)` adds n strips under f from a to b, each as tall as f at its middle; a fifth input `"left"` or `"right"` samples the strip's end instead. Its block draws the strips with the integral beside the sum.
 - In a graph, `y = deriv(x^3, x)` and `y = integral(t, t, 0, x)` draw the derivative and the area function.
+- The same in notation: `f'(2)` and `f''(2)`, `d/dx x^3`, `sum_{n=1}^{10} n^2`, `prod_{n=1}^{5} n`, and `int_0^3 t^2 dt` (or `∑`, `∏` and `∫`). A sum or a `d/dx` covers the product after it, and an integral runs to its `dx`.
 
 ## Matrices, vectors, and transforms
 
-- Matrices: `[[1,2],[3,4]]`, `det inv transpose identity rref linsolve`, `A^-1`, `A^n`, `trace`, `rank`, `eigen` (2×2 and 3×3; complex eigenvalues need Complex mode), `augment(A, B)`. A grid editor lives on the Matrix tab.
+- Matrices: `[[1,2],[3,4]]`, `det inv transpose identity rref linsolve`, `A^-1`, `A^n`, `trace`, `rank`, `eigen` (2×2 and 3×3; complex eigenvalues need Complex mode), `augment(A, B)`. A grid editor lives on the Matrix tab. A line whose answer is a 2×2 matrix draws the plane carried through it: the grid, the basis vectors (drag their tips) and the unit square's image, whose area is the determinant.
 - Vectors: `⟨3, 4⟩` or `[3, 4]`, `dot cross mag unit angle`.
 - Transforms: `rotation(θ)`, `reflectx`, `reflecty`, `reflectyx`, `dilation(k)`, `apply(M, points)`, `polygon(...)`.
 - Geometry: `distance(p, q)`, `midpoint(p, q)`, `slope(p, q)`, `area` and `perimeter` of a polygon or a list of points, `circlearea(r)`, `circumference(r)`.
 
 ## Trigonometry
 
-Trig follows the Deg/Rad switch. `sin … cot`, `asin … acot` (the range shows under the answer), `atan2`, `30°` from either mode, `torad todeg arclen sector unitcircle period trigform tanform`. In radian mode, trig graphs count the x-axis in π. Working (in Modes, on unless you turn it off) adds the angle unit under trig answers, substituted formulas, the unit circle drawing and asymptote lines. It changes no answer. The notes that say what a function did to reach its answer stay either way.
+Trig follows the Deg/Rad switch. `sin … cot`, `asin … acot` (the range shows under the answer), `atan2`, `30°` from either mode, `torad todeg arclen sector unitcircle period trigform tanform`. `unit circle(θ)` (or `unitcircle(θ)`) on its own line is a figure: the circle with cos θ and sin θ, beside their waves, with the point to drag. In radian mode, trig graphs count the x-axis in π. Working (in Modes, on unless you turn it off) adds the angle unit under trig answers, substituted formulas, the unit circle drawing and asymptote lines. It changes no answer. The notes that say what a function did to reach its answer stay either way.
 
 ## Complex numbers
 
@@ -85,6 +90,20 @@ Turn on Complex mode (the a+bi mode pill) to allow results with i. `re`, `im`, `
 - `hex(255)` is "FF", with `bin`, `oct`, and `base(n, b)` for bases 2 to 36. `dec("ff", 16)` and `dec("0b101")` read digits back.
 - `convert(5, "mi", "km")` covers length, mass, time, volume, area, speed, temperature (°C, °F, K), data (kB and KiB, bits and bytes), angle, pressure, power, energy, volume flow, Btu/lb, humidity ratio, density, ΔT, and R-value. Converting between kinds, like miles to kilograms, is an error. `"ton"` means a ton of cooling when the other unit is power.
 
+## Written the way other calculators take it
+
+Lines from Desmos, a TI or code mostly work as they are.
+
+- Copied out of Desmos, a line is LaTeX, and it reads as it is: `\frac{1}{2}`, `\sqrt[3]{8}`, `\left(1+2\right)\cdot3`, `x_{1}`, `\sum_{n=1}^{10}n`, `y_{1}\sim mx_{1}+b`.
+- Desmos lists: `[1...10]` and `[1, 3, ..., 9]` are ranges, `L[2]` is the second item and `L[2...4]` three of them, `[n^2 for n = [1...5]]` builds a list, and `x^2 with x = 3` swaps a value in. A `[ ]` of numbers takes `+ 1` and `^2` on each number. `total`, `quantile(list, 0.5)`, `quartile(list, 1)`, `spearman`, `join`, `repeat`, `unique`.
+- A dot reads a part: `P.x` and `P.y` of a point, and `normaldist(0, 1).cdf(1)`, `.cdf(low, high)`, `.pdf(x)` and `.inversecdf(p)` of a normal or `binomialdist(n, p)`. On a table of results it reads a row: `A.h` of a moist-air state, `stats(L).s`, `quartiles(L).Q1`, `linreg(xs, ys).r2`, `coil(…).tons`. A function name after a dot works on what it hangs off, as Desmos reads `L.mean`; a row of the same name wins.
+- A TI's keys: `5 → A` (or `5 -> A`) stores, `3ᴇ5`, `⁻5`, `³√8`, `[[1, 2][3, 4]]`, `[A]ᵀ`, and `nDeriv`, `fnInt`, `iPart`, `fPart`, `int`, `logBASE(x, b)`, `remainder`, `stdDev`, `variance`, `dim`, `geometpdf`, `χ²cdf`.
+- From code and other calculators: `pow`, `hypot`, `trunc`, `ceiling`, `sgn`, `cuberoot`, `binomial`, `ld`, `lg`, `sind cosd tand`, `degrees radians`, `asinh acosh atanh` (also `arcsinh`), `sech csch coth`, `clamp(x, low, high)`, `if(condition, then, otherwise)`, `first last reverse`.
+- Operators: `≠` and ` != `, `==`, `<>`, `and or xor not(…)`, `a := 5`, `½ ¼ ¾`, `0x1F`, `0b101`. A `$` is skipped, so `$5 + $3` is 8. `5!=120` is still five factorial equal to 120; put a space before `!=` to mean "not equal".
+- A function or constant typed in another case is read as itself once no line defines that name: `Sqrt(16)`, `LOG(100)`, `PI`, `Ans`.
+
+Some names mean something else here than in Desmos, and keep their meaning: `count(a, b, c)` multiplies choices, `var` and `cov` follow the Pop/Sample switch, `log(b, x)` takes the base first, and `7 % 3` is 7% of 3 (use `mod`).
+
 ## Graphing
 
 - `y = …`, `x = …`, inequalities with shading, implicit curves like `x^2 + y^2 = 25`, points and point lists, domain restrictions `y = x^2 {x > 0}`, piecewise `{x < 0: -x, x}`, normal curves, and binomial sticks.
@@ -97,7 +116,7 @@ Turn on Complex mode (the a+bi mode pill) to allow results with i. `re`, `im`, `
 
 The Air, Refrig, and Flow tabs cover field and design work. Inputs are US units, and `"SI"` as the last input switches a function to metric. [docs/guide.md](guide.md#hvac) has worked examples.
 
-- Moist air: `psych(75, 50)` gives wet bulb, dew point, %RH, humidity ratio, grains, enthalpy, volume, density, and pressure, with altitude as an optional third input. `psychwb`, `psychdp`, `psychw`, and `psychh` start from another property. `enthalpy`, `wetbulb`, `dewpoint`, `humratio`, `grains`, `specvol`, and `airdensity` return one number, work over lists, and graph. The equations are from the 2017 ASHRAE Handbook of Fundamentals.
+- Moist air: `psych(75, 50)` gives wet bulb, dew point, %RH, humidity ratio, grains, enthalpy, volume, density, and pressure, with altitude as an optional third input. `psychwb`, `psychdp`, `psychw`, and `psychh` start from another property. A named state's rows read by the chart's names: `A.Tdb`, `A.Twb`, `A.Tdp`, `A.RH`, `A.W` (humidity ratio), `A.gr` or `A.g` (grains or g/kg), `A.h`, `A.v`, `A.rho`, `A.pv`, `A.p`, so `q = A.h − B.h` is a coil's enthalpy drop. `enthalpy`, `wetbulb`, `dewpoint`, `humratio`, `grains`, `specvol`, and `airdensity` return one number, work over lists, and graph. The equations are from the 2017 ASHRAE Handbook of Fundamentals.
 - Loads: `sensibleheat`, `latentheat`, `totalheat`, `airflow`, `temprise`, `shratio`, `coil`, `coilwb`, `mixair`, `mixtemp`, `oapercent`, `bypassfactor`, `waterheat`, `waterflow`, `uaheat`, `uvalue`, `airchanges`, `achflow`, and `ventair`.
 - Refrigerants: `superheat`, `subcool`, `ptchart`, `sattemp`, `pbubble`, `pdew`, `tbubble`, `tdew`, `refprops`, and `refcycle` for 20 refrigerants, including R-410A, R-454B, R-32, and R-22. Blends have separate bubble and dew points.
 - Efficiency: `eertocop`, `seertocop`, `hspftocop`, `coptoeer`, `coptokwton`, `kwtontocop`, `carnotcop`.

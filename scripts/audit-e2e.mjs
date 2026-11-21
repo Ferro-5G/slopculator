@@ -8,7 +8,8 @@ const undo = (p) => p.keyboard.press('ControlOrMeta+z');
 const redo = (p) => p.keyboard.press('ControlOrMeta+Shift+z');
 const texts = (p) => p.evaluate(() => window.slopculator.lines().map((r) => r.text));
 const seed = (p, lines) => p.evaluate((lines) => window.slopculator.setLines(lines), lines);
-const expr = (p) => p.locator('.rows .row .expr').last();
+/** The composer's line: the sheet's new last line, or the block being edited. */
+const expr = (p) => p.locator('.composer .expr');
 /** Takes down the Undo toast that seeding leaves over the list toolbar for 10 s, so a click there isn't held until it fades. */
 const dropToast = (p) => p.evaluate(() => { const t = document.querySelector('.toast'); t.classList.remove('show'); t.inert = true; });
 async function save(p, name) {
@@ -42,7 +43,7 @@ for (const operation of ['clear', 'delete']) {
   await check(`${operation} replacement line survives undo and redo of later typing`, async (p) => {
     await seed(p, ['5']);
     if (operation === 'clear') await p.evaluate(() => window.slopculator.clear());
-    else await p.locator('.rows .row .del').click();
+    else await p.locator('.tape .rows .row .del').click();
     await expr(p).fill('42');
     await undo(p); await undo(p);
     assert.deepEqual(await texts(p), ['5']);
@@ -84,10 +85,12 @@ for (const trailing of [[], ['']]) {
   await check(`Combine has its own undo with ${trailing.length ? 'an empty' : 'a new'} result line`, async (p) => {
     await seed(p, ['1', '2', ...trailing]);
     await dropToast(p);
-    await p.locator('.combine button[aria-label="Add all lines"]').click();
+    await p.click('.menu-btn');
+    await p.locator('.combine-row button[aria-label="Add all lines"]').click();
     assert.deepEqual(await texts(p), ['1', '2', '1 + 2']);
     await undo(p);
-    assert.deepEqual(await texts(p), ['1', '2', ...trailing]);
+    // The composer's empty new line isn't one of the sheet's lines.
+    assert.deepEqual(await texts(p), ['1', '2']);
     await redo(p);
     assert.deepEqual(await texts(p), ['1', '2', '1 + 2']);
     await p.evaluate(() => {
@@ -95,14 +98,15 @@ for (const trailing of [[], ['']]) {
       input.value = '10'; input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await undo(p); await undo(p);
-    assert.deepEqual(await texts(p), ['1', '2', ...trailing]);
+    assert.deepEqual(await texts(p), ['1', '2']);
   });
 }
 
 await check('Combine toast undo preserves newer source edits', async (p) => {
   await seed(p, ['1', '2']);
   await dropToast(p);
-  await p.locator('.combine button[aria-label="Add all lines"]').click();
+  await p.click('.menu-btn');
+  await p.locator('.combine-row button[aria-label="Add all lines"]').click();
   await p.evaluate(() => {
     const input = document.querySelector('.rows .row .expr');
     input.value = '10'; input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -120,7 +124,7 @@ for (const damaged of ['{broken', JSON.stringify({ rows: [null] })]) {
     }, damaged);
     await p.reload();
     await p.waitForFunction(() => !!window.slopculator);
-    assert.equal(await p.locator('.sheet-title').textContent(), 'Slopculator');
+    assert.equal(await p.locator('.sheet-title').textContent(), 'Untitled sheet');
     await expr(p).fill('42');
     await p.waitForFunction(() => {
       try { return JSON.parse(localStorage.getItem(slopKeys.document)).rows?.[0]?.text === '42'; }
@@ -153,9 +157,9 @@ await check('repairing duplicate imported IDs cannot collide with another import
   assert.notEqual(generated, 'same');
   await load([{ id: generated, text: '1' }, { id: 'same', text: '2' }, { id: 'same', text: '3' }]);
   assert.deepEqual(await texts(p), ['1', '2', '3']);
-  assert.equal(await p.locator('.rows .row').count(), 3);
+  assert.equal(await p.locator('.tape .rows .row.blk:not(.blk-blank)').count(), 3);
   await expr(p).fill('4');
-  assert.deepEqual(await texts(p), ['1', '2', '4']);
+  assert.deepEqual(await texts(p), ['1', '2', '3', '4']);
 });
 
 await check('editing after undo discards the redo branch', async (p) => {
@@ -170,7 +174,7 @@ await check('editing after undo discards the redo branch', async (p) => {
     input.focus(); input.value = '13'; input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await redo(p);
-  assert.deepEqual(await texts(p), ['13', '']);
+  assert.deepEqual(await texts(p), ['13']);
 });
 
 await check('failed named save reports failure and prevents New from discarding it', async (p) => {
@@ -268,73 +272,18 @@ await check('undoing Open saves edits to the outgoing named sheet before its tim
   assert.equal(saved, '12345');
 });
 
-for (const hasTouch of [false, true]) {
-  await check(`phone navigation stays centered across panes, touch=${hasTouch}`, async (p) => {
-    for (const look of ['modern', 'retro']) {
-      await p.selectOption('select.look', look, { force: true });
-      for (const width of [320, 390, 760]) {
-        await p.setViewportSize({ width, height: 844 });
-        for (const name of ['Calculate', 'Graph']) {
-          await p.locator('.nav-view').filter({ hasText: name }).click();
-          const offset = await p.locator('.nav-seg').evaluate((e) => {
-            const r = e.getBoundingClientRect();
-            return r.x + r.width / 2 - innerWidth / 2;
-          });
-          assert.ok(Math.abs(offset) < 1, `${look} ${width} ${name}: offset ${offset}`);
-          const keys = p.locator('.nav-keys');
-          if (await keys.isVisible()) {
-            const tabs = await p.locator('.nav-seg').boundingBox();
-            const action = await keys.boundingBox();
-            assert.ok(tabs.x + tabs.width <= action.x, 'keyboard action overlaps pane switcher');
-          }
-        }
-      }
-    }
-  }, { hasTouch });
-}
-
-await check('laptop starter cards fit above the keypad with usable key targets', async (p) => {
-  await p.setViewportSize({ width: 1280, height: 800 });
-  const room = await p.evaluate(() => ({
-    cards: document.querySelector('.starter').getBoundingClientRect().bottom,
-    keypad: document.querySelector('.keypad').getBoundingClientRect().top,
-    keys: [...document.querySelectorAll('.numpad .key')].map((e) => e.getBoundingClientRect().height),
-  }));
-  assert.ok(room.cards <= room.keypad, 'starter cards extend under the keypad');
-  assert.ok(room.keys.every((h) => h >= 42), 'number pad targets are shorter than 42 px');
-});
-
-await check('desktop combined probabilities keep their answer whole, beside the expression or under it', async (p) => {
+await check('desktop combined probabilities keep their answer whole in their block, in both looks', async (p) => {
   await seed(p, ['normalcdf(-1,1)+normalcdf(-2,2)']);
-  const layout = () => p.evaluate(() => {
-    const rect = (s) => document.querySelector(s).getBoundingClientRect();
-    const src = rect('.src'), out = rect('.out'), left = rect('.left'), graph = rect('.graph-pane');
-    const beside = out.left >= src.right && out.top < src.bottom;
-    return { beside, whole: beside || (out.top >= src.top && out.right <= left.right + 0.5 && out.left >= left.left), left: left.width, graph: graph.width };
-  });
-  const initial = await layout();
-  assert.ok(initial.whole, 'combined probability answer is cut off or outside the notebook');
-  assert.ok(initial.graph > initial.left && initial.graph >= 280, 'graph lost its default majority');
   for (const look of ['modern', 'retro']) {
-    await p.setViewportSize({ width: 1440, height: 900 });
     await p.selectOption('select.look', look, { force: true });
-    for (const fraction of [0.25, 0.75]) {
-      const before = await layout();
-      const splitter = await p.locator('.splitter').boundingBox();
-      const grab = splitter.x + splitter.width * fraction;
-      await p.mouse.move(grab, splitter.y + 100);
-      await p.mouse.down();
-      await p.mouse.move(grab + 64, splitter.y + 100);
-      await p.mouse.up();
-      const dragged = await layout();
-      assert.ok(Math.abs(dragged.left - before.left - 64) < 2, `${look}: splitter did not follow pointer delta: ${before.left} to ${dragged.left}`);
-    }
-    const dragged = await layout();
-    await p.setViewportSize({ width: 1920, height: 1080 });
-    assert.ok(Math.abs((await layout()).left - dragged.left) < 2, `${look}: resizing loses the user splitter width`);
-    await p.locator('.splitter').dblclick();
-    const reset = await layout();
-    assert.ok(reset.graph > reset.left && (look !== 'modern' || reset.whole), `${look}: splitter reset loses useful notebook or graph space`);
+    await p.waitForTimeout(150);
+    const fit = await p.evaluate(() => {
+      const block = document.querySelector('.tape .rows .row.blk:not(.blk-blank)');
+      const r = (e) => e.getBoundingClientRect();
+      const b = r(block), out = r(block.querySelector('.out')), res = block.querySelector('.out .result');
+      return { inside: out.left >= b.left - 0.5 && out.right <= b.right + 0.5, whole: !!res && res.scrollWidth <= res.clientWidth + 1 };
+    });
+    assert.ok(fit.inside && fit.whole, `${look}: the combined probability is cut or runs out of its block: ${JSON.stringify(fit)}`);
   }
 });
 
@@ -416,49 +365,27 @@ for (const look of ['modern', 'retro']) {
 }
 
 for (const look of ['modern', 'retro']) {
-  await check(`${look} narrow desktop preserves graph space and contains its controls`, async (p) => {
+  await check(`${look} narrow desktop keeps the graph block's controls inside it and the bar inside the window`, async (p) => {
     await p.selectOption('select.look', look, { force: true });
+    await seed(p, ['y = x^2']);
     await p.evaluate(() => document.fonts.ready);
-    const layout = () => p.evaluate(() => {
-      const main = document.querySelector('.main'), pane = document.querySelector('.graph-pane');
-      const graph = pane.getBoundingClientRect();
-      const list = document.querySelector('.list-tools');
-      const buttons = [...pane.querySelectorAll('.graph-tools button')].map((e) => {
-        const b = e.getBoundingClientRect();
-        return { name: e.getAttribute('aria-label'), left: b.left, right: b.right, bottom: b.bottom, width: b.width };
-      });
-      return { left: document.querySelector('.left').getBoundingClientRect().width, graph: graph.width,
-        min: parseFloat(getComputedStyle(main).getPropertyValue('--graph-min-w')), stored: parseFloat(main.style.getPropertyValue('--left')),
-        listFits: list.scrollWidth <= list.clientWidth + 1,
-        fits: buttons.every((b) => b.left >= graph.left - 1 && b.right <= graph.right + 1 && b.bottom <= graph.bottom + 1), buttons };
-    });
     for (const theme of ['paper', 'contrastLight']) {
       await p.emulateMedia({ colorScheme: 'light' });
       await p.evaluate((theme) => window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme }), theme);
       for (const width of [761, 780, 800, 900]) {
         await p.setViewportSize({ width, height: 768 });
-        const before = await layout();
-        assert.ok(before.graph >= before.min - 0.5, `${look} ${theme} ${width}: graph ${before.graph}px is below ${before.min}px`);
-        assert.equal(before.buttons.length, 6);
-        assert.ok(before.listFits, `${look} ${theme} ${width}: notebook tools need horizontal scrolling`);
-        assert.ok(before.fits, `${look} ${theme} ${width}: graph controls escape their pane`);
-        const splitter = await p.locator('.splitter').boundingBox();
-        await p.mouse.move(splitter.x + splitter.width / 2, splitter.y + 100);
-        await p.mouse.down(); await p.mouse.move(width - 20, splitter.y + 100); await p.mouse.up();
-        const dragged = await layout();
-        assert.ok(Math.abs(dragged.left - dragged.stored) < 1, `${look}: stored splitter width differs from its visible width`);
-        assert.ok(dragged.graph >= dragged.min - 0.5 && dragged.fits, `${look}: dragging leaves insufficient graph space`);
-        await p.locator('.splitter').dblclick();
+        await p.waitForTimeout(100);
+        const g = await p.evaluate(() => {
+          const pane = document.querySelector('.tape .graph-pane'), r = pane.getBoundingClientRect();
+          const buttons = [...pane.querySelectorAll('.graph-tools button')].map((e) => e.getBoundingClientRect());
+          const bar = document.querySelector('.modebar');
+          return { count: buttons.length, fits: buttons.every((b) => b.left >= r.left - 1 && b.right <= r.right + 1 && b.bottom <= r.bottom + 1), bar: bar.scrollWidth <= bar.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth };
+        });
+        assert.equal(g.count, 6);
+        assert.ok(g.fits, `${look} ${theme} ${width}: graph controls escape their block`);
+        assert.ok(g.bar && g.page, `${look} ${theme} ${width}: the bar or the page runs past the window: ${JSON.stringify(g)}`);
       }
     }
-    await seed(p, ['y=x^2-4']);
-    await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await p.mouse.move(10, 10);
-    await p.locator('.graph-host').focus();
-    await p.locator('.graph-host').hover();
-    await p.waitForFunction(() => document.querySelector('.marks-hint').classList.contains('show'));
-    const hintFits = await p.evaluate(() => document.querySelector('.marks-hint').getBoundingClientRect().bottom <= document.querySelector('.graph-host').getBoundingClientRect().bottom);
-    assert.ok(hintFits, `${look}: point keyboard hint covers controls outside the graph canvas`);
   });
 }
 

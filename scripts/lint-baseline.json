@@ -1,5 +1,6 @@
 {
-  "scripts/e2e.mjs": 2,
+  "scripts/e2e.mjs": 1,
+  "src/app/canvas.ts": 1,
   "src/app/download.ts": 1,
   "src/app/edits.ts": 1,
   "src/app/feedback.ts": 1,
@@ -12,9 +13,9 @@
   "src/app/render.ts": 1,
   "src/app/rows.ts": 3,
   "src/app/sheet.ts": 1,
-  "src/app/sound.ts": 1,
   "src/app/thumb.ts": 1,
   "src/app/toast.ts": 1,
+  "src/app/wiretags.ts": 1,
   "src/ui/voices.ts": 1,
   "test/feedback.test.ts": 2
 }

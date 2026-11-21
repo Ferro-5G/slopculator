@@ -84,8 +84,11 @@ await visit('/', { width: 1280, height: 800 }, async (page) => {
 for (const width of [1280, 390]) {
   await visit('/app', { width, height: 800 }, async (page, where) => {
     await page.waitForFunction(() => !!window.slopculator);
-    const title = await page.locator('.sheet-title').isVisible();
-    expect(!title, `${where}: an unnamed sheet's title steps aside for the logo link`);
+    // The bar reads "Slopculator | Untitled sheet": the logo link and the sheet's name beside it.
+    const title = await page.locator('.sheet-title').isVisible() && (await page.locator('.sheet-title').textContent()) === 'Untitled sheet';
+    // A phone's bar has room for the logo only; an unnamed sheet's title steps aside there.
+    const phone = page.viewportSize().width <= 760;
+    expect((phone ? !(await page.locator('.sheet-title').isVisible()) : title) && await page.locator('.brand-home').isVisible(), `${where}: the bar should read the logo link${phone ? '' : ', then Untitled sheet'}`);
     await page.click('.brand-home');
     await page.waitForURL(`${base}/`);
     expect(!(await page.locator('dialog[open]').count()), `${where}: the logo opened a dialog instead of going home`);

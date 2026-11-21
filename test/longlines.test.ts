@@ -7,6 +7,7 @@ import { callNameBefore, usageForms } from '../src/ui/brackets';
 import { unfilled } from '../src/ui/slots';
 import { slotInfo } from '../src/ui/linestate';
 import { isUnit, otherUnit } from '../src/engine/units';
+import { parse } from '../src/engine/parser';
 
 const N = 50_000;
 const ms = (f: () => unknown): number => {
@@ -46,3 +47,24 @@ describe('hints on very long lines', () => {
     expect(usageForms('log(x), log(b, x), or log_b(x)')).toEqual(['log(x)', 'log(b, x)', 'log_b(x)']);
   });
 });
+
+describe('forms from other calculators on very long lines', () => {
+  const read = (text: string): number => ms(() => {
+    try {
+      parse(text);
+    } catch {
+      // Too deep or not math: only the time matters here.
+    }
+  });
+  it('reads LaTeX, subscripts, exponents and integrals without retrying', () => {
+    expect(read('\\sqrt{'.repeat(N / 6))).toBeLessThan(FAST);
+    expect(read(`${'\\frac{'.repeat(N / 12)}1${'}{2}'.repeat(N / 12)}`)).toBeLessThan(FAST);
+    expect(read('x_{'.repeat(N / 3))).toBeLessThan(FAST);
+    expect(read('2^{'.repeat(N / 3))).toBeLessThan(FAST);
+    expect(read('\\left('.repeat(N / 6))).toBeLessThan(FAST);
+    expect(read('int_0^1 '.repeat(N / 8))).toBeLessThan(FAST);
+    expect(read(`L${'[1]'.repeat(N / 3)}`)).toBeLessThan(FAST);
+    expect(read(`${'[1...'.repeat(N / 5)}`)).toBeLessThan(FAST);
+  });
+});
+

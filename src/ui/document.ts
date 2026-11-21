@@ -6,7 +6,12 @@ import { COLORS, GRAPH_RATE_NAMES, LOOK_NAMES, MODE_NAMES, MOTION_NAMES, THEME_N
 import { lineErrorText } from './errortext';
 import { ROUND_MAX } from './rounding';
 
-export type DocRow = RowInput & { color: number; note?: string };
+/**
+ * `at` is where the line's block sits on a wide canvas (src/ui/canvas.ts); narrow layouts ignore it, and a line without
+ * one is placed when it's first shown. `example` marks the first run's example lines, which Clear example removes.
+ * `open` marks a line whose steps are showing (src/ui/unfold.ts), so it opens that way again.
+ */
+export type DocRow = RowInput & { color: number; note?: string; at?: { x: number; y: number }; example?: true; open?: true; /** A figure block showing its numbers (figure is the default). */ view?: 'numbers' };
 
 export interface DocBody<R extends DocRow> {
   rows: R[];
@@ -44,9 +49,20 @@ export interface SheetView {
   graphPinned?: boolean;
   keypad?: boolean;
   view?: 'calc' | 'graph';
+  /** Where the person put the graph block on a wide canvas (dragged or resized), and its size. Unset, the layout places it. */
+  graphBlock?: { x: number; y: number; w: number; h: number };
+  /**
+   * 2 once the wide canvas lays blocks out by kind, where a stored position (a row's `at`, `graphBlock`) is one the
+   * person chose by dragging. Unset, positions came from an older build that stored every block's place, and are dropped.
+   */
+  flow?: 2;
+  /** The psychrometric chart showing its states' numbers instead of the chart (the chart is the default). */
+  psych?: 'numbers';
+  /** Where the person dragged the psychrometric chart on a wide canvas. Unset, the layout places it. */
+  psychAt?: { x: number; y: number };
 }
 
-const SHEET_VIEW_FIELDS: readonly (keyof SheetView)[] = ['graph', 'graphPinned', 'keypad', 'view'];
+const SHEET_VIEW_FIELDS: readonly (keyof SheetView)[] = ['graph', 'graphPinned', 'keypad', 'view', 'graphBlock', 'flow', 'psych', 'psychAt'];
 
 export const CURRENT_SHEET_KEY = 'slopculator:current';
 export const RECENT_MAX = 6;
@@ -83,7 +99,21 @@ export function cleanSheetView(raw: Record<string, unknown>): SheetView {
     ...(raw.graphPinned === true ? { graphPinned: true } : {}),
     ...(typeof raw.keypad === 'boolean' ? { keypad: raw.keypad } : {}),
     ...(raw.view === 'calc' || raw.view === 'graph' ? { view: raw.view } : {}),
+    ...(cleanBlockRect(raw.graphBlock) ? { graphBlock: cleanBlockRect(raw.graphBlock)! } : {}),
+    ...(raw.flow === 2 ? { flow: 2 as const } : {}),
+    ...(raw.psych === 'numbers' ? { psych: 'numbers' as const } : {}),
+    ...(cleanPoint(raw.psychAt) ? { psychAt: cleanPoint(raw.psychAt)! } : {}),
   };
+}
+
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1e7;
+function cleanPoint(raw: unknown): { x: number; y: number } | null {
+  const p = asObject(raw);
+  return finite(p.x) && finite(p.y) ? { x: p.x, y: p.y } : null;
+}
+function cleanBlockRect(raw: unknown): { x: number; y: number; w: number; h: number } | null {
+  const p = cleanPoint(raw), r = asObject(raw);
+  return p && finite(r.w) && finite(r.h) && r.w >= 80 && r.h >= 60 ? { ...p, w: r.w, h: r.h } : null;
 }
 
 /**
@@ -132,7 +162,8 @@ export function cleanBody<R extends DocRow>(raw: Record<string, unknown>, newId:
     seen.add(row.id);
     const stored = asObject(r);
     const { color, note } = stored;
-    rows.push({ ...row, color: Number.isInteger(color) && (color as number) >= 0 ? (color as number) : k, ...(typeof note === 'string' ? { note } : {}) } as R);
+    const at = cleanPoint(stored.at);
+    rows.push({ ...row, color: Number.isInteger(color) && (color as number) >= 0 ? (color as number) : k, ...(typeof note === 'string' ? { note } : {}), ...(at ? { at } : {}), ...(stored.example === true ? { example: true } : {}), ...(stored.open === true ? { open: true } : {}), ...(stored.view === 'numbers' ? { view: 'numbers' } : {}) } as R);
   }
   return { rows: rows.length ? rows : [blankRow()], settings: cleanSettings(raw.settings), display: cleanDisplay(raw.display) };
 }

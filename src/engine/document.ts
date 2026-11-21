@@ -1,17 +1,18 @@
 import { errorSpan, lineWarnings, type LineWarning, type Span } from './diagnostics';
 import { BudgetError, CalcError, EdgeError, OrderError, OverflowError, drawDeadline, errorText, isDrawing, quietSample, varErrorText, withLineBudget, withSheetBudget } from './errors';
-import { isHeading, parse, type Node, type RelOp } from './parser';
+import { isHeading, parse, parseSpanned, type Node, type RelOp, type Spanned } from './parser';
 import { isIdentifier } from './lexer';
 import { Env, RESERVED, SETTINGS, compile, settingsKey, type Fn, type Settings } from './evaluator';
 import { callsValue } from './resolve';
 import { BUILTINS, CONSTANTS, readsAsValue, soleUnknown } from './builtins';
-import { normBetween, binomRange } from './numeric';
+import { normBetween, binomRange, ridders } from './numeric';
 import { type Value, type NormalDist, type BinomDist, isDist, num, tidy, weightedTotal } from './values';
 import { PreciseState, sameShape, toValue, type Precise } from './precise';
 import { children, isGraphVar, lettersOf, namesIn } from './ast';
 import { Lru } from './memo';
 import { Fingerprints, type Fingerprint } from './fingerprint';
 import { unitPhrase } from './units';
+import { isFitNode, planFit, type FitPlan } from './regress';
 
 interface DistState {
   cdf: boolean;
@@ -224,7 +225,8 @@ function freeXY(n: Node, env: Env, bound: Set<string>, seen = new Set<string>())
           out.x ||= r.x;
           out.y ||= r.y;
         }
-        if (!f && !(m.name in BUILTINS) && !env.hasVar(m.name)) visit({ k: 'id', name: m.name, pos: 0 }, b);
+        // A field after a dot (A.h) is no name of the sheet's.
+        if (!f && !(m.name in BUILTINS) && !env.hasVar(m.name) && !(m.dot && m.args.length === 1)) visit({ k: 'id', name: m.name, pos: 0 }, b);
         return;
       }
       default: children(m).forEach((c) => visit(c, b));
@@ -292,6 +294,8 @@ interface Parsed {
   error?: CalcError;
   defVar?: { name: string; node: Node };
   defFunc?: { name: string; params: string[]; body: Node };
+  /** The line is a regression, y1 ~ m x1 + b. */
+  fit?: FitPlan;
 }
 
 /**
@@ -342,11 +346,77 @@ export function lineDefines(text: string): string | null {
   }
 }
 
+/** A line's syntax tree, as the sheet reads it: "5 mi to km" is the convert call it names. Throws a CalcError. */
+export const parseLine = (text: string): Node => parse(unitPhrase(text) ?? text);
+/** parseLine with where each part was typed (see parseSpanned). */
+export const parseLineSpanned = (text: string): Spanned => parseSpanned(unitPhrase(text) ?? text);
+
 export function evaluateDocument(rows: RowInput[], settings: Settings): RowResult[] {
   return withSheetBudget(() => evaluateSheet(rows, settings));
 }
 
-function evaluateSheet(rows: RowInput[], settings: Settings): RowResult[] {
+/** A part of a line worked out on its own: its value (and exact value, as a line gets one), or its error's text. */
+export type PartResult = { value: Value; precise?: Precise } | { error: string };
+
+/**
+ * Works out parts of one line's tree (parseLine(text) of `rows[index]`, or nodes in it) where that line sits on the
+ * sheet: every name means what it means on that line, ans included. Each part gets a line's budget, and the value
+ * or error the line itself would get for it. A line's steps (src/ui/unfold.ts) are worked out this way.
+ */
+export function evaluateParts(rows: RowInput[], settings: Settings, index: number, parts: readonly Node[]): PartResult[] {
+  const out: PartResult[] = [];
+  withSheetBudget(() => evaluateSheet(rows, settings, (env, exact) => {
+    for (const part of parts) {
+      env.inRow([], () => withLineBudget(() => {
+        try {
+          const { value, precise } = valueOf(part, env, exact, index);
+          out.push(precise ? { value, precise } : { value });
+        } catch (e) {
+          out.push({ error: errorText(e) });
+        }
+      }));
+    }
+  }));
+  return out;
+}
+
+/** A function a figure draws: its name on the sheet (f, or a built-in like sin), and whether it's the slope f′ instead. */
+export interface FigureFunction { name: string; slope?: boolean }
+
+/**
+ * As evaluateParts, and each of `fns` as a function of one number that a figure can sample (a function's name called
+ * with it, or the slope of one), compiled where the line sits. A name that isn't a one-input function gives null.
+ * Samples outside the domain are NaN, never an error. Figures (src/ui/figures.ts) read their math this way.
+ */
+export function evaluateFigureParts(rows: RowInput[], settings: Settings, index: number, parts: readonly Node[], fns: readonly FigureFunction[]): { parts: PartResult[]; fns: (((x: number) => number) | null)[] } {
+  const out: PartResult[] = [];
+  const fs: (((x: number) => number) | null)[] = [];
+  withSheetBudget(() => evaluateSheet(rows, settings, (env, exact) => {
+    for (const part of parts) {
+      env.inRow([], () => withLineBudget(() => {
+        try {
+          const { value, precise } = valueOf(part, env, exact, index);
+          out.push(precise ? { value, precise } : { value });
+        } catch (e) {
+          out.push({ error: errorText(e) });
+        }
+      }));
+    }
+    for (const { name, slope } of fns) {
+      const b = BUILTINS[name];
+      if (!env.hasFunc(name) && !(b && b.min <= 1 && b.max >= 1 && !b.lazy)) { fs.push(null); continue; }
+      try {
+        const f = numericFn1(compile({ k: 'call', name, args: [{ k: 'id', name: 'x', pos: 0 }], pos: 0 }, env, ['x'], index));
+        fs.push(slope ? (x) => { const d = ridders(f, x, 1); return Number.isFinite(d.value) && d.err <= 1e-4 * Math.max(1, Math.abs(d.value)) ? d.value : NaN; } : f);
+      } catch {
+        fs.push(null);
+      }
+    }
+  }));
+  return { parts: out, fns: fs };
+}
+
+function evaluateSheet(rows: RowInput[], settings: Settings, after?: (env: Env, exact: PreciseState) => void): RowResult[] {
   const env: Env = new Env(settings, {
     improve: (name, v) => {
       const pr = exact.varFinal(name);
@@ -368,7 +438,7 @@ function evaluateSheet(rows: RowInput[], settings: Settings): RowResult[] {
     const text = row.text.trim();
     if (!text || isHeading(text)) return { row, index };
     try {
-      const ast = parse(unitPhrase(text) ?? text);
+      const ast = parseLine(text);
       return { row, index, ast, ...classifyDefinition(ast) };
     } catch (e) {
       return { row, index, error: e instanceof CalcError ? e : new CalcError(errorText(e)) };
@@ -421,6 +491,18 @@ function evaluateSheet(rows: RowInput[], settings: Settings): RowResult[] {
       env.defineVar({ name: h, node, row: i });
     }
   });
+
+  // A regression reads every other definition, so its unknowns are whatever is still undefined once those are in.
+  // In line order: a later regression reads an earlier one's unknowns as values.
+  for (const p of parsed) {
+    if (!p.ast || !isFitNode(p.ast)) continue;
+    const plan = planFit(p.ast, p.index, env, (name) => tableColumn(rows, p.index, name), (name) => {
+      const at = isGraphVar(name) ? undefined : env.varDef(name)?.row;
+      return isGraphVar(name) || (at !== undefined && rows[at]?.kind === 'table');
+    });
+    p.fit = plan;
+    for (const name of plan.params) env.defineVar({ name, node: plan.key, row: p.index, compute: () => plan.run().params.get(name)! });
+  }
 
   const results: RowResult[] = [];
   const running = new Set<number>();
@@ -475,6 +557,7 @@ function evaluateSheet(rows: RowInput[], settings: Settings): RowResult[] {
       }
     });
   }
+  after?.(env, exact);
   return results;
 }
 
@@ -496,6 +579,18 @@ function varsReached(nodes: Node[], env: Env): Set<string> {
   };
   nodes.forEach(visit);
   return out;
+}
+
+/** The column headed name in the table nearest above a line, or else the first one below it, as a list. */
+function tableColumn(rows: RowInput[], index: number, name: string): Node | null {
+  const order = [...rows.keys()].filter((i) => i < index).reverse().concat([...rows.keys()].filter((i) => i > index));
+  for (const i of order) {
+    const row = rows[i];
+    if (row.kind !== 'table') continue;
+    const col = row.columns.find((c) => c.header.trim() === name);
+    if (col) return { k: 'list', items: trimCells(col.cells).map((c) => (c.trim() ? safeParse(c) : { k: 'num', v: NaN })) };
+  }
+  return null;
 }
 
 function safeParse(src: string): Node {
@@ -549,6 +644,15 @@ function evalExprRow(p: Parsed, env: Env, res: RowResult, dup: (n: string) => bo
     else addValueGraph(res, res.value);
     return;
   }
+  if (p.fit) {
+    const fit = p.fit.run();
+    res.value = fit.value;
+    cachedGraph('R', prints.of(p.fit.key, p.index), env, res, () => {
+      if (fit.curve) res.graph.push({ type: 'fx', f: numericFn1(fit.curve) });
+      if (fit.points?.length) res.graph.push({ type: 'points', pts: fit.points });
+    });
+    return;
+  }
   if (ast.k === 'rel') {
     evalRelation(ast, env, res, p.index, prints);
     return;
@@ -561,35 +665,43 @@ function evalExprRow(p: Parsed, env: Env, res: RowResult, dup: (n: string) => bo
     });
     return;
   }
+  const { value: v, precise } = valueOf(ast, env, exact, p.index);
+  if (precise) res.precise = precise;
+  res.value = v;
+  res.prob = isProbNode(ast);
+  if (isDist(v)) evalDist(v, row.dist, env, res, p.index);
+  else addValueGraph(res, v);
+}
+
+/** An expression's value, with its exact value when exact math covers it. Throws the expression's error. */
+function valueOf(ast: Node, env: Env, exact: PreciseState, row: number): { value: Value; precise?: Precise } {
   let v: Value;
+  let precise: Precise | undefined;
   try {
-    v = compile(ast, env, [], p.index)([]);
+    v = compile(ast, env, [], row)([]);
   } catch (e) {
     // 200!/199! overflows doubles on the way, and 1/(1e16 + 1 − 1e16) divides by a zero only doubles see. Exact math
     // gets to both.
     let pr: Precise | null = null;
     if (e instanceof OverflowError || e instanceof EdgeError) {
       try {
-        pr = exact.evaluate(ast, p.index);
+        pr = exact.evaluate(ast, row);
       } catch {
         // Exact math has no value for it either, so the double's error stands.
       }
     }
     if (!pr) throw e;
-    res.precise = pr;
+    precise = pr;
     v = toValue(pr);
   }
-  if (!res.precise && (typeof v === 'number' || EXACT_SHAPES.has(v.t))) {
-    const pr = exact.evaluate(ast, p.index);
+  if (!precise && (typeof v === 'number' || EXACT_SHAPES.has(v.t))) {
+    const pr = exact.evaluate(ast, row);
     if (pr && sameShape(pr, v)) {
-      res.precise = pr;
+      precise = pr;
       v = toValue(pr);
     }
   }
-  res.value = v;
-  res.prob = isProbNode(ast);
-  if (isDist(v)) evalDist(v, row.dist, env, res, p.index);
-  else addValueGraph(res, v);
+  return { value: v, precise };
 }
 
 function isProbNode(n: Node): boolean {

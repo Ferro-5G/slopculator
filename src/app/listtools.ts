@@ -4,6 +4,7 @@ import { play } from './sound';
 import { roving, h, icon, iconLabel, ICONS } from './dom';
 import { combineAll, clearAll, addRow, addTable, addNormalCurve, appendLine } from './edits';
 import { listTools } from './layout';
+import { cancelButton, dialogShell } from './overlay';
 import { kb } from './platform';
 import { activeId, doc } from './sheet';
 import { setKeypad, keypadOn } from './shell';
@@ -23,10 +24,10 @@ export function syncListTools(empty: boolean): void {
 }
 const STARTER_ICONS: Partial<Record<StarterId, keyof typeof ICONS>> = { normal: 'curve', zscore: 'func', binomial: 'bars', sliders: 'sliders' };
 export const starter = h('div', { class: 'starter', role: 'group', 'aria-label': 'Start with an example' },
-  h('div', { class: 'starter-head' }, 'Start with an example', h('span', {}, h('kbd', {}, kb('Ctrl+K')), ' finds any function')),
   h('div', { class: 'starter-grid' }, ...STARTERS.filter((ex) => !ex.hvac).map((ex) => {
     const b = h('button', { type: 'button', class: 'starter-card' }, h('span', { class: 'sc-title' }, icon(STARTER_ICONS[ex.id]!), h('span', {}, ex.title)), h('span', { class: 'sc-lines' }, ex.lines.join(String.fromCharCode(10))));
     b.addEventListener('click', () => {
+      b.closest('dialog')?.close('ok');
       play('enter');
       for (const { text, dist } of starterRows(ex)) {
         if (dist) addRow(doc.rows[doc.rows.length - 1].id, { kind: 'expr', text, dist }, false);
@@ -51,4 +52,12 @@ export function initListtools(): void {
     clearAllBtn,
   );
   roving(starter, '.starter-card');
+}
+
+/** The starters, from File: each puts its lines on the canvas, ready to edit. */
+export function openExamples(): void {
+  const dialog = dialogShell('Start with an example', starter, h('div', { class: 'mx-actions' }, cancelButton()));
+  dialog.classList.add('examples-dialog');
+  dialog.showModal();
+  dialog.querySelector<HTMLButtonElement>('.starter-card')?.focus();
 }

@@ -27,28 +27,34 @@ const name = (name: string, title: string, sub?: string): Key => ({ label: name,
 const d = (label: string): Key => ({ label, ins: label, tone: 'num' });
 const act = (label: string, action: Key['action'], title: string, sub?: string): Key => ({ label, action, title, sub, tone: 'act' });
 
-/** Legends say × ÷ −; the keys type * / -, which is what the line reads. */
+/**
+ * The number pad under the everyday row (x y π e % ans, ROW1 in thumbindex.ts): four rows of six for a right thumb,
+ * digits in the middle and operators down the right edge. Enter lives on the composer, and the function tabs and AC
+ * on the composer's top edge, so the pad holds only what types. Legends say × ÷ −; the keys type * / -, which is what
+ * the line reads.
+ */
 export const PAD: Key[][] = [
-  [act('←', 'left', 'Move the caret left. Hold to repeat, or slide to move it along'), act('→', 'right', 'Move the caret right. Hold to repeat, or slide to move it along'), d('7'), d('8'), d('9'), op('×', '*', 'Multiply')],
-  [op('xʸ', '^', 'Power'), op('√', '√(¦)', 'Square root'), d('4'), d('5'), d('6'), op('−', '-', 'Subtract')],
-  [op('(', '('), op(')', ')'), d('1'), d('2'), d('3'), op('+', '+', 'Add')],
+  [act('←', 'left', 'Move the caret left. Hold to repeat, or slide to move it along'), act('→', 'right', 'Move the caret right. Hold to repeat, or slide to move it along'), d('7'), d('8'), d('9'), op('÷', '/', 'Divide')],
+  [op('xʸ', '^', 'Power'), op('√', '√(¦)', 'Square root'), d('4'), d('5'), d('6'), op('×', '*', 'Multiply')],
+  [op('(', '('), op(')', ')'), d('1'), d('2'), d('3'), op('−', '-', 'Subtract')],
   // , and = type just themselves: the typeset line spaces them, and no space the app put in hides between them and
   // the caret (a tap landed between the comma and an invisible space, and a fix could give a wrong answer).
-  [op(',', ',', 'Separates inputs: f(a, b)'), op('=', '=', 'Define a variable, graph a curve or write an equation'), d('0'), d('.'), act('⌫', 'back', 'Backspace. Hold to clear the line; Undo brings it back', 'hold: clear'), { label: 'enter', action: 'enter', title: 'New line (Enter)', tone: 'hero' }],
+  [op(',', ',', 'Separates inputs: f(a, b)'), op('=', '=', 'Define a variable, graph a curve or write an equation'), d('0'), d('.'), act('⌫', 'back', 'Backspace. Hold to clear the line; Undo brings it back'), op('+', '+', 'Add')],
 ];
 
+/** For a left hand, each group keeps its order and the groups swap ends: operators down the left edge. */
 export function padRows(padLeft = false): Key[][] {
   if (!padLeft) return PAD;
-  return PAD.map((r, i) => {
-    if (i < PAD.length - 1) return [r[5], r[2], r[3], r[4], r[0], r[1]];
-    // , = 0 . ⌫ enter → enter ⌫ 0 . = ,
-    return [r[5], r[4], r[2], r[3], r[1], r[0]];
-  });
+  return PAD.map((r) => [r[5], r[2], r[3], r[4], r[0], r[1]]);
 }
+
+/** The composer's send key: the one accent-filled key, drawn on the composer rather than on the pad. */
+export const ENTER: Key = { label: 'enter', action: 'enter', title: 'Send the line (Enter)', tone: 'hero' };
 
 export const ANS: Key = { label: 'ans', ins: 'ans', title: 'Answer from the line above', tone: 'fn' };
 export const AC: Key = { label: 'AC', action: 'clearall', title: 'Clear every line (Ctrl+Alt+Backspace). Ctrl+Z brings them back', tone: 'red' };
-export const DIV: Key = op('÷', '/', 'Divide');
+/** ÷, on the pad's top row. */
+export const DIV: Key = PAD[0][5];
 
 export const LONG_LABEL = 7;
 /** Every caption's size, in points (dp, px), on every platform and in both looks. One that can't fit is left off. */
@@ -69,7 +75,6 @@ export const keyCall = (k: Key): string | null => leadingCall(k.ins ?? '');
 
 export function keyCaption(k: Key): string | undefined {
   if (!k.sub) return undefined;
-  if (k.action === 'back') return k.sub;
   if ([...k.label].length >= LONG_LABEL || keyLegend(k.label).length > 1) return undefined;
   return textFits(k.sub, 'mono', CAPTION_MIN, CAPTION_ROOM) ? k.sub : undefined;
 }
@@ -281,6 +286,8 @@ export const PANELS: Panel[] = [
     hero('roots', 'roots(a, b, c, …): every root of a polynomial, highest power first', 'p(x) = 0'), fn('polyval', 'polyval({a, b, c}, x) = ax² + bx + c', 'p(x)'),
     fn('sum', 'sum(list) or sum(expr, n, a, b)', 'Σ'), fn('seq', 'seq(expr, n, a, b): a list', 'list'),
     fn('gamma', 'Γ(x); gamma(n) = (n − 1)!', 'Γ(x)'),
+    fn('tangent', 'tangent(f, p): the line touching f at x = p, drawn with f and f′', 'touching line'),
+    fn('riemann', 'riemann(f, a, b, n): a Riemann sum in n strips; "left", "right" or "mid" last', 'Σ f·Δx'),
   ]),
   panel('Matrix', [
     act('new matrix', 'matrix', 'Build a matrix in a grid', 'grid editor'), op('[[ ]]', '[[¦]]', 'Matrix: [[1,2],[3,4]]', 'matrix'),
@@ -414,7 +421,7 @@ export const PANELS: Panel[] = [
 
 /**
  * Key heights for a phone held upright and typed on with one thumb, in points (dp on Android, px on the web): the
- * bank's two rows and the pad's four, 6 apart. A short screen takes a little off; no key goes under 44.
+ * everyday row (bank) and the pad's four, 6 apart. A short screen takes a little off; no key goes under 44.
  */
 export function phoneRows(screenH: number): { bank: number; pad: number } {
   if (screenH >= 800) return { bank: 48, pad: 56 };

@@ -2402,8 +2402,7 @@ dialog.palette {
   }
 
   .splitter,
-  .main.view-graph .left,
-  .main:not(.view-graph) .graph-pane {
+  .main.view-graph .left {
     display: none !important;
   }
 

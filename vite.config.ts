@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 // With their extensions, as in the modules these import: Node loads this file and what it imports as written.
-import { DESKTOP_QUERY, PHONE_QUERY } from './src/app/breakpoints.ts';
+import { NARROW_QUERY as PHONE_QUERY, WIDE_QUERY as DESKTOP_QUERY } from './src/ui/breakpoints.ts';
 import { paletteCss } from './src/ui/webtokens.ts';
 import { escapeHtml, PRIVACY_INTRO, privacyHtml } from './src/ui/privacy.ts';
 

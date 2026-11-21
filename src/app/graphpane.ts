@@ -268,7 +268,8 @@ export function initGraphpane(): void {
     }
   });
   graph.onPin = () => play('toggle');
-  const syncCover = () => graph.setCover({ top: 0, bottom: getComputedStyle(graphDock).position === 'absolute' ? graphPane.clientHeight - graphDock.offsetTop : 0 });
+  // On the canvas the graph block's tools float in its corner over the plot, so nothing is held back from it.
+  const syncCover = () => graph.setCover({ top: 0, bottom: 0 });
   new ResizeObserver(syncCover).observe(graphDock);
   splitter.addEventListener('pointerdown', (e) => {
     e.preventDefault();

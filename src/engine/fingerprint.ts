@@ -1,4 +1,4 @@
-import type { Node } from './parser';
+import { inParens, type Node } from './parser';
 import { NO_ROW, type Env } from './evaluator';
 import { lettersOf, namesIn } from './ast';
 import { Lru } from './memo';
@@ -138,7 +138,8 @@ const sigs = new WeakMap<Node, string>();
 function sig(n: Node): string {
   let s = sigs.get(n);
   if (s === undefined) {
-    s = sigOf(n);
+    // Grouping changes a power's meaning ((ab)^2 against ab^2), so it is part of the key.
+    s = inParens(n) ? `g(${sigOf(n)})` : sigOf(n);
     sigs.set(n, s);
   }
   return s;
@@ -153,7 +154,7 @@ function sigOf(n: Node): string {
     case 'bin': return `(${sig(n.a)}${n.op}${sig(n.b)})`;
     case 'post': return `(${sig(n.a)}${n.op})`;
     case 'abs': return `|${sig(n.a)}|`;
-    case 'call': return `${n.name}${n.base ? `_${sig(n.base)}` : ''}(${n.args.map(sig).join(',')})`;
+    case 'call': return `${n.dot ? '.' : ''}${n.name}${n.base ? `_${sig(n.base)}` : ''}(${n.args.map(sig).join(',')})`;
     case 'point': case 'vec': case 'bracket': case 'list': return `${n.k}[${n.items.map(sig).join(',')}]`;
     case 'piece': return `piece[${n.branches.map((b) => `${b.cond ? sig(b.cond) : ''}:${b.val ? sig(b.val) : ''}`).join(',')}]`;
     case 'rel': return `rel[${n.items.map(sig).join(',')}|${n.ops.join(',')}]`;

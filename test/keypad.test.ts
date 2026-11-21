@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AC, ANS, bigOp, DIV, drawTone, keyCaption, keyLines, LABEL_MIN, PAD, padRows, PANELS, phoneRows, keyLegend, legendText, textFits, type Key } from '../src/ui/keypad';
+import { AC, ANS, bigOp, DIV, drawTone, ENTER, keyCaption, keyLines, LABEL_MIN, PAD, padRows, PANELS, phoneRows, keyLegend, legendText, textFits, type Key } from '../src/ui/keypad';
 import { BUILTINS } from '../src/engine/builtins';
 import refiled from './fixtures/banks-before-refile.json';
 
@@ -8,34 +8,35 @@ const labels = (r: Key[]) => r.map((k) => k.label).join(' ');
 const does = (k: { action?: string; ins?: string; label: string }) => (k.action ? `action:${k.action}` : (k.ins ?? k.label).trim());
 
 describe('the number pad', () => {
-  it('is four rows of six for a right thumb: digits in the middle, operators down the right edge, enter at their foot, ⌫ beside it', () => {
+  it('is four rows of six for a right thumb under the everyday row: digits in the middle, operators down the right edge, no enter', () => {
     expect(PAD.length).toBe(4);
     for (const r of PAD) expect(r.length, labels(r)).toBe(6);
     // The caret keys up on the 7 row, out of the way; the parentheses down on the 1 row, where the thumb rests.
-    expect(PAD.map(labels)).toEqual(['← → 7 8 9 ×', 'xʸ √ 4 5 6 −', '( ) 1 2 3 +', ', = 0 . ⌫ enter']);
+    expect(PAD.map(labels)).toEqual(['← → 7 8 9 ÷', 'xʸ √ 4 5 6 ×', '( ) 1 2 3 −', ', = 0 . ⌫ +']);
     expect(DIV).toMatchObject({ label: '÷', ins: '/' });
+    expect(PAD.flat().some((k) => k.action === 'enter' || k.action === 'clearall')).toBe(false);
   });
 
-  it('has every key the design asks for, with × ÷ − legends that type * / -', () => {
-    const keys = [...PAD.flat(), DIV];
+  it('has every key the design asks for, with × ÷ − legends that type * / -; enter is the composer\'s', () => {
+    const keys = PAD.flat();
     for (const digit of '0123456789.') expect(keys.some((k) => k.label === digit && k.ins === digit), digit).toBe(true);
     for (const ins of [',', '+', '-', '*', '/', '(', ')', '^', '√', '=']) expect(keys.some((k) => k.ins?.trim().startsWith(ins)), ins).toBe(true);
-    for (const action of ['back', 'enter', 'left', 'right']) expect(keys.some((k) => k.action === action), action).toBe(true);
+    for (const action of ['back', 'left', 'right']) expect(keys.some((k) => k.action === action), action).toBe(true);
+    expect(ENTER.action).toBe('enter');
     expect(keys.find((k) => k.ins === '*')?.label).toBe('×');
     expect(keys.find((k) => k.ins === '/')?.label).toBe('÷');
     expect(keys.find((k) => k.ins === '-')?.label).toBe('−');
   });
 
-  it('mirrors for a left hand group by group: operators and enter down the left edge, order kept inside each group', () => {
+  it('mirrors for a left hand group by group: operators down the left edge, order kept inside each group', () => {
     const rows = padRows(true);
-    expect(rows.map(labels)).toEqual(['× 7 8 9 ← →', '− 4 5 6 xʸ √', '+ 1 2 3 ( )', 'enter ⌫ 0 . = ,']);
-    expect(rows[3][0].action).toBe('enter');
+    expect(rows.map(labels)).toEqual(['÷ 7 8 9 ← →', '× 4 5 6 xʸ √', '− 1 2 3 ( )', '+ 0 . ⌫ , =']);
     expect(padRows(false)).toBe(PAD);
     for (let i = 0; i < PAD.length; i++) expect([...rows[i]].sort((a, b) => a.label.localeCompare(b.label))).toEqual([...PAD[i]].sort((a, b) => a.label.localeCompare(b.label)));
   });
 
   it('draws enter as the one accent key: a bank\'s main keys are plain function keys, AC a quiet key', () => {
-    const accented = [...PAD.flat(), ANS, AC, DIV, ...PANELS.flatMap((p) => p.keys)].filter((k) => drawTone(k) === 'hero');
+    const accented = [...PAD.flat(), ENTER, ANS, AC, ...PANELS.flatMap((p) => p.keys)].filter((k) => drawTone(k) === 'hero');
     expect(accented.map((k) => k.label)).toEqual(['enter']);
     for (const p of PANELS) for (const k of p.keys) if (k.tone === 'hero') expect(drawTone(k)).toBe('fn');
     expect(drawTone(AC)).toBe('fn');
@@ -99,7 +100,7 @@ describe('bank rows', () => {
     for (const label of ['%', '|x|']) expect(PANELS[0].keys.some((k) => k.label === label), label).toBe(true);
   });
 
-  it('ans, AC and ÷ are fixed beside every bank, and in no bank\'s sliding keys', () => {
+  it('ans, AC and ÷ have fixed homes (ans on the everyday row, AC on the composer, ÷ on the pad), and are in no bank\'s sliding keys', () => {
     expect(AC).toMatchObject({ label: 'AC', action: 'clearall', tone: 'red' });
     expect(ANS).toMatchObject({ label: 'ans', ins: 'ans' });
     for (const p of PANELS)
@@ -109,7 +110,8 @@ describe('bank rows', () => {
         expect(does(k), `${p.name}: ${k.label}`).not.toBe(does(ANS));
       }
     const pad = new Set(PAD.flat().map(does));
-    expect(pad.has(does(AC)) || pad.has(does(ANS)) || pad.has(does(DIV))).toBe(false);
+    expect(pad.has(does(AC)) || pad.has(does(ANS))).toBe(false);
+    expect(pad.has(does(DIV))).toBe(true);
   });
 
   it('the Graph bank types y = 2x + 1 with the pad, from keys that show before any sliding', () => {
@@ -171,13 +173,14 @@ describe('one-handed phone key heights', () => {
 });
 
 describe('readable bank labels', () => {
-  it('one caption rule: a long label shows alone, a short one keeps a caption that fits every platform, ⌫ and AC say what they do', () => {
+  it('one caption rule: a long label shows alone, a short one keeps a caption that fits every platform, ⌫ needs none', () => {
     const find = (bank: string, label: string) => PANELS.find((p) => p.name === bank)!.keys.find((k) => k.label === label)!;
     expect(keyCaption(find('Normal', 'normaldist'))).toBeUndefined();
     expect(keyCaption(find('Normal', 'x_from_z'))).toBeUndefined();
     expect(keyCaption(find('Normal', 'zscore'))).toBe('(x−μ)/σ');
     const back = PAD.flat().find((k) => k.action === 'back')!;
-    expect(keyCaption(back)).toBe('hold: clear');
+    // The hold still clears the line (the key's title says so); it isn't printed under the key on any platform.
+    expect(keyCaption(back)).toBeUndefined();
     for (const k of PAD.flat().filter((k) => k.action === 'left' || k.action === 'right')) expect(keyCaption(k)).toBeUndefined();
     expect(keyCaption(ANS)).toBeUndefined();
     // z crit says it's the middle 95%, so .95 no longer reads as the 95th percentile; the normal percentile says so

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { friendlyError } from '../src/ui/errortext';
-import { EMPTY_PARENS, ENDS_EARLY, arityText, emptyLineText, isWarningNote, readError, undefinedNameText, unexpectedText, unclosedText, unknownFunctionText, unknownNameText, unmatchedText, varErrorText } from '../src/engine/errors';
+import { EMPTY_PARENS, ENDS_EARLY, arityText, divisionByZeroText, logDomainText, notRealText, emptyLineText, isWarningNote, readError, undefinedNameText, unexpectedText, unclosedText, unknownFunctionText, unknownNameText, unmatchedText, varErrorText } from '../src/engine/errors';
 import { evaluateDocument } from '../src/engine/document';
 
 const S = { deg: true, complex: false, sample: false };
@@ -39,7 +39,12 @@ describe('readError', () => {
     expect(readError(unknownFunctionText('sinn', 'sin(…)'))).toEqual({ k: 'unknown', name: 'sinn', hint: 'sin(…)', example: null });
     expect(readError(emptyLineText('B'))).toEqual({ k: 'emptyLine', name: 'B' });
     expect(readError(varErrorText('A', varErrorText('B', unknownNameText('q'))))).toEqual({ k: 'inVar', name: 'A', inner: { k: 'inVar', name: 'B', inner: { k: 'unknown', name: 'q', hint: null, example: null } } });
-    expect(readError('Division by zero')).toEqual({ k: 'other' });
+    expect(readError(divisionByZeroText())).toEqual({ k: 'divZero' });
+    expect(readError(divisionByZeroText(': total heat is 0'))).toEqual({ k: 'divZero' });
+    expect(readError(notRealText('√', -3, true))).toEqual({ k: 'notReal' });
+    expect(readError(notRealText('Even root', -2))).toEqual({ k: 'notReal' });
+    expect(readError(logDomainText('ln', -1))).toEqual({ k: 'logDomain', name: 'ln' });
+    expect(readError('Points can have 2 or 3 coordinates')).toEqual({ k: 'other' });
   });
 });
 

@@ -1,12 +1,23 @@
 // The decisions compile() and precise.ts must make the same way: what a name means, what a call means, what [ ] builds.
 // Each evaluator does its own arithmetic, in doubles or exactly; it takes these answers and switches on them.
-import type { Node } from './parser';
+import { inParens, type Node } from './parser';
 import type { Env, FuncDef } from './evaluator';
 import type { Builtin } from './builtin-types';
 import { BUILTINS, CONSTANTS, readsAsValue } from './builtins';
 import { lettersOf } from './ast';
+import { canonicalName } from './lexer';
 
 export const MAX_CALL_DEPTH = 200;
+
+let byLower: Map<string, Builtin> | null = null;
+/** The built-in a name is in another case: randint for randInt, SQRT for sqrt. */
+export function anyCase(name: string): Builtin | undefined {
+  if (!byLower) {
+    byLower = new Map();
+    for (const n of Object.keys(BUILTINS)) if (!byLower.has(n.toLowerCase())) byLower.set(n.toLowerCase(), BUILTINS[n]);
+  }
+  return byLower.get(name.toLowerCase());
+}
 
 function isKnownName(name: string, env: Env, locals: readonly string[]): boolean {
   return locals.includes(name) || env.hasVar(name) || name in CONSTANTS || (name === 'i' && env.settings.complex);
@@ -32,7 +43,7 @@ type NameUse =
   | { k: 'var' }
   | { k: 'ans' }
   | { k: 'i' }
-  | { k: 'constant' }
+  | { k: 'constant'; name?: string }
   | { k: 'zeroInput' }
   | { k: 'function' }
   | { k: 'letters'; parts: string[] }
@@ -50,7 +61,11 @@ export function resolveId(name: string, env: Env, locals: readonly string[]): Na
   if (env.hasFunc(name)) return { k: 'function' };
   const parts = splitName(name, env, locals);
   if (parts) return { k: 'letters', parts };
-  return name in BUILTINS ? { k: 'builtin' } : { k: 'unknown' };
+  if (name in BUILTINS) return { k: 'builtin' };
+  // Pi and PI are pi in another case, once nothing else answers to the name.
+  const lower = canonicalName(name.toLowerCase());
+  if (name.length > 1 && lower !== name && lower in CONSTANTS) return { k: 'constant', name: lower };
+  return { k: 'unknown' };
 }
 
 /** What name(…) means, tried in this order: a value times a bracket, a user function, a built-in, letters times a bracket. */
@@ -67,14 +82,19 @@ export function resolveCall(name: string, argCount: number, env: Env, locals: re
   if (def) return { k: 'user', def };
   const b = BUILTINS[name];
   if (b) return { k: 'builtin', b };
-  return splitName(name, env, locals) && argCount === 1 ? { k: 'letters' } : { k: 'unknown' };
+  if (splitName(name, env, locals) && argCount === 1) return { k: 'letters' };
+  // Sin(…), SQRT(…) and SortA(…) are the function in another case, once nothing else answers to the name.
+  const lower = anyCase(name);
+  return lower ? { k: 'builtin', b: lower } : { k: 'unknown' };
 }
 
 /**
  * Textbook reading of powers after implicit products the parser can't see:
  * P(1 + r)^t is P·(1 + r)^t when P is a value, and Pe^(rt) or ax^2 split as P·e^(rt) and a·x^2.
+ * A base in its own parentheses is raised whole: (ab)^2 is (a·b)^2.
  */
 export function rewritePower(base: Node, exp: Node, env: Env, locals: readonly string[]): Node | null {
+  if (inParens(base)) return null;
   const isValue = (name: string) => callsValue(name, env, locals) && !env.hasFunc(name);
   if (base.k === 'call' && !base.base && base.args.length === 1 && isValue(base.name)) {
     return { k: 'bin', op: '*', a: { k: 'id', name: base.name, pos: base.pos }, b: { k: 'bin', op: '^', a: base.args[0], b: exp } };

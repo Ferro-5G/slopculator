@@ -1,4 +1,4 @@
-import { chargeWork, fail, failEdge, failLazy, failOverflow } from './errors';
+import { chargeWork, divisionByZeroText, fail, failEdge, failLazy, failOverflow } from './errors';
 import { hypotOf, isWhole, maxOf } from './numeric';
 
 interface Complex { t: 'complex'; re: number; im: number }
@@ -9,14 +9,16 @@ interface MatrixV { t: 'matrix'; m: number[][] }
 export interface NormalDist { t: 'normal'; mu: number; sigma: number }
 export interface BinomDist { t: 'binom'; n: number; p: number }
 interface PolygonV { t: 'polygon'; pts: number[][] }
-export interface RecordRow { label: string; value: Value }
+/** `key`: the name a dot reads the row by (A.h), when its label isn't one a line can type. */
+export interface RecordRow { label: string; value: Value; key?: string }
 /** A drawing to show beside a table, where the platform can draw one. Angle in radians. */
 export interface UnitCircleFigure { kind: 'unit-circle'; cos: number; sin: number; angle: number }
 /**
  * decimal: the rows are physical readings, so Exact mode doesn't turn them into fractions.
  * alongside: each number shows its exact form and its decimal together, whichever the Exact switch says.
  */
-export interface RecordV { t: 'record'; title: string; rows: RecordRow[]; decimal?: boolean; alongside?: boolean; figure?: UnitCircleFigure }
+/** `kind`: what the record describes, for a front end that draws it: 'air' is a moist-air state (psych and the like). */
+export interface RecordV { t: 'record'; title: string; rows: RecordRow[]; decimal?: boolean; alongside?: boolean; figure?: UnitCircleFigure; kind?: 'air' }
 interface TextV { t: 'text'; s: string }
 
 export type Value = number | Complex | ListV | PointV | VectorV | MatrixV | NormalDist | BinomDist | PolygonV | RecordV | TextV;
@@ -30,6 +32,16 @@ export const matrix = (m: number[][]): MatrixV => ({ t: 'matrix', m });
 export const complex = (re: number, im: number): Value => (im === 0 ? re : { t: 'complex', re, im });
 export const record = (title: string, rows: RecordRow[]): RecordV => ({ t: 'record', title, rows });
 export const text = (s: string): TextV => ({ t: 'text', s });
+
+/**
+ * The row a dot reads off a record (A.h, stats(L).mean): by its key, then by its label as typed, then by its key in
+ * any case (A.tdp). Undefined when the record has no such row.
+ */
+export function recordField(v: RecordV, name: string): Value | undefined {
+  const row = v.rows.find((r) => r.key === name) ?? v.rows.find((r) => r.label === name)
+    ?? v.rows.find((r) => r.key !== undefined && r.key.toLowerCase() === name.toLowerCase());
+  return row?.value;
+}
 
 export function typeName(v: Value): string {
   if (typeof v === 'number') return 'number';
@@ -82,7 +94,13 @@ function cx(v: Value): { re: number; im: number } | null {
 }
 
 function cPow(a: { re: number; im: number }, b: { re: number; im: number }): Value {
-  if (a.re === 0 && a.im === 0) return b.re === 0 && b.im === 0 ? 1 : 0;
+  if (a.re === 0 && a.im === 0) {
+    if (b.re > 0) return 0;
+    if (b.re === 0 && b.im === 0) return 1;
+    // 0^z is |0|^Re z times a turn, so Re z ≤ 0 has no value: 0^(−1 + i) divides by 0.
+    if (b.re < 0) fail(divisionByZeroText(' (0 to a negative power)'));
+    fail('0 to an imaginary power is undefined');
+  }
   // Integer powers by repeated multiplication stay exact for small cases like i².
   if (b.im === 0 && Number.isInteger(b.re) && Math.abs(b.re) <= 64) {
     let n = Math.abs(b.re);
@@ -92,22 +110,51 @@ function cPow(a: { re: number; im: number }, b: { re: number; im: number }): Val
       [br, bi] = [br * br - bi * bi, 2 * br * bi];
       n >>= 1;
     }
-    if (b.re < 0) {
-      const d = rr * rr + ri * ri;
-      return complex(rr / d, -ri / d);
-    }
-    return complex(rr, ri);
+    return b.re < 0 ? cDiv({ re: 1, im: 0 }, { re: rr, im: ri }) : complex(rr, ri);
   }
   const r = Math.hypot(a.re, a.im);
   const th = Math.atan2(a.im, a.re);
   const lnr = Math.log(r);
   const mag = Math.exp(b.re * lnr - b.im * th);
   const ang = b.im * lnr + b.re * th;
-  return complex(clean(mag * Math.cos(ang)), clean(mag * Math.sin(ang)));
+  return complex(clean(mag * Math.cos(ang), mag), clean(mag * Math.sin(ang), mag));
 }
 
-function clean(x: number): number {
-  return Math.abs(x) < 1e-15 ? 0 : x;
+/** A part that is rounding noise next to the whole number's size mag: the 1.2e-16i of e^(iπ). e^(−40 + i) keeps both. */
+function clean(x: number, mag: number): number {
+  return Math.abs(x) < 1e-15 * mag ? 0 : x;
+}
+
+const CDIV_HI = 2 ** 1020; // well under MAX_VALUE / 2 so x + y·r can't overflow
+const CDIV_LO = 2 ** -960; // above subnormals so b·r doesn't underflow away precision
+const CDIV_UP = 2 ** 128;
+
+/** a/b by Smith's method with power-of-2 prescaling so parts near 1e308 or 1e-308 can't overflow or lose digits. */
+function cDiv(a: { re: number; im: number }, b: { re: number; im: number }): Value {
+  if (b.re === 0 && b.im === 0) fail(divisionByZeroText());
+  let ar = a.re, ai = a.im, br = b.re, bi = b.im, shift = 0;
+  const sa = Math.max(Math.abs(ar), Math.abs(ai));
+  const sb = Math.max(Math.abs(br), Math.abs(bi));
+  if (sa > CDIV_HI) { ar *= 0.25; ai *= 0.25; shift += 2; }
+  else if (sa > 0 && sa < CDIV_LO) { ar *= CDIV_UP; ai *= CDIV_UP; shift -= 128; }
+  if (sb > CDIV_HI) { br *= 0.25; bi *= 0.25; shift -= 2; }
+  else if (sb < CDIV_LO) { br *= CDIV_UP; bi *= CDIV_UP; shift += 128; }
+  let qr: number, qi: number;
+  if (Math.abs(br) >= Math.abs(bi)) {
+    const r = bi / br, d = br + bi * r;
+    qr = (ar + ai * r) / d;
+    qi = (ai - ar * r) / d;
+  } else {
+    const r = br / bi, d = br * r + bi;
+    qr = (ar * r + ai) / d;
+    qi = (ai * r - ar) / d;
+  }
+  if (shift !== 0) {
+    const s = Math.pow(2, shift);
+    qr *= s;
+    qi *= s;
+  }
+  return complex(qr, qi);
 }
 
 export function complexSqrt(x: number): Value {
@@ -119,11 +166,7 @@ function complexOp(op: string, a: { re: number; im: number }, b: { re: number; i
     case '+': return complex(a.re + b.re, a.im + b.im);
     case '-': return complex(a.re - b.re, a.im - b.im);
     case '*': return complex(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
-    case '/': {
-      const d = b.re * b.re + b.im * b.im;
-      if (d === 0) fail('Division by zero');
-      return complex((a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d);
-    }
+    case '/': return cDiv(a, b);
     case '^': return cPow(a, b);
   }
   return fail(`Can't use ${op} with complex numbers`);
@@ -170,13 +213,15 @@ export function matInverse(a: number[][]): number[][] | null {
   const m = a.map((r, i) => [...r, ...id[i]]);
   // What each entry's size would be with no cancellation, for telling noise from a tiny true entry.
   const size = m.map((r) => r.map(Math.abs));
-  // A loop, not Math.max(...): spreading a big matrix overflows the call stack.
-  let scale = 1e-300;
-  for (const row of a) for (const x of row) scale = Math.max(scale, Math.abs(x));
   for (let c = 0; c < n; c++) {
-    let p = c;
-    for (let r = c + 1; r < n; r++) if (Math.abs(m[r][c]) > Math.abs(m[p][c])) p = r;
-    if (Math.abs(m[p][c]) < PIVOT_TOL * scale) return null;
+    // Pick the largest candidate that isn't cancellation noise next to what made it, rather than taking the largest
+    // raw entry and giving up if that row cancelled: [[1, 1e16, 0], [1, 1e16 + 2, 1], [0, 1, 0]] has pivot 1 in row 3.
+    let p = -1;
+    for (let r = c; r < n; r++) {
+      const v = Math.abs(m[r][c]);
+      if (v > 0 && v >= PIVOT_TOL * size[r][c] && (p < 0 || v > Math.abs(m[p][c]))) p = r;
+    }
+    if (p < 0) return null;
     [m[c], m[p]] = [m[p], m[c]];
     [size[c], size[p]] = [size[p], size[c]];
     chargeWork(2 * n * n);
@@ -271,10 +316,10 @@ export function arith(op: '+' | '-' | '*' | '/' | '^', a: Value, b: Value): Valu
       case '-': return a - b;
       case '*': return a * b;
       case '/':
-        if (b === 0) failEdge('Division by zero');
+        if (b === 0) failEdge(divisionByZeroText());
         return a / b;
       case '^': {
-        if (a === 0 && b < 0) fail('Division by zero (0 to a negative power)');
+        if (a === 0 && b < 0) fail(divisionByZeroText(' (0 to a negative power)'));
         const r = Math.pow(a, b);
         if (Number.isNaN(r) && a < 0) failLazy(() => `${a}^${b} is not a real number`);
         return r;
@@ -309,11 +354,15 @@ export function arith(op: '+' | '-' | '*' | '/' | '^', a: Value, b: Value): Valu
         case '*': return x * s;
         case '/':
           if (scalarFirst) fail(`Can't divide a number by a ${typeName(o)}`);
-          if (s === 0) failEdge('Division by zero');
+          if (s === 0) failEdge(divisionByZeroText());
           return x / s;
         default: return fail(`Can't use ${op} between a number and a ${typeName(o)}`);
       }
     };
+    // A [ ] of numbers is a list as well as a vector: [1, 2, 3] + 1 and [1, 2, 3]^2 work on each number, as Desmos has it.
+    if (o.t === 'vector' && op !== '*' && op !== '/') {
+      return vector(o.c.map((x) => num(arith(op, scalarFirst ? s : x, scalarFirst ? x : s), 'Each number')));
+    }
     if (o.t === 'matrix') {
       if (op === '^' && !scalarFirst) return matPow(o.m, s);
       return matrix(o.m.map((r) => r.map(f)));
@@ -385,6 +434,7 @@ export function negate(v: Value): Value {
 export function mapNum(v: Value, f: (x: number) => number, what: string): Value {
   if (typeof v === 'number') return f(v);
   if (v.t === 'list') return list(v.items.map((x) => mapNum(x, f, what)));
+  if (v.t === 'vector') return vector(v.c.map(f));
   if (v.t === 'complex') return fail(`${what} needs a real number, got a complex number`);
   return fail(`${what} needs a number, got a ${typeName(v)}`);
 }

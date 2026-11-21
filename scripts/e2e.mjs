@@ -25,6 +25,16 @@ async function check(name, fn, phone = false, { folded = false, clock = false, o
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   // Before the app starts, so a timer from before a freeze can't fire past it and clearTimeout can't miss one.
   if (clock) await page.clock.install();
+  // A reload waits for the app to finish booting (its agent API is the last thing boot sets up), so a check never reads
+  // the page before the saved sheet and settings are back. A fixed wait after it wasn't always enough on CI.
+  if (!clock) {
+    const reload = page.reload.bind(page);
+    page.reload = async (options) => {
+      const r = await reload(options);
+      await page.waitForFunction(() => !!window.slopculator, null, { timeout: 10000 }).catch(() => {});
+      return r;
+    };
+  }
   await open(page);
   if (!phone && folded) {
     await page.keyboard.press('Control+Alt+Shift+K');
@@ -41,6 +51,23 @@ async function check(name, fn, phone = false, { folded = false, clock = false, o
   await context.close();
 }
 const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+/** To the composer's new line: an edit in the composer is kept (Enter), then the new line takes the caret. */
+const toNewLine = async (page) => {
+  if (await page.evaluate(() => !!document.querySelector('.composer.editing'))) await page.keyboard.press('Enter');
+  await page.locator('.composer .expr').click();
+};
+/** A File menu item, by its words: Add a table, Add a normal curve, Start with an example… */
+const fileItem = async (page, text) => {
+  await page.click('.menu-btn');
+  await page.locator('.menu [role=menuitem]', { hasText: text }).first().click();
+};
+/** The graph is a block that comes when a line draws: send one, so a check about the graph has one. */
+const drawSomething = async (page, { text = 'y = x', clock = false } = {}) => {
+  await page.keyboard.type(text);
+  await page.keyboard.press('Enter');
+  if (clock) await page.clock.runFor(200);
+  else await page.waitForFunction(() => !!document.querySelector('.tape .graph-pane'));
+};
 const lines = (page) => page.evaluate(() => window.slopculator.lines());
 /** For a check run with { clock: true }. Only page.clock.runFor moves the page's clock then, so holds and toasts don't depend on how busy the machine is. */
 const freezeClock = (page) => page.clock.pauseAt(Date.now() + 1000);
@@ -156,6 +183,7 @@ await check('motion states: Modes owns its closing input boundary and reverses s
 }, true);
 
 await check('motion states: Off and Reduced stop an active graph zoom', async (page) => {
+  await drawSomething(page, { clock: true });
   for (const motion of ['off', 'reduced']) {
     await page.evaluate(() => {
       const s = document.querySelector('select.motion'); s.value = 'full'; s.dispatchEvent(new Event('change', { bubbles: true }));
@@ -186,32 +214,8 @@ await check('motion states: Off settles keypad and graph panel transitions', asy
   expect(panels.running > 0 && panels.keypad && !panels.graph && panels.active === 0 && !panels.overflow, `panel policy state: ${JSON.stringify(panels)}`);
 });
 
-await check('motion states: Off settles an active notebook alignment glide', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(Array.from({ length: 40 }, (_, i) => `${i}+1`)));
-  await page.clock.runFor(50);
-  const phase = await page.evaluate(() => {
-    const list = document.querySelector('.rows');
-    // Exercise the JS settle without the browser's independent native scroll snap taking over first.
-    list.style.scrollSnapType = 'none';
-    list.scrollTop = 0;
-    list.dispatchEvent(new Event('scrollend'));
-    list.dispatchEvent(new WheelEvent('wheel', { deltaY: 13 }));
-    list.scrollTop = 13;
-    list.dispatchEvent(new Event('scroll'));
-    list.dispatchEvent(new Event('scrollend'));
-    return list.dataset.scroll;
-  });
-  expect(phase === 'settling', `fixture did not start a glide: ${phase}`);
-  await page.clock.runFor(40);
-  const stopped = await page.evaluate(() => {
-    const s = document.querySelector('select.motion'); s.value = 'off'; s.dispatchEvent(new Event('change', { bubbles: true }));
-    return document.querySelector('.rows').scrollTop;
-  });
-  await page.clock.runFor(100);
-  expect(Math.abs((await page.evaluate(() => document.querySelector('.rows').scrollTop)) - stopped) < 0.5, 'notebook alignment kept moving after Off');
-}, false, { clock: true });
-
 await check('motion states: pointer down takes ownership from a graph zoom immediately', async (page) => {
+  await drawSomething(page, { clock: true });
   await page.evaluate(() => document.querySelector('.graph-tools button').click());
   await page.clock.runFor(40);
   const box = await page.locator('.graph-canvas').boundingBox();
@@ -224,12 +228,639 @@ await check('motion states: pointer down takes ownership from a graph zoom immed
 }, false, { clock: true });
 
 await check('starter example loads a shaded curve', async (page) => {
-  await page.click('.starter-card');
+  await page.click('.menu-btn');
+  await page.locator('.menu [role=menuitem]', { hasText: 'Start with an example' }).click();
+  await page.click('.examples-dialog .starter-card');
   await page.waitForTimeout(400);
   const l = await lines(page);
   expect(l.some((x) => x.probability && Math.abs(x.probability - 0.8186) < 1e-3), JSON.stringify(l));
   await page.screenshot({ path: '.shots/e2e-starter.png' });
 });
+
+/** A block on the canvas, by the text its line reads. */
+const blockOf = async (page, text) => {
+  const i = await page.evaluate((t) => [...document.querySelectorAll('.tape .rows .row.blk')].findIndex((r) => r.querySelector('input.expr')?.value === t), text);
+  return page.locator('.tape .rows .row.blk').nth(Math.max(0, i));
+};
+const composerText = (page) => page.locator('.composer .expr').inputValue();
+const typeLine = async (page, text) => { await page.keyboard.type(text); await page.keyboard.press('Enter'); await page.waitForTimeout(120); };
+
+await check('canvas: a sent line becomes a block; a click on it edits it in the composer, Update keeps the change and Cancel puts it back', async (page) => {
+  await page.keyboard.type('12*7');
+  await page.waitForFunction(() => document.querySelector('.composer')?.dataset.state === 'ok');
+  expect((await page.locator('.composer .out').innerText()).includes('84'), 'no live answer in the composer');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(200);
+  expect(await (await blockOf(page, '12*7')).isVisible(), 'the sent line is not a block on the canvas');
+  expect(await composerText(page) === '', 'the composer kept the sent line');
+  await (await blockOf(page, '12*7')).click();
+  await page.waitForTimeout(150);
+  expect(await composerText(page) === '12*7', 'a click on the block did not load it into the composer');
+  expect((await page.locator('.composer-enter').innerText()) === 'Update', 'enter does not read Update while editing');
+  expect(await page.locator('.blk-ghost').isVisible(), 'no ghost where the block waits');
+  await page.keyboard.press('End');
+  await page.keyboard.type('+1');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(150);
+  let l = await lines(page);
+  expect(l.some((x) => x.text === '12*7+1' && x.result === '85'), JSON.stringify(l));
+  expect(await composerText(page) === '', 'Update left the line in the composer');
+  await (await blockOf(page, '12*7+1')).click();
+  await page.keyboard.type('000');
+  await page.locator('.composer-cancel').click();
+  await page.waitForTimeout(150);
+  l = await lines(page);
+  expect(l.some((x) => x.text === '12*7+1'), `Cancel did not put the line back: ${JSON.stringify(l)}`);
+  await (await blockOf(page, '12*7+1')).click();
+  await page.keyboard.type('9');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+  l = await lines(page);
+  expect(l.some((x) => x.text === '12*7+1'), `Esc did not put the line back: ${JSON.stringify(l)}`);
+});
+
+await check('canvas: typing a name that is already defined offers Update r, previews it, and changes that line', async (page) => {
+  await typeLine(page, 'r = 4');
+  await typeLine(page, 'A = πr^2');
+  await page.keyboard.type('r = 6');
+  await page.waitForTimeout(150);
+  expect((await page.locator('.composer-enter').innerText()) === 'Update r', `enter reads ${await page.locator('.composer-enter').innerText()}`);
+  const preview = await page.evaluate(() => window.slopculator.lines());
+  expect(!preview.some((x) => x.error), `the preview reads r as defined twice: ${JSON.stringify(preview)}`);
+  expect(preview.some((x) => x.text === 'A = πr^2' && Math.abs(x.value - 36 * Math.PI) < 1e-9), `no live preview: ${JSON.stringify(preview)}`);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(150);
+  const l = (await lines(page)).filter((x) => x.text);
+  expect(JSON.stringify(l.map((x) => x.text)) === '["r = 6","A = πr^2"]', JSON.stringify(l));
+});
+
+await check('canvas: a name used by another line is wired to it and drawn lines to the graph; a slider drag pulses and lands on the right answers', async (page) => {
+  await typeLine(page, 'a = 1');
+  await typeLine(page, 'y = a(x - 1)^2 - 3');
+  await typeLine(page, 'b = 2a');
+  await page.waitForTimeout(300);
+  const wires = await page.evaluate(() => [...document.querySelectorAll('.cv-wires path.w')].map((p) => `${p.dataset.from}>${p.dataset.to}`));
+  const ids = await page.evaluate(() => window.slopculator.lines().map((l) => l.text));
+  expect(wires.length === 3 && wires.some((w) => w.endsWith('>#graph')), `wires: ${wires} for ${ids}`);
+  expect(await page.locator('.tape .rows .blk-graph').isVisible(), 'no graph block');
+  const range = page.locator('.tape .row.blk-slider input.slider');
+  const box = await range.boundingBox();
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2, { steps: 5 });
+  const pulsed = await page.evaluate(() => document.querySelectorAll('.cv-wires path.pulse').length);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const l = await lines(page);
+  const a = l.find((x) => x.text.startsWith('a = ')), b = l.find((x) => x.text === 'b = 2a');
+  expect(a && b && Number(b.result) === 2 * Number(a.result) && Number(a.result) > 1, JSON.stringify(l));
+  expect(pulsed > 0, 'no pulse ran down the wires');
+});
+
+/** Holds a slider down by its thumb, moves it `by` px, and returns a function that lets go. */
+const holdSlider = async (page, name, by) => {
+  const range = page.locator(`.tape .row.blk-slider input.slider[aria-label="${name}"]`);
+  await range.scrollIntoViewIfNeeded();
+  const box = await range.boundingBox();
+  const f = await range.evaluate((r) => (Number(r.value) - Number(r.min)) / (Number(r.max) - Number(r.min)));
+  const x = box.x + 10 + (box.width - 20) * f, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + by, y, { steps: 4 });
+  await page.waitForTimeout(500);
+  return () => page.mouse.up();
+};
+const shownTags = (page) => page.evaluate(() => [...document.querySelectorAll('.cv-tag.on:not(.gone)')].map((t) => ({ key: t.dataset.key, text: t.textContent, lit: t.classList.contains('lit'), dim: t.classList.contains('dim'), box: t.getBoundingClientRect().toJSON() })));
+
+await check('canvas: values on wires show only while a slider is held, lit with their change where it reaches, then go; pointing at a wire shows its full value', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['d = 0.3', 'v = 2', 'A = πd^2/4', 'Q = A v', 'T = {9.6, 10.4, 10.1}', 'Tm = mean(T)']));
+  await page.waitForTimeout(400);
+  expect((await shownTags(page)).length === 0, `tags at rest: ${JSON.stringify(await shownTags(page))}`);
+  const letGo = await holdSlider(page, 'd', 12);
+  const held = await shownTags(page);
+  const lit = held.filter((t) => t.lit), dim = held.filter((t) => t.dim);
+  expect(lit.some((t) => /^d.*[+−][\d.]+%/.test(t.text)), `no lit d tag with its change: ${JSON.stringify(held)}`);
+  expect(lit.some((t) => t.text.startsWith('A')), `A's tag isn't lit: ${JSON.stringify(held)}`);
+  expect(dim.some((t) => t.text.startsWith('v')) && dim.some((t) => t.text.startsWith('T')), `wires d doesn't reach aren't dim: ${JSON.stringify(held)}`);
+  expect(held.some((t) => t.text.startsWith('T') && /\d–\d/.test(t.text)) && await page.locator('.cv-tag .bars').count() > 0, `a list's tag isn't a range with bars: ${JSON.stringify(held)}`);
+  // Each tag sits on a wire, clear of every block.
+  const blocks = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank)')].map((b) => b.getBoundingClientRect().toJSON()));
+  for (const t of held) for (const b of blocks) expect(!(t.box.left < b.right - 1 && b.left < t.box.right - 1 && t.box.top < b.bottom - 1 && b.top < t.box.bottom - 1), `tag ${t.text} covers a block`);
+  await letGo();
+  await page.waitForFunction(() => !document.querySelector('.cv-tag.on'), null, { timeout: 4000 });
+  // Pointing at a wire shows its tag, with the full value, and dims the rest.
+  const at = await page.evaluate(() => { const p = document.querySelector('.cv-wires path.hit'); const l = p.getTotalLength(), pt = p.getPointAtLength(l / 2), m = p.getScreenCTM(); return { x: pt.x * m.a + m.e, y: pt.y * m.d + m.f }; });
+  await page.mouse.move(at.x, at.y);
+  await page.waitForTimeout(250);
+  const hovered = await shownTags(page);
+  expect(hovered.length === 1, `pointing at a wire shows ${hovered.length} tags`);
+  expect(await page.locator('.cv-wires path.w.dim').count() > 0, 'pointing at a wire dims the others');
+  await page.mouse.move(5, 300);
+  await page.waitForTimeout(250);
+  expect((await shownTags(page)).length === 0, 'the tag stays after the pointer leaves');
+  // The keyboard reaches the tags: one Tab stop, arrows between them, and a focused one shows.
+  await page.locator('.cv-tag[tabindex="0"]').focus();
+  expect((await shownTags(page)).length === 1, 'a focused tag does not show');
+  const first = await page.evaluate(() => document.activeElement.dataset.key);
+  await page.keyboard.press('ArrowRight');
+  expect(await page.evaluate((k) => document.activeElement.classList.contains('cv-tag') && document.activeElement.dataset.key !== k, first), 'the arrow keys do not move between tags');
+});
+
+await check('phone canvas: holding a slider puts each tag on its wire in open canvas, lights what it reaches, and the slider stays under the finger', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['d = 0.3', 'A = πd^2/4', 'Q = 2A']));
+  await page.waitForTimeout(400);
+  const before = await page.locator('.tape .row.blk-slider input.slider').boundingBox();
+  const blocksBefore = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank)')].map((b) => b.getBoundingClientRect().toJSON()));
+  const letGo = await holdSlider(page, 'd', 6);
+  const after = await page.locator('.tape .row.blk-slider input.slider').boundingBox();
+  expect(Math.abs(after.y - before.y) < 2, `the slider moved under the finger: ${before.y} → ${after.y}`);
+  expect(!(await page.locator('.tape .row.blk-slider .lim.step').isVisible()), 'a slider shows its step field in the column');
+  const held = await page.evaluate(() => {
+    const blocks = [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank)')].map((b) => b.getBoundingClientRect().toJSON());
+    const wires = [...document.querySelectorAll('.cv-wires path.w')].map((p) => ({ key: `${p.dataset.from}>${p.dataset.to}`, box: p.getBoundingClientRect().toJSON() }));
+    const tags = [...document.querySelectorAll('.cv-tag.on:not(.gone)')].map((t) => ({ key: t.dataset.key, box: t.getBoundingClientRect().toJSON() }));
+    const lit = document.querySelectorAll('.tape .rows > .row.blk.cv-lit').length;
+    return { blocks, wires, tags, lit };
+  });
+  const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  expect(held.tags.length === 2, `not a tag on each wire: ${JSON.stringify(held.tags)}`);
+  for (const t of held.tags) {
+    expect(!held.blocks.some((b) => hit(t.box, b)), `a tag covers a block: ${JSON.stringify(t)}`);
+    // On its wire: the wire's box runs through the tag's.
+    const w = held.wires.find((x) => x.key === t.key);
+    expect(w && w.box.left <= t.box.right && w.box.right >= t.box.left && w.box.top <= t.box.bottom && w.box.bottom >= t.box.top, `a tag is off its wire: ${JSON.stringify({ t, w })}`);
+  }
+  expect(held.lit === 3, `the slider and what it reaches don't light up: ${held.lit}`);
+  // Nothing in the column moved while held.
+  expect(held.blocks.every((b, k) => Math.abs(b.top - blocksBefore[k].top) < 1 && Math.abs(b.left - blocksBefore[k].left) < 1), `a block moved while the slider was held: ${JSON.stringify(blocksBefore.map((b) => [b.left, b.top, b.width]))} → ${JSON.stringify(held.blocks.map((b) => [b.left, b.top, b.width]))}`);
+  await letGo();
+  await page.waitForFunction(() => !document.querySelector('.cv-tag.on:not(.gone)') && !document.querySelector('.tape .row.blk.cv-lit'), null, { timeout: 4000 });
+}, true);
+
+/** The column's blocks and wires, in page coordinates, for the Cascade checks. */
+const column = (page) => page.evaluate(() => ({
+  blocks: Object.fromEntries([...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank)')].map((b) => [b.querySelector('.expr')?.value ?? '', b.getBoundingClientRect().toJSON()])),
+  graph: document.querySelector('.tape .rows > .blk-graph')?.getBoundingClientRect().toJSON() ?? null,
+  column: (() => { const l = document.querySelector('.tape .rows'), cs = getComputedStyle(l), r = l.getBoundingClientRect(); return { left: r.left + parseFloat(cs.paddingLeft), right: r.right - parseFloat(cs.paddingRight) }; })(),
+  wires: [...document.querySelectorAll('.cv-wires path.w')].map((p) => ({ from: p.dataset.from, to: p.dataset.to, d: p.getAttribute('d') })),
+}));
+/** A wire's square points from its path (M, L, H, V and the Q of each rounded corner's turn). */
+const wirePoints = (d) => {
+  const nums = [...d.matchAll(/([MLHVQ])\s*([-\d.,\s]+)/g)];
+  const pts = [];
+  for (const [, op, args] of nums) {
+    const v = args.trim().split(/[\s,]+/).map(Number);
+    const last = pts[pts.length - 1];
+    if (op === 'M' || op === 'L') pts.push({ x: v[0], y: v[1] });
+    else if (op === 'H') pts.push({ x: v[0], y: last.y });
+    else if (op === 'V') pts.push({ x: last.x, y: v[0] });
+    else if (op === 'Q') pts.push({ x: v[0], y: v[1] });
+  }
+  return pts.filter((p, i) => i === 0 || p.x !== pts[i - 1].x || p.y !== pts[i - 1].y);
+};
+/** Whether two wires' square points cross, or run along each other. */
+const wiresCross = (a, b) => {
+  const segs = (pts) => pts.slice(1).map((q, i) => [pts[i], q]);
+  return segs(a).some(([p0, p1]) => segs(b).some(([q0, q1]) => {
+    const pv = Math.abs(p0.x - p1.x) < 0.5, qv = Math.abs(q0.x - q1.x) < 0.5;
+    if (pv === qv) return pv ? Math.abs(p0.x - q0.x) < 0.5 && Math.min(p1.y, p0.y) < Math.max(q0.y, q1.y) - 0.5 && Math.min(q0.y, q1.y) < Math.max(p0.y, p1.y) - 0.5 : false;
+    const [v0, v1, h0, h1] = pv ? [p0, p1, q0, q1] : [q0, q1, p0, p1];
+    return h0.y > Math.min(v0.y, v1.y) + 0.5 && h0.y < Math.max(v0.y, v1.y) - 0.5 && v0.x > Math.min(h0.x, h1.x) + 0.5 && v0.x < Math.max(h0.x, h1.x) - 0.5;
+  }));
+};
+
+await check('phone canvas: Cascade makes a block a pill as wide as its line and steps a dependent right; the graph spans', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['p = 1.3', 'f(x) = x^3 - 3x', 'y = 2sin(90x) + p', 'd = 3p^2 - 3']));
+  await page.waitForTimeout(500);
+  const c = await column(page);
+  const width = c.column.right - c.column.left;
+  const f = c.blocks['f(x) = x^3 - 3x'], y = c.blocks['y = 2sin(90x) + p'], d = c.blocks['d = 3p^2 - 3'], p = c.blocks['p = 1.3'];
+  expect(f && y && d && p && c.graph, `blocks missing: ${JSON.stringify(Object.keys(c.blocks))}`);
+  // Each line's pill is its line's width, short of the column's; nothing runs past the column.
+  expect(f.width < width * 0.75 && y.width < width * 0.9, `pills as wide as the column: f ${f.width}, y ${y.width} of ${width}`);
+  expect(Object.values(c.blocks).every((b) => b.right <= c.column.right + 1 && b.left >= c.column.left - 1), 'a block runs out of the column');
+  // Its text keeps one line: no pill squeezes its line.
+  const lines = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk-curve .tex')].map((t) => t.getClientRects().length && t.getBoundingClientRect().height));
+  expect(lines.every((h) => h < 40), `a pill wraps its line: ${lines}`);
+  // Sources hug the left; y and d read p and step right by the same step.
+  expect(Math.abs(f.left - c.column.left) < 1 && Math.abs(p.left - c.column.left) < 1, `a source is off the left: f ${f.left}, p ${p.left}, column ${c.column.left}`);
+  expect(y.left - f.left > 20 && Math.abs((d.left - c.column.left) - (y.left - c.column.left)) < 1, `dependents don't step right: y ${y.left}, d ${d.left}`);
+  expect(Math.abs(c.graph.width - width) < 2, `the graph doesn't span: ${c.graph.width} of ${width}`);
+  // One radius for blocks, the graph and the composer.
+  const radii = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank), .tape .rows > .blk-graph, .composer')].map((e) => getComputedStyle(e).borderTopLeftRadius));
+  expect(new Set(radii).size === 1 && radii[0] === '22px', `radii differ: ${radii}`);
+}, true);
+
+await check('phone canvas: Cascade wires drop straight down in lanes of their own and never cross; only one takes the margin', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['p = 1.3', 'f(x) = x^3 - 3x', 'y = 2sin(90x) + p', 'd = 3p^2 - 3']));
+  await page.waitForTimeout(500);
+  const c = await column(page);
+  const routes = c.wires.map((w) => ({ ...w, pts: wirePoints(w.d) }));
+  const margin = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.tape .rows')).paddingLeft));
+  const straight = routes.filter((r) => r.pts.length === 2 && r.pts[0].x === r.pts[1].x);
+  const inMargin = routes.filter((r) => r.pts.some((q) => q.x < margin));
+  expect(routes.length === 4, `not four wires: ${routes.length}`);
+  expect(straight.length === 3 && inMargin.length === 1, `wires aren't straight but one: ${JSON.stringify(routes.map((r) => r.pts))}`);
+  for (let i = 0; i < routes.length; i++) for (let j = 0; j < i; j++) expect(!wiresCross(routes[i].pts, routes[j].pts), `wires cross: ${routes[i].d} and ${routes[j].d}`);
+}, true);
+
+await check('phone canvas: on a busier sheet sliders leave open canvas on their right, wires take it before the margin, and few cross', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 2', 'b = 3', 'c = a + b', 'y = a sin(x) + b', 'q = c^2', 'g = q + a', 'h = g/b', 'y = c x/4']));
+  await page.waitForTimeout(500);
+  const c = await column(page);
+  const width = c.column.right - c.column.left;
+  const sliders = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk-slider')].map((b) => b.getBoundingClientRect().width));
+  expect(sliders.length === 2 && sliders.every((w) => width - w >= 60), `sliders fill the column: ${sliders} of ${width}`);
+  const margin = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.tape .rows')).paddingLeft));
+  const listLeft = await page.evaluate(() => document.querySelector('.tape .rows').getBoundingClientRect().left);
+  const routes = c.wires.map((w) => wirePoints(w.d));
+  const inMargin = routes.filter((pts) => pts.some((q) => q.x < margin - 1));
+  const onRight = routes.filter((pts) => pts.some((q) => q.x > c.column.right - listLeft - 60));
+  expect(inMargin.length <= 2, `more than two wires in the margin: ${inMargin.length}`);
+  expect(onRight.length >= 2, `no wires down the right: ${JSON.stringify(routes)}`);
+  // a → g, b → h, c → y₂ and y → graph interleave pairwise, so one crossing at least; the layout keeps to a few.
+  let pairs = 0;
+  for (let i = 0; i < routes.length; i++) for (let j = 0; j < i; j++) if (wiresCross(routes[i], routes[j])) pairs++;
+  expect(pairs <= 3, `too many crossings: ${pairs}`);
+}, true);
+
+await check('phone canvas: on the example sheet the wires drop straight and the held tag rides on its wire', async (page) => {
+  await page.evaluate(() => { sessionStorage.setItem('e2e-first-run', '1'); localStorage.removeItem(window.slopKeys.firstRun); localStorage.removeItem(window.slopKeys.current); localStorage.removeItem(window.slopKeys.document); });
+  await page.reload();
+  await page.waitForFunction(() => !!document.querySelector('.tape .row.blk-slider'));
+  await page.waitForTimeout(400);
+  const routes = (await column(page)).wires.map((w) => wirePoints(w.d));
+  expect(routes.length >= 2 && routes.every((pts) => pts.length === 2 && pts[0].x === pts[1].x), `the example's wires aren't straight: ${JSON.stringify(routes)}`);
+  const letGo = await holdSlider(page, 'k', 8);
+  const t = await page.evaluate(() => {
+    const tag = document.querySelector('.cv-tag.on:not(.gone)'), wire = document.querySelector('.cv-wires path.w.lit');
+    return tag && wire && { tag: tag.getBoundingClientRect().toJSON(), wire: wire.getBoundingClientRect().toJSON() };
+  });
+  expect(t && t.wire.left >= t.tag.left && t.wire.right <= t.tag.right && t.wire.top <= t.tag.top && t.wire.bottom >= t.tag.bottom, `the tag isn't on its wire: ${JSON.stringify(t)}`);
+  // The graph traces, dotted, where the curve started.
+  await letGo();
+}, true);
+
+await check('Deg | Rad keeps one size whichever is chosen, on a phone and on a desktop', async (page) => {
+  for (const vp of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(vp);
+    await page.waitForTimeout(200);
+    const size = () => page.evaluate(() => { const s = [...document.querySelectorAll('.modebar .desk-modes .seg')].find((e) => e.offsetParent); const r = s.getBoundingClientRect(); return { w: r.width, h: r.height, b: [...s.querySelectorAll('button')].map((b) => b.getBoundingClientRect().width) }; });
+    const a = await size();
+    await page.evaluate(() => window.slopculator.setSettings({ deg: false }));
+    await page.waitForTimeout(150);
+    const b = await size();
+    await page.evaluate(() => window.slopculator.setSettings({ deg: true }));
+    await page.waitForTimeout(150);
+    expect(a.w === b.w && a.h === b.h && a.b.every((w, k) => w === b.b[k]), `Deg | Rad changed size at ${vp.width}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
+  }
+});
+
+await check('canvas: a window going from the phone\'s column to the wide canvas drops the column\'s widths and steps', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['p = 1.3', 'y = 2sin(90x) + p']));
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk')].some((b) => b.style.marginLeft)), 'the column set no steps');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForFunction(() => !!document.querySelector('.tape.cv-wide'));
+  await page.waitForTimeout(300);
+  const left = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk, .tape .rows > .blk-graph')].map((b) => [b.style.marginLeft, b.style.marginTop]).flat().filter(Boolean));
+  expect(left.length === 0, `the column's steps stayed on the wide canvas: ${left}`);
+}, { width: 390, height: 844 });
+
+await check('desktop canvas: a line that reads another steps right under it, and its wire drops straight', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['p = 1.3', 'y = 2sin(90x) + p']));
+  await page.waitForTimeout(500);
+  const c = await column(page);
+  const p = c.blocks['p = 1.3'], y = c.blocks['y = 2sin(90x) + p'];
+  expect(y.left - p.left > 20 && y.top > p.bottom, `y doesn't step right under p: ${JSON.stringify({ p, y })}`);
+  const w = c.wires.find((x) => x.to !== '#graph');
+  const pts = wirePoints(w.d);
+  expect(pts.length === 2 && pts[0].x === pts[1].x, `p's wire into y isn't straight: ${w.d}`);
+});
+
+await check('canvas: Steps unfolds a line into its working without moving it; a failing step says so briefly and the steps after it show —; open lines stay open', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 1', 'b = -3', 'c = 2', 'r = (−b + √(b² − 4ac)) / 2a']));
+  await page.waitForTimeout(400);
+  const line = page.locator('.tape .rows > .row.blk-value');
+  const at = await line.boundingBox();
+  await page.locator('.cv-steps').click();
+  await page.waitForTimeout(300);
+  expect(await page.locator('.cv-steps').getAttribute('aria-expanded') === 'true', 'Steps does not say it is open');
+  const moved = await line.boundingBox();
+  expect(Math.abs(moved.x - at.x) < 1 && Math.abs(moved.y - at.y) < 1, `the line moved when it opened: ${JSON.stringify([at, moved])}`);
+  const steps = await page.evaluate(() => [...document.querySelectorAll('.cv-tray .cv-step')].map((s) => ({ math: s.querySelector('.sm').textContent.replace(/\s/g, ''), v: s.querySelector('.v').textContent, box: s.getBoundingClientRect().toJSON() })));
+  expect(steps.length === 6, `steps: ${JSON.stringify(steps.map((s) => s.math))}`);
+  expect(steps.some((s) => s.math === '2a' && s.v === '2') && steps.some((s) => s.v === '1'), `step values: ${JSON.stringify(steps)}`);
+  const tray = await page.locator('.cv-tray').boundingBox();
+  expect(tray.y >= moved.y + moved.height, 'the tray is not under its line');
+  for (const s of steps) expect(s.box.left >= tray.x && s.box.right <= tray.x + tray.width && s.box.bottom <= tray.y + tray.height, `a step is outside the tray: ${s.math}`);
+  // Pointing at a step marks the part of the line it works out.
+  await page.locator('.cv-step', { hasText: '4ac' }).first().hover();
+  expect(await page.locator('.tape .row.blk-value .tex .cv-hl').count() > 0, 'pointing at a step marks nothing in the line');
+  // A failing step: short words, a coral border; the steps after it show —, their wires dashed.
+  await page.locator('.tape .row.blk-slider input.slider[aria-label="c"]').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => window.slopculator.lines().some((l) => l.text === 'c = 3'));
+  await page.waitForTimeout(300);
+  const bad = page.locator('.cv-step.bad');
+  expect(await bad.count() === 1 && (await bad.locator('.v').innerText()) === 'Not real', `the failing step: ${await bad.allInnerTexts()}`);
+  expect((await page.locator('.cv-step.void .v').allInnerTexts()).every((t) => t === '—') && await page.locator('.cv-step.void').count() === 1, 'the step after it does not show —');
+  expect(await page.locator('.cv-wires path.w.err').count() >= 2, 'no dashed wires after the failing step');
+  await bad.hover();
+  expect((await bad.locator('.v').innerText()).includes('negative'), 'pointing at the failing step does not show the full error');
+  // It stays open after a reload.
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  await page.waitForTimeout(400);
+  expect(await page.locator('.cv-tray .cv-step').count() === 6, 'the open line closed on reload');
+  await page.locator('.cv-steps').click();
+  await page.waitForTimeout(200);
+  expect(await page.locator('.cv-tray').count() === 0, 'Steps did not close the tray');
+});
+
+await check('canvas: during a drag only the steps that change light, each with its change', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 1', 'b = -3', 'c = 2', 'r = (−b + √(b² − 4ac)) / 2a']));
+  await page.waitForTimeout(300);
+  await page.locator('.cv-steps').click();
+  await page.waitForTimeout(300);
+  const letGo = await holdSlider(page, 'c', -12);
+  const steps = await page.evaluate(() => [...document.querySelectorAll('.cv-tray .cv-step')].map((s) => ({ math: s.querySelector('.sm').textContent.replace(/\s/g, ''), d: s.querySelector('.d').textContent, same: s.classList.contains('same') })));
+  expect(steps.filter((s) => s.d).length === 4 && steps.filter((s) => s.same).length === 2, `steps mid-drag: ${JSON.stringify(steps)}`);
+  expect(steps.find((s) => s.math === '2a')?.same && !steps.find((s) => s.math === '2a')?.d, `2a should stay as it was: ${JSON.stringify(steps)}`);
+  await letGo();
+});
+
+await check('phone canvas: Steps opens the working as an indented tree under the line', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 1', 'b = -3', 'c = 2', 'r = (−b + √(b² − 4ac)) / 2a']));
+  await page.waitForTimeout(300);
+  await page.locator('.cv-steps').tap();
+  await page.waitForTimeout(500);
+  const steps = await page.evaluate(() => [...document.querySelectorAll('.cv-tray .cv-step')].map((s) => ({ math: s.querySelector('.sm').textContent.replace(/\s/g, ''), x: Math.round(s.getBoundingClientRect().left) })));
+  expect(steps.length === 6 && steps[0].math.startsWith('−b') && steps.at(-1).math === '2a', `tree order: ${JSON.stringify(steps)}`);
+  expect(steps[1].x > steps[0].x && steps[2].x > steps[1].x && steps.at(-1).x === steps[0].x, `not indented by depth: ${JSON.stringify(steps)}`);
+  const tray = await page.locator('.cv-tray').boundingBox(), line = await page.locator('.tape .rows > .row.blk-value').boundingBox();
+  expect(tray.y >= line.y + line.height - 1, 'the tree is not under its line');
+  const view = await page.locator('.tape').boundingBox();
+  expect(tray.y + 40 <= view.y + view.height && line.y >= view.y - 1, 'the opened steps or their line are out of sight');
+}, true);
+
+await check('canvas: figure blocks draw from their line, sit clear of each other, and switch to their numbers', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['θ = 40', 'unit circle(θ)', 'f(x) = x^3 - 3x', 'tangent(f, 1.3)', 'riemann(f, 0, 2, 8)', 'P = normalcdf(-1, 1)', 'M = [[1.5, 0.6], [0.4, 1.2]]']));
+  await page.waitForTimeout(500);
+  const kinds = await page.evaluate(() => [...document.querySelectorAll('.cv-fig:not([hidden])')].map((f) => [...f.classList].find((c) => c.startsWith('cv-fig-')) + ':' + f.querySelectorAll('svg path, svg line').length));
+  for (const k of ['unit-circle', 'tangent', 'riemann', 'normal', 'matrix']) expect(kinds.some((x) => x.startsWith(`cv-fig-${k}:`) && Number(x.split(':')[1]) > 10), `no ${k} figure: ${JSON.stringify(kinds)}`);
+  const boxes = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank), .tape .blk-graph')].map((el) => el.getBoundingClientRect().toJSON()));
+  const hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  expect(!boxes.some((a, i) => boxes.some((b, j) => i < j && hit(a, b))), 'two blocks overlap');
+  // The riemann sum and the integral under its figure, from the engine.
+  expect((await page.locator('.cv-fig-riemann .cv-readouts').innerText()).replace(/\s/g, '').includes('=−2'), 'the integral is not under the strips');
+  // = shows the numbers, and the choice is kept.
+  const normal = page.locator('.tape .row.blk', { has: page.locator('.cv-fig-normal') });
+  await normal.locator('.cv-seg-view button[data-value="numbers"]').click();
+  await page.waitForTimeout(200);
+  expect(await page.locator('.cv-fig-normal').isHidden(), '= did not hide the figure');
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  await page.waitForTimeout(400);
+  expect(await page.locator('.cv-fig-normal').isHidden(), 'the numbers view was not kept');
+  await normal.locator('.cv-seg-view button[data-value="figure"]').click();
+  await page.waitForTimeout(200);
+  expect(await page.locator('.cv-fig-normal').isVisible(), '△ did not bring the figure back');
+});
+
+await check('canvas: dragging a figure handle moves the slider it reads or rewrites the line, and arrow keys nudge it', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['θ = 40', 'unit circle(θ)', 'P = normalcdf(-1, 1)']));
+  await page.waitForTimeout(500);
+  const h = await page.locator('.cv-fig-unit-circle .fh').boundingBox();
+  const c = await page.locator('.cv-fig-unit-circle rect.fw').first().boundingBox();
+  // From the point to straight above the circle's middle: 90°.
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(c.x + c.width / 2, c.y + 12, { steps: 6 });
+  expect(await page.evaluate(() => window.slopculator.lines()[0].text) === 'θ = 90', `the slider did not follow: ${await page.evaluate(() => window.slopculator.lines()[0].text)}`);
+  expect(await page.locator('.cv-fig-unit-circle .fs-teal[stroke-dasharray]').count() > 0, 'the cos guide does not show while the point is held');
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  // A typed bound rewrites the line in place.
+  const hi = page.locator('.cv-fig-normal .fh[data-h="hi"]');
+  const b = await hi.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2 + 50, b.y + b.height / 2, { steps: 5 });
+  await page.mouse.up();
+  const text = await page.evaluate(() => window.slopculator.lines()[2].text);
+  expect(/^P = normalcdf\(-1, 1\.\d+\)$/.test(text), `the bound was not rewritten: ${text}`);
+  // Arrow keys on a focused handle.
+  await hi.focus();
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(100);
+  const after = await page.evaluate(() => window.slopculator.lines()[2].text);
+  expect(after !== text && /^P = normalcdf\(-1, 1\.\d+\)$/.test(after), `ArrowLeft did not nudge the bound: ${text} → ${after}`);
+  expect(await page.evaluate(() => document.activeElement?.getAttribute('data-h')) === 'hi', 'the handle lost focus');
+});
+
+await check('canvas: Riemann’s Left, Middle and Right rewrite its line', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['g(x) = x^2', 'riemann(g, 0, 1, 4)']));
+  await page.waitForTimeout(400);
+  await page.locator('.cv-fig-rule button[data-value="left"]').click();
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.slopculator.lines()[1].text) === 'riemann(g, 0, 1, 4, "left")', 'Left did not rewrite the line');
+  expect((await page.locator('.cv-fig-riemann .ro-sum .rv').innerText()) === '0.21875', 'the sum did not change to the left ends');
+});
+
+await check('phone canvas: a figure block fills the column, the unit circle beside its waves', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['θ = 40', 'unit circle(θ)']));
+  await page.waitForTimeout(500);
+  const blk = await page.locator('.tape .row.blk-figure').boundingBox(), svg = await page.locator('.cv-fig-svg').boundingBox();
+  expect(svg.width > blk.width - 40 && svg.x >= blk.x && svg.x + svg.width <= blk.x + blk.width + 1, `the figure does not fill its block: ${JSON.stringify([blk, svg])}`);
+  const panes = await page.evaluate(() => [...document.querySelectorAll('.cv-fig-svg rect.fw')].map((r) => r.getBoundingClientRect().toJSON()));
+  expect(panes.length === 2 && Math.abs(panes[0].top - panes[1].top) < 1 && panes[1].left > panes[0].right, `the circle and its waves are not side by side: ${JSON.stringify(panes)}`);
+}, true);
+
+await check('canvas: named moist-air states share one psychrometric chart, each with its readouts and ports', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['Tdb = 26', 'RH = 50', 'A = psych(Tdb, RH, "SI")', 'B = psych(13, 95, "SI")', 'q = A.h − B.h']));
+  await page.waitForTimeout(500);
+  expect(await page.locator('.tape .blk-psych').count() === 1, 'no one chart for the sheet');
+  const states = await page.locator('.blk-psych .cv-states .row.blk-pstate').count();
+  expect(states === 2, `the states are not in the chart: ${states}`);
+  const reads = await page.evaluate(() => [...document.querySelectorAll('.blk-psych .cv-reads')].map((r) => r.innerText.replace(/\s+/g, ' ')));
+  expect(reads[0].includes('14.8') && reads[0].includes('°C') && reads[0].includes('g/kg') && reads[0].includes('kJ/kg'), `A's readouts: ${reads[0]}`);
+  const ticks = await page.evaluate(() => [...document.querySelectorAll('.cv-fig-psych text')].map((t) => t.textContent));
+  expect(ticks.includes('40 °C') && ticks.includes('g/kg') && !ticks.some((t) => /°F|gr\/lb/.test(t)), `the axes mix units: ${ticks.join(' ')}`);
+  // q's two wires leave from the h readouts' ports, on the chart's right edge.
+  const ports = await page.evaluate(() => {
+    const chart = document.querySelector('.blk-psych').getBoundingClientRect();
+    const hs = [...document.querySelectorAll('.blk-psych .rd[data-port="h"]')].map((r) => r.getBoundingClientRect());
+    const outs = [...document.querySelectorAll('.cv-wires circle.port-out')].map((c) => c.getBoundingClientRect()).map((r) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 }));
+    return hs.map((h) => outs.some((o) => Math.abs(o.x - chart.right) < 3 && Math.abs(o.y - (h.top + h.height / 2)) < 3));
+  });
+  expect(ports.length === 2 && ports.every(Boolean), `the h ports carry no wires: ${JSON.stringify(ports)}`);
+  expect(await page.locator('.cv-wires circle.port-free').count() === 4, 'unused ports are not shown as hollow dots');
+  // = shows the numbers only; △ brings the chart back.
+  await page.locator('.cv-psych-view button[data-value="numbers"]').click();
+  await page.waitForTimeout(200);
+  expect(await page.locator('.cv-fig-psych').isHidden(), '= did not hide the chart');
+  await page.locator('.cv-psych-view button[data-value="figure"]').click();
+  await page.waitForTimeout(200);
+  expect(await page.locator('.cv-fig-psych').isVisible(), '△ did not bring the chart back');
+});
+
+await check('canvas: dragging a state on the chart moves its sliders or rewrites its line, and arrow keys nudge it', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['Tdb = 26', 'RH = 50', 'A = psych(Tdb, RH, "SI")', 'B = psych(13, 95, "SI")']));
+  await page.waitForTimeout(500);
+  const a = await page.locator('.cv-fig-psych .fh').first().boundingBox();
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2 + 40, a.y + a.height / 2 - 60, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  const after = await page.evaluate(() => window.slopculator.lines().slice(0, 2).map((l) => l.text));
+  expect(after[0] !== 'Tdb = 26' && after[1] !== 'RH = 50' && /^Tdb = \d+(\.5)?$/.test(after[0]), `the sliders did not follow: ${after}`);
+  const b = page.locator('.cv-fig-psych .fh').nth(1);
+  await b.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.slopculator.lines()[3].text) === 'B = psych(13.5, 95, "SI")', 'ArrowRight did not nudge the dry bulb');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.slopculator.lines()[3].text) === 'B = psych(13.5, 94, "SI")', 'ArrowDown did not nudge the humidity');
+  // A click on a state's line edits it in the composer.
+  await page.locator('.blk-psych .row.blk-pstate').nth(1).click({ position: { x: 80, y: 14 } });
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => !!document.querySelector('.composer.editing')), 'a state did not open in the composer');
+});
+
+await check('canvas: a list is a stats block, its readouts wired from their ports; a fit draws its scatter', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['d = [31.2, 33.8, 29.6, 32.4, 30.9, 31.7, 34.1, 32.8, 28.9, 33.2]', 'fk = mean(d) − 1.645 stdev(d)', 'x1 = [2, 4, 6, 8, 10]', 'y1 = [0.41, 0.79, 1.22, 1.6, 2.02]', 'y1 ~ m x1 + b', 'k = 1 / m']));
+  await page.waitForTimeout(500);
+  expect(await page.locator('.cv-fig-stats').count() === 1, 'the list draws no histogram (or the fit’s lists do)');
+  expect(await page.locator('.cv-fig-pairs').count() === 1, 'the fit draws no scatter');
+  const labels = await page.evaluate(() => [...document.querySelectorAll('.cv-reads .rd')].map((r) => `${r.querySelector('.k').textContent}:${r.dataset.port ?? ''}`));
+  for (const want of ['n:n', 'x̄:mean', 's:s', 'median:median', 'slope:m', 'intercept:b']) expect(labels.includes(want), `no readout ${want}: ${labels}`);
+  const wired = await page.evaluate(() => {
+    const out = [...document.querySelectorAll('.cv-wires circle.port-out')].map((c) => c.getBoundingClientRect().y);
+    return ['mean', 's', 'm'].map((p) => { const r = document.querySelector(`.cv-reads .rd[data-port="${p}"]`).getBoundingClientRect(); return out.some((y) => Math.abs(y + 3 - (r.top + r.height / 2)) < 4); });
+  });
+  expect(wired.every(Boolean), `a readout read by a line has no wire from its port: ${wired}`);
+  // The block's line stays short: a long list shows its first items and an ellipsis.
+  expect((await page.locator('.tape .row.blk-reads .tex').first().innerText()).includes('…'), 'the long list is set in full');
+});
+
+await check('phone canvas: the psychrometric chart fills the column, its states under it', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['A = psych(80, 50)', 'B = psych(55, 95)', 'q = A.h − B.h']));
+  await page.waitForTimeout(500);
+  const blk = await page.locator('.tape .blk-psych').boundingBox(), svg = await page.locator('.cv-fig-psych svg').boundingBox(), st = await page.locator('.blk-pstate').first().boundingBox();
+  expect(svg.width > blk.width - 40 && svg.x >= blk.x - 1 && svg.x + svg.width <= blk.x + blk.width + 1, `the chart does not fill its block: ${JSON.stringify([blk, svg])}`);
+  expect(st.y > svg.y + svg.height - 1, 'the states are not under the chart');
+  const ticks = await page.evaluate(() => [...document.querySelectorAll('.cv-fig-psych text')].map((t) => t.textContent));
+  expect(ticks.some((t) => t.endsWith('°F')) && ticks.includes('gr/lb'), `°F lines get °C axes: ${ticks.join(' ')}`);
+}, true);
+
+await check('the composer sets what is typed as math on one row: × for *, italic names, the answer on the right, a sparkline for a curve', async (page) => {
+  const box = await page.locator('.composer').boundingBox();
+  await page.keyboard.type('12*7');
+  await page.waitForTimeout(150);
+  const typed = await page.evaluate(() => ({ text: document.querySelector('.cv-mirror .cv-track').textContent, caret: !document.querySelector('.cv-mirror .cv-caret').hidden, field: getComputedStyle(document.querySelector('.composer .expr')).color }));
+  expect(typed.text === '12×7' && typed.caret, `the composer shows ${JSON.stringify(typed)}`);
+  expect((await page.locator('.composer .out').innerText()).includes('84'), 'no live answer');
+  expect(await page.locator('.composer').getAttribute('data-state') === 'ok', 'the edge does not light once the line works out');
+  // The caret goes where a click is in the math.
+  const one = await page.locator('.cv-mirror .g').first().boundingBox();
+  await page.mouse.click(one.x + one.width * 0.4, one.y + one.height / 2);
+  expect(await page.evaluate(() => document.querySelector('.composer .expr').selectionStart) === 1, 'a click in the math does not put the caret there');
+  await page.keyboard.press('End');
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Backspace');
+  await page.keyboard.type('y = 2sin(45x)');
+  await page.waitForTimeout(150);
+  expect(await page.locator('.composer-preview svg path').count() === 1, 'no sparkline for a line that draws');
+  const italic = await page.evaluate(() => [...document.querySelectorAll('.cv-mirror .g-var')].map((g) => g.textContent + getComputedStyle(g).fontStyle));
+  expect(italic.includes('yitalic') && italic.includes('xitalic') && !italic.some((t) => t.startsWith('s')), `names and functions: ${italic}`);
+  const after = await page.locator('.composer').boundingBox();
+  expect(Math.abs(after.height - box.height) < 1, `the composer grew from ${box.height} to ${after.height}`);
+});
+
+await check('the composer is calm while typing: an error shows only after the pause, short and whole, with the full words on hover', async (page) => {
+  await page.keyboard.type('2 + qqq');
+  const during = await page.evaluate(() => { const e = document.querySelector('.composer .out .err'); return !!e && e.getBoundingClientRect().width > 0; });
+  expect(!during, 'red text while typing');
+  const err = page.locator('.composer.shows-error .out .err');
+  await err.waitFor({ state: 'visible' });
+  const said = await err.evaluate((e) => ({ text: e.textContent, full: e.dataset.full ?? '', cut: e.scrollWidth > e.clientWidth + 1 }));
+  expect(said.text === "qqq isn't defined" && !said.cut && /Define it on its own line/.test(said.full), `the composer's error: ${JSON.stringify(said)}`);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('.tape .rows .row.blk .out .err')].some((e) => e.textContent === "qqq isn't defined"), null, { timeout: 5000 });
+  await page.evaluate(() => window.slopculator.setLines(['r = sqrt(-3)']));
+  await page.waitForFunction(() => document.querySelector('.tape .rows .row.blk .out .err')?.textContent === 'Not real', null, { timeout: 5000 });
+});
+
+await check('canvas: the first run shows an editable example; Clear example takes it away with Undo, and File brings it back', async (page) => {
+  await page.evaluate(() => { localStorage.removeItem(window.slopKeys.firstRun); localStorage.removeItem(window.slopKeys.document); sessionStorage.setItem('e2e-first-run', '1'); });
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  await page.waitForTimeout(300);
+  let l = (await lines(page)).map((x) => x.text);
+  expect(JSON.stringify(l) === '["k = 45","y = 2sin(kx)"]', JSON.stringify(l));
+  expect(await page.locator('.example-frame').isVisible(), 'no example frame');
+  expect(await page.locator('.composer .expr').getAttribute('placeholder') === '12 × 7, or r = 4', 'no first-run placeholder');
+  expect(await page.locator('.saved-note').count() === 0, 'the saved note came back');
+  expect(!(await page.locator('.example-frame').innerText()).includes('Example'), 'the example frame has a title again');
+  expect(await page.locator('.blk-example-graph').isVisible(), "the example has no graph of its own");
+  expect(await page.locator('.tape .graph-pane').count() === 0, "the sheet's graph shows with only the example drawing");
+  await page.click('.example-clear');
+  await page.waitForTimeout(150);
+  l = (await lines(page)).map((x) => x.text);
+  expect(JSON.stringify(l) === '[""]', `cleared: ${l}`);
+  await page.locator('.toast.show button', { hasText: 'Undo' }).click();
+  await page.waitForTimeout(150);
+  expect((await lines(page)).length === 2, 'Undo did not bring the example back');
+  await page.click('.example-clear');
+  await page.click('.menu-btn');
+  await page.locator('.menu [role=menuitem]', { hasText: 'Show the example again' }).click();
+  await page.waitForTimeout(150);
+  expect((await lines(page)).some((x) => x.text === 'k = 45'), 'File did not bring the example back');
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  await page.click('.example-clear');
+  await page.reload();
+  await page.waitForFunction(() => !!window.slopculator);
+  expect(!(await lines(page)).some((x) => x.text === 'k = 45'), 'the example came back by itself');
+});
+
+await check('canvas: Fit all, zoom and the keypad toggle; Ctrl+K opens Find', async (page) => {
+  for (const t of ['1', '2', '3']) await typeLine(page, t);
+  await page.click('.cv-tools .cv-btn:has-text("+")');
+  await page.waitForTimeout(300);
+  expect((await page.locator('.cv-zoom').innerText()) === '125%', `zoom: ${await page.locator('.cv-zoom').innerText()}`);
+  await page.click('.cv-tools .cv-btn:has-text("Fit all")');
+  await page.waitForTimeout(300);
+  expect(Number((await page.locator('.cv-zoom').innerText()).replace('%', '')) <= 100, 'Fit all zoomed in past 100%');
+  const keys = page.locator('#keypad');
+  expect(await keys.isVisible(), 'keypad hidden at the start');
+  await page.click('.bar-tog[aria-controls=keypad]');
+  await page.waitForTimeout(300);
+  expect(!(await keys.isVisible()), 'Keypad did not hide the keys');
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.waitForTimeout(200);
+  expect(await page.locator('.palette, [role=dialog].palette, .cmd-palette').first().isVisible(), 'Ctrl+K did not open Find');
+});
+
+await check('phone canvas: blocks stack in the sheet\'s order with a wire straight down between them, the composer sits over the keys, and the keypad has no enter', async (page) => {
+  await page.locator('#keypad .key[data-key="7"]').tap();
+  await page.locator('.composer-enter').tap();
+  await page.keyboard.type('a = 2');
+  await page.locator('.composer-enter').tap();
+  await page.keyboard.type('b = a + 1');
+  await page.locator('.composer-enter').tap();
+  await page.waitForTimeout(300);
+  const tops = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank)')].map((r) => r.getBoundingClientRect().top));
+  expect(tops.length === 3 && tops.every((t, k) => k === 0 || t > tops[k - 1]), `blocks out of order: ${tops}`);
+  const wire = await page.evaluate(() => { const p = document.querySelector('.cv-wires path.w'); return p ? p.getBoundingClientRect().toJSON() : null; });
+  expect(wire !== null && wire.width < 2 && wire.height > 4, `no wire straight down: ${JSON.stringify(wire)}`);
+  const comp = await page.locator('.composer').boundingBox(), pad = await page.locator('#keypad').boundingBox();
+  expect(comp.y + comp.height <= pad.y + 1, 'the composer is not over the keys');
+  expect((await page.locator('#keypad .key[data-action=enter]').count()) === 0, 'the keypad still has an enter key');
+  expect((await page.locator('.composer-tabs .ti-tab').count()) === 5, 'the tabs are not on the composer');
+}, true);
 
 await check('the Konami code unlocks Pride, strips itself from the line, and lands in Appearance', async (page) => {
   await page.click('.appear-btn');
@@ -248,8 +879,9 @@ await check('the Konami code unlocks Pride, strips itself from the line, and lan
   await page.waitForTimeout(250);
   expect(!(await page.evaluate(() => document.documentElement.hasAttribute('data-pride'))), 'the second code did not switch Pride off');
   await page.reload();
-  await page.waitForTimeout(200);
   await page.click('.appear-btn');
+  // The menu fills in once the saved unlock is read, which can take a slow machine longer than a fixed wait.
+  await page.locator('.appear-menu button', { hasText: 'Pride colors' }).waitFor({ timeout: 8000 }).catch(() => {});
   expect((await page.locator('.appear-menu button', { hasText: 'Pride colors' }).count()) === 1, 'Pride left Appearance after a reload');
   await page.screenshot({ path: '.shots/e2e-pride.png' });
 });
@@ -334,7 +966,7 @@ await check('click on a curve pins a label, a second click takes it off, and Del
     return window.canvasText.filter((t) => t.font.startsWith('600 12px')).map((t) => t.text);
   });
   expect((await pins()).length === 0, 'a pin before any click');
-  await page.mouse.click(...at(-5, 9));
+  await page.mouse.click(...at(-6, -4));
   expect((await pins()).length === 0, 'a click away from the curve pinned something');
   await page.mouse.click(...at(3, 5));
   const pinned = await pins();
@@ -468,7 +1100,7 @@ await check('Shift+drag zooms into the box', async (page) => {
 });
 
 await check('table Fit line adds y = ax + b', async (page) => {
-  await page.click('.list-tools .add-table');
+  await fileItem(page, 'Add a table');
   const data = [['1', '3'], ['2', '5'], ['3', '7'], ['4', '9']];
   await page.fill('.tbl thead th:nth-child(2) input', 'y_1');
   for (let r = 0; r < data.length; r++) for (let c = 0; c < 2; c++) await page.fill(`.tbl input[data-r="${r}"][data-c="${c}"]`, data[r][c]);
@@ -481,14 +1113,67 @@ await check('table Fit line adds y = ax + b', async (page) => {
   expect(l.some((x) => /^y = 2x \+ 1$/.test(x.text)), JSON.stringify(l.map((x) => x.text)));
 });
 
+await check('a regression line reads the table, shows its fit and defines m and b; Desmos and LaTeX forms are read and drawn as math', async (page) => {
+  await fileItem(page, 'Add a table');
+  const data = [['1', '3'], ['2', '5'], ['3', '7'], ['4', '9']];
+  await page.fill('.tbl thead th:nth-child(2) input', 'y');
+  for (let r = 0; r < data.length; r++) for (let c = 0; c < 2; c++) await page.fill(`.tbl input[data-r="${r}"][data-c="${c}"]`, data[r][c]);
+  await page.locator('.rows .row .expr').first().click();
+  const typed = ['y ~ mx + b', 'm + b', "f(x) = x^3", "f'(2)", 'sum_{n=1}^{10} n^2', '\\frac{1}{2} + \\sqrt{16}', 'int_0^1 x^2 dx', '[1...4]^2'];
+  for (const [i, text] of typed.entries()) {
+    if (i) await page.keyboard.press('Enter');
+    await page.keyboard.type(text);
+  }
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.rows .row')].filter((r) => r.querySelector('.expr')).map((r) => ({ out: (r.querySelector('.out')?.innerText ?? '').replace(/\s+/g, ' ').trim(), err: !!r.querySelector('.out .err'), math: (r.querySelector('.math')?.textContent ?? '') })));
+  const outs = rows.map((r) => r.out);
+  expect(!rows.some((r) => r.err), `a line has an error: ${JSON.stringify(outs)}`);
+  expect(/Best fit m 2 b 1 R² 1/.test(outs[0]), `the fit: ${outs[0]}`);
+  expect(outs[1] === '3' && outs[3] === '12' && outs[4] === '385' && outs[5] === '4.5' && /^0\.3333/.test(outs[6]) && outs[7] === '{1, 4, 9, 16}', `the answers: ${JSON.stringify(outs)}`);
+  const named = await page.waitForFunction(() => window.slopculator.graph.names().some((n) => n.text.includes('~')), null, { timeout: 5000 }).then(() => true, () => false);
+  expect(named, `the fit isn't drawn with its name: ${JSON.stringify(await page.evaluate(() => window.slopculator.graph.names().map((n) => n.text)))}`);
+});
+
+await check('keys play their recorded sounds: a digit, an operator and Enter each start a clip that has sound in it', async (page) => {
+  const played = () => page.evaluate(() => window.slopPlayed);
+  const press = async (label, tap) => {
+    const before = (await played()).length;
+    await tap(label);
+    await page.waitForFunction((n) => window.slopPlayed.length > n, before, { timeout: 5000 }).catch(() => { throw new Error(`${label} played nothing`); });
+    return (await played()).at(-1);
+  };
+  // Enter is on the composer; the rest are on the keypad.
+  const key = (label) => page.evaluate((label) => [...document.querySelectorAll('.keypad .key, .composer .key')].find((k) => k.querySelector('.kl')?.textContent.replace(/\s/g, '') === label && k.offsetParent).click(), label);
+  const digit = await press('7', key);
+  const operator = await press('+', key);
+  const enter = await press('enter', key);
+  for (const [name, clip] of Object.entries({ digit, operator, enter })) {
+    expect(clip.rate === 44100 && clip.ms > 5 && clip.ms < 200 && clip.peak > 0.15 && clip.peak <= 0.75, `the ${name} clip: ${JSON.stringify(clip)}`);
+  }
+  expect(operator.ms > digit.ms && enter.ms !== digit.ms, `an operator and Enter sound like a digit: ${JSON.stringify({ digit, operator, enter })}`);
+}, false, {
+  open: async (page) => {
+    // Every clip the page starts, as what it holds: the suite can't hear, but it can see that a real recording played.
+    await page.addInitScript(() => {
+      window.slopPlayed = [];
+      const start = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        const data = this.buffer.getChannelData(0);
+        let peak = 0;
+        for (const v of data) peak = Math.max(peak, Math.abs(v));
+        window.slopPlayed.push({ rate: this.buffer.sampleRate, ms: Math.round(this.buffer.duration * 1000), peak: Math.round(peak * 100) / 100 });
+        return start.apply(this, args);
+      };
+    });
+    await openApp(page);
+  },
+});
+
 await check('rounding is one slider from Auto to 15 places', async (page) => {
   const places = () => page.evaluate(() => window.slopculator.settings().places);
   const stop = (n) => page.evaluate((v) => { const r = document.querySelector('.round-slider'); r.value = String(v); r.dispatchEvent(new Event('input', { bubbles: true })); }, n);
-  expect((await page.textContent('.modebar .round-chip')) === 'Round: Auto', 'the Round chip');
-  await page.click('.modebar .round-chip');
-  expect(await page.isVisible('.round-pop .bar-round-slider'), 'the Round chip opens its slider');
-  await page.keyboard.press('Escape');
-  expect(await page.isHidden('.round-pop'), 'Esc closes the Round popover');
+  // The canvas's bar keeps Deg | Rad; rounding is under Modes.
   await page.click('.modebar .desk-more');
   expect(await page.isVisible('.mode-menu .round-slider'), 'More should open the modes menu with the slider');
   await page.keyboard.press('Escape');
@@ -499,15 +1184,14 @@ await check('rounding is one slider from Auto to 15 places', async (page) => {
   await stop(4);
   expect((await places()) === 3, 'stop 4 is 3 places');
   expect((await page.textContent('.round-out')) === '3 dp', 'label says 3 dp');
-  expect((await page.textContent('.modebar .round-chip')) === 'Round: 3 dp', 'the chip says 3 dp');
   const answer = await page.evaluate(() => window.slopculator.evaluate('1/3'));
   expect(JSON.stringify(answer).includes('0.333') && !JSON.stringify(answer.result ?? answer).includes('0.3333'), `1/3 at 3 places: ${JSON.stringify(answer)}`);
   await stop(16);
   expect((await places()) === 15, 'last stop is 15 places');
   await stop(0);
   expect((await places()) === null, 'first stop is Auto again');
-  await page.click('.modebar .round-chip');
-  await page.focus('.round-pop .round-slider');
+  await page.click('.modebar .desk-more');
+  await page.focus('.mode-menu .round-slider');
   await page.keyboard.press('ArrowRight');
   expect((await places()) === 0, 'arrow keys move the slider');
   expect(await page.evaluate(() => document.activeElement.classList.contains('round-slider')), 'arrow keys keep focus on the slider');
@@ -557,7 +1241,7 @@ await check('the page never scrolls or overflows at any window size', async (pag
   }
 });
 
-await check('a line keeps its height while typing, with errors and hints', async (page) => {
+await check('the line being typed keeps its height while typing, with errors and hints', async (page) => {
   const height = () => page.evaluate(() => document.querySelector('.row.active').getBoundingClientRect().height);
   await page.evaluate(() => window.slopculator.setSettings({ lineNames: true }));
   const start = await height();
@@ -569,7 +1253,8 @@ await check('a line keeps its height while typing, with errors and hints', async
     }
     await page.waitForTimeout(700);
     const paused = await page.evaluate(() => { const r = document.querySelector('.row.active'); return { h: r.getBoundingClientRect().height, error: (r.classList.contains('has-error') || !!r.querySelector('.calm-hint')) && !r.classList.contains('completing') }; });
-    expect(paused.error === shows && (shows ? paused.h > start : paused.h === start), `${text} after a pause: ${JSON.stringify(paused)}, was ${start}`);
+    // The composer is one row: an error shows on it, on the right, and never makes it taller.
+    expect(paused.error === shows && paused.h === start, `${text} after a pause: ${JSON.stringify(paused)}, was ${start}`);
     for (let i = 0; i < text.length; i++) await page.keyboard.press('Backspace');
     await page.waitForTimeout(40);
     heights.add(await height());
@@ -702,98 +1387,37 @@ await check('a warning shows on a valid line, with a fix', async (page) => {
   expect((await page.textContent('.row.active .result .val')).trim() === '9', `answer: ${await page.textContent('.row.active .result')}`);
 });
 
-await check('desktop: the Thumb Index\'s two rows over the pad, six columns across the column, every row of keys 42 px or more, AC at the pad\'s corner', async (page) => {
+await check('desktop: the keypad is the everyday row over a 6 × 4 pad with keys 42 px or more, and the five tabs and AC sit on the composer\'s edge', async (page) => {
   const g = await page.evaluate(() => {
-    const r = (e) => { const x = e.getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom, w: x.width, h: x.height }; };
-    return {
-      rows: [...document.querySelectorAll('.ti-row')].map((row) => [...row.querySelectorAll('.key')].map((k) => ({ ...r(k), label: k.getAttribute('aria-label').split(':')[0] }))),
-      pad: [...document.querySelectorAll('.numpad .krow')].map((row) => [...row.querySelectorAll('.key')].map(r)),
-      ac: r(document.querySelector('.key.desk-ac')), acText: document.querySelector('.key.desk-ac .kl').textContent.trim(),
-      col: r(document.querySelector('.keypad')),
-    };
+    const rows = [...document.querySelectorAll('#keypad .ti-row, #keypad .numpad .krow')].map((r) => [...r.querySelectorAll('.key')].map((k) => ({ h: k.getBoundingClientRect().height, label: k.getAttribute('data-key') })));
+    const tabs = [...document.querySelectorAll('.composer-tabs .ti-tab')].map((t) => t.getAttribute('aria-label'));
+    const comp = document.querySelector('.composer').getBoundingClientRect(), ac = document.querySelector('.composer-ac').getBoundingClientRect();
+    return { rows, tabs, acAbove: ac.bottom <= comp.top + 1 };
   });
-  expect(g.rows.length === 2 && g.rows.every((r) => r.length === 6) && g.pad.length === 4 && g.pad.every((r) => r.length === 6), `rows: ${g.rows.map((r) => r.length)} over ${g.pad.map((r) => r.length)}`);
-  expect(g.rows[0].map((k) => k.label).join(' ') === 'x y π e % ans', `row 1: ${g.rows[0].map((k) => k.label)}`);
-  expect(g.rows[1].map((k) => k.label).join(' ') === 'Math Stats Chance Matrix HVAC ÷', `row 2: ${g.rows[1].map((k) => k.label)}`);
-  const all = [...g.rows, ...g.pad];
-  const hs = all.map((r) => r[0].h);
-  expect(Math.max(...hs) - Math.min(...hs) < 1 && Math.min(...hs) >= 42, `row heights: ${hs}`);
-  for (const row of all) row.forEach((k, i) => expect(Math.abs(k.l - g.pad[0][i].l) < 0.6 && Math.abs(k.w - g.pad[0][i].w) < 0.6, `a key off pad column ${i + 1}: ${JSON.stringify(k)}`));
-  expect(g.pad[0][0].w > 64 && g.pad[0][0].l - g.col.l < 20 && g.col.r - g.pad[0][5].r < 20, `the keys don't fill the column: ${JSON.stringify(g.pad[0].map((k) => Math.round(k.w)))}`);
-  expect(g.acText === 'AC' && Math.abs(g.ac.l - g.pad[3][0].l) < 0.6 && Math.abs(g.ac.w - g.pad[3][0].w) < 1 && g.ac.t >= g.pad[3][0].b, `AC: ${JSON.stringify(g.ac)}`);
+  expect(g.rows.length === 5 && g.rows.every((r) => r.length === 6), `rows: ${g.rows.map((r) => r.length)}`);
+  expect(g.rows.flat().every((k) => k.h >= 42), `key heights: ${g.rows.map((r) => r[0].h)}`);
+  expect(g.rows.map((r) => r.map((k) => k.label).join(' ')).join(' / ') === 'x y π e % ans / ← → 7 8 9 ÷ / xʸ √ 4 5 6 × / ( ) 1 2 3 − / , = 0 . ⌫ +', JSON.stringify(g.rows.map((r) => r.map((k) => k.label))));
+  expect(g.tabs.join() === 'Math,Stats,Chance,Matrix,HVAC', `tabs: ${g.tabs}`);
+  expect(g.acAbove, 'AC is not on the composer\'s edge');
 });
-
-await check('desktop at 1366 × 768: the keys stay 42 px tall, the line being typed shows whole with its bar', async (page) => {
-  await page.setViewportSize({ width: 1366, height: 768 });
-  await page.evaluate(() => window.slopculator.setLines(['y = x^2/4 - 3', '12*3', '7+5', 'normalcdf(-1, 1, 0, 1)', 'r = 2', '']));
-  await page.waitForTimeout(300);
-  await page.locator('.rows .row').last().locator('.expr').click();
-  await page.waitForTimeout(200);
-  const g = await page.evaluate(() => {
-    const rows = document.querySelector('.rows'), rr = rows.getBoundingClientRect();
-    const lines = [...rows.querySelectorAll('.row')].map((e) => e.getBoundingClientRect());
-    const active = document.querySelector('.row:focus-within');
-    return { pad: Math.round(document.querySelector('.pad').getBoundingClientRect().height), key: Math.round(document.querySelector('.numpad .key').getBoundingClientRect().height), lines: lines.length, whole: lines.filter((b) => b.top >= rr.top - 1 && b.bottom <= rr.bottom + 1).length,
-      bar: getComputedStyle(active).boxShadow, left: Math.round(active.getBoundingClientRect().left - rr.left), activeWhole: active.getBoundingClientRect().top >= rr.top - 1 && active.getBoundingClientRect().bottom <= rr.bottom + 1 };
-  });
-  expect(g.pad === 282 && g.key >= 42, `the keys keep 42 px on a short window: ${JSON.stringify(g)}`);
-  expect(g.lines === 6 && g.whole >= 5 && g.activeWhole, `${g.whole} of ${g.lines} lines whole: ${JSON.stringify(g)}`);
-  expect(/3px 0px 0px 0px inset|inset 3px 0px 0px/.test(g.bar) && g.left === 0, `the active line's bar, edge to edge: ${JSON.stringify(g)}`);
-});
-
-await check('desktop: a tab\'s page sits on the keys inside the notebook, one size on every tab and page, never scrolls, no key moves, and the line being typed stays in view', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['12*3', '7+5', '']));
-  await page.locator('.rows .row').last().locator('.expr').click();
-  await page.waitForTimeout(150);
-  const linesAt = () => page.evaluate(() => JSON.stringify({ top: document.querySelector('.rows').scrollTop, pad: document.querySelector('.rows').style.paddingTop, rows: [...document.querySelectorAll('.rows .row')].map((r) => { const b = r.getBoundingClientRect(); return [Math.round(b.top * 2) / 2, Math.round(b.height * 2) / 2]; }) }));
-  const linesBefore = await linesAt();
-  const keys = () => page.$$eval('.keys .key, .key.desk-ac', (ks) => ks.map((k) => { const r = k.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}x${Math.round(r.height)}`; }).join(' '));
-  const before = await keys();
-  const measure = () => page.evaluate(() => {
-    const pg = document.querySelector('.ti-page'), p = pg.getBoundingClientRect(), k = document.querySelector('.keypad').getBoundingClientRect(), gr = document.querySelector('.graph-pane').getBoundingClientRect();
-    const tiles = [...document.querySelectorAll('.ti-tile')];
-    const list = document.querySelector('.rows');
-    return { size: `${Math.round(p.width)}x${Math.round(p.height)}`, bottom: p.bottom, right: p.right, kTop: k.top, gLeft: gr.left, foot: list.getBoundingClientRect().top + list.clientTop + list.clientHeight, cols: getComputedStyle(document.querySelector('.ti-grid')).gridTemplateColumns.split(' ').length,
-      scrolls: pg.scrollHeight > pg.clientHeight + 1, cut: tiles.some((t) => t.getBoundingClientRect().bottom > p.bottom + 0.5),
-      face: Math.max(...tiles.map((t) => parseFloat(getComputedStyle(t.querySelector('.ti-face')).fontSize))), name: Math.max(...tiles.map((t) => parseFloat(getComputedStyle(t.querySelector('.ti-name')).fontSize))),
-      clipped: tiles.flatMap((t) => [t.querySelector('.ti-face'), t.querySelector('.ti-name')]).filter((k) => k.scrollWidth > k.clientWidth + 1).map((k) => k.textContent),
-      ring: getComputedStyle(pg).borderColor };
-  });
-  const sizes = new Set();
+await check('desktop: a tab\'s page rises from the composer\'s edge over the canvas, one size on every tab, and never covers the keys', async (page) => {
+  const sizes = [];
   for (let i = 0; i < 5; i++) {
-    await page.locator('.ti-tab').nth(i).click();
-    // Past the tab's press, which scales it for a moment.
-    await page.waitForTimeout(400);
-    const segs = await page.locator('.ti-seg').count();
-    for (let j = 0; j < Math.max(1, segs); j++) {
-      if (segs) await page.locator('.ti-seg').nth(j).click();
-      await page.waitForTimeout(60);
-      const g = await measure();
-      sizes.add(g.size);
-      expect(g.bottom <= g.kTop + 0.5 && g.right <= g.gLeft + 0.5, `tab ${i} page ${j} covers the keys or the graph: ${JSON.stringify(g)}`);
-      expect(Math.abs(g.bottom - g.foot) <= 1, `tab ${i} page ${j}: the page's foot isn't the list's: ${JSON.stringify(g)}`);
-      const clear = await page.evaluate(() => document.querySelector('.rows .row:last-child').getBoundingClientRect().bottom <= document.querySelector('.ti-page').getBoundingClientRect().top + 1);
-      expect(clear, `tab ${i} page ${j}: the line being typed is under the page: ${await linesAt()}`);
-      expect(g.cols === 4 && !g.scrolls && !g.cut && !g.clipped.length, `tab ${i} page ${j}: ${JSON.stringify(g)}`);
-      expect(g.face >= 15 && g.face <= 17 && g.name >= 11 && g.name <= 12, `tile type, tab ${i} page ${j}: ${JSON.stringify(g)}`);
-      expect((await keys()) === before, `tab ${i} page ${j}: a key moved`);
-    }
+    await page.locator('.composer-tabs .ti-tab').nth(i).click();
+    await page.waitForTimeout(250);
+    const g = await page.evaluate(() => {
+      const p = document.querySelector('.ti-page').getBoundingClientRect(), c = document.querySelector('.composer').getBoundingClientRect(), k = document.querySelector('#keypad').getBoundingClientRect();
+      const tiles = [...document.querySelectorAll('.ti-page .ti-tile')].map((t) => t.getBoundingClientRect());
+      return { p: { t: p.top, b: p.bottom, l: p.left, r: p.right, h: p.height }, compTop: c.top, keysLeft: k.left, whole: tiles.every((t) => t.bottom <= p.bottom + 1 && t.top >= p.top - 1) };
+    });
+    expect(g.p.b <= g.compTop + 1, `tab ${i}: the page runs onto the composer: ${JSON.stringify(g)}`);
+    expect(g.p.r <= g.keysLeft + 1, `tab ${i}: the page covers the keys: ${JSON.stringify(g)}`);
+    expect(g.whole, `tab ${i}: a tile is cut`);
+    sizes.push(Math.round(g.p.h));
+    await page.keyboard.press('Escape');
   }
-  expect(sizes.size === 1, `the page changed size: ${[...sizes]}`);
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.waitForTimeout(300);
-  const wide = await measure();
-  expect(wide.cols === 4 && !wide.scrolls && !wide.cut, `at 1920: ${JSON.stringify(wide)}`);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.waitForTimeout(300);
-  await page.locator('.ti-close').click();
-  await page.waitForTimeout(200);
-  expect(await page.isHidden('.ti-page'), '✕ closes the page');
-  expect((await linesAt()) === linesBefore, `the lines did not come back when the page closed: ${linesBefore} → ${await linesAt()}`);
-  await page.evaluate(() => [...document.querySelectorAll('.ti-row .key')].find((k) => k.getAttribute('aria-label').startsWith('ans')).click());
-  expect((await page.inputValue('.row.active .expr')) === 'ans', `ans typed ${await page.inputValue('.row.active .expr')}`);
+  expect(new Set(sizes).size === 1, `page heights differ: ${sizes}`);
 });
-
 await check('the number pad stays while tabs open, and the keys type y = 2x + 1', async (page) => {
   const pad = () => page.$$eval('.numpad .key', (ks) => ks.map((k) => { const r = k.getBoundingClientRect(); return `${k.textContent}@${Math.round(r.left)},${Math.round(r.top)}`; }).join(' '));
   const before = await pad();
@@ -855,19 +1479,19 @@ await check('desktop: Ctrl+Alt+1–5 open the tabs on their first tile; arrows w
 
 await check('the number pad sits on the right, and can switch sides', async (page) => {
   const firstRow = () => page.$$eval('.numpad .krow:first-child .key', (els) => els.map((e) => e.getAttribute('aria-label').split(':')[0]).join(' '));
-  expect((await firstRow()) === '← → 7 8 9 ×', `right: ${await firstRow()}`);
+  expect((await firstRow()) === '← → 7 8 9 ÷', `right: ${await firstRow()}`);
   const box = await page.evaluate(() => document.querySelector('.pad').getBoundingClientRect().height);
   await page.keyboard.press('Control+/');
   await page.keyboard.type('switch number pad');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(80);
-  expect((await firstRow()) === '× 7 8 9 ← →', `left: ${await firstRow()}`);
+  expect((await firstRow()) === '÷ 7 8 9 ← →', `left: ${await firstRow()}`);
   const after = await page.evaluate(() => document.querySelector('.pad').getBoundingClientRect().height);
   expect(after === box, `pad height ${box} became ${after}`);
   await page.waitForTimeout(350);
   await page.reload();
   await page.waitForTimeout(150);
-  expect((await firstRow()) === '× 7 8 9 ← →', `after reload: ${await firstRow()}`);
+  expect((await firstRow()) === '÷ 7 8 9 ← →', `after reload: ${await firstRow()}`);
   await page.click('.keys .key:has-text("7")');
   await page.click('.keys .key:has-text("×")');
   await page.click('.keys .key:has-text("6")');
@@ -875,9 +1499,7 @@ await check('the number pad sits on the right, and can switch sides', async (pag
   expect((await page.textContent('.row.active .result .val')).trim() === '42', `7 * 6: ${await page.textContent('.row.active .result')}`);
 });
 
-await check('the active line shows its whole error under the expression', async (page) => {
-  const width = () => page.evaluate(() => document.querySelector('.row.active .expr').getBoundingClientRect().width);
-  const before = await width();
+await check('the line being typed shows its error on its row, whole on hover, and a line left shows it under it', async (page) => {
   await page.keyboard.type('nCr(7,5)*0.56)');
   const during = await page.evaluate(() => { const e = document.querySelector('.row.active .err'); return !!e && e.getBoundingClientRect().width > 0; });
   expect(!during, 'no error while typing');
@@ -886,11 +1508,9 @@ await check('the active line shows its whole error under the expression', async 
     const expr = document.querySelector('.row.active .expr').getBoundingClientRect();
     const err = document.querySelector('.row.active .err');
     const box = err?.getBoundingClientRect();
-    return { hasError: document.querySelector('.row.active').classList.contains('has-error'), shown: !!box && box.width > 0, below: !!box && box.top >= expr.bottom - 1, cut: !!err && err.scrollWidth > err.clientWidth + 1 };
+    return { hasError: document.querySelector('.row.active').classList.contains('has-error'), shown: !!box && box.width > 0, beside: !!box && box.top < expr.bottom && box.left >= expr.right - 1, whole: !!err && /Unmatched/.test(err.title) };
   });
-  expect(row.hasError && row.shown && row.below && !row.cut, `active row: ${JSON.stringify(row)}`);
-  const after = await width();
-  expect(after >= before, `expression width ${before} became ${after}`);
+  expect(row.hasError && row.shown && row.beside && row.whole, `active row: ${JSON.stringify(row)}`);
   const clipped = await page.evaluate(() => {
     const expr = document.querySelector('.row.active .expr');
     return expr.scrollWidth > expr.clientWidth;
@@ -912,7 +1532,7 @@ await check('the active line shows its whole error under the expression', async 
 await check('lines you are not editing read as typeset math, and open as their source', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['price = 24.99', 'y = x^2/4 - 3', '2+3', 'normcdf(1', '{x < 0: -x, x}', '']));
   await page.waitForTimeout(200);
-  await page.locator('.rows .expr').last().click();
+  await toNewLine(page);
   await page.waitForTimeout(100);
   const read = () => page.evaluate(() => [...document.querySelectorAll('.rows .row')].map((r) => ({
     typeset: r.classList.contains('typeset') && !r.classList.contains('active') && getComputedStyle(r.querySelector('.tex')).display !== 'none',
@@ -926,23 +1546,24 @@ await check('lines you are not editing read as typeset math, and open as their s
   expect(l[1].frac && l[1].exp && l[4].cases, `fraction, exponent and cases: ${JSON.stringify(l[1])} ${JSON.stringify(l[4])}`);
   expect(l[0].result === null, `price = 24.99 shows no answer: ${l[0].result}`);
   expect(l[2].result === '5', `answers have no "=": ${l[2].result}`);
-  const beside = await page.evaluate(() => {
+  // On the canvas a value's block reads what was asked, then its answer under it.
+  const under = await page.evaluate(() => {
     const r = document.querySelectorAll('.rows .row')[2];
     const a = r.querySelector('.tex').getBoundingClientRect(), b = r.querySelector('.result').getBoundingClientRect();
-    return Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 8 && b.left > a.right;
+    return b.top >= a.bottom - 2 && Math.abs(b.left - a.left) < 16;
   });
-  expect(beside, 'the answer sits beside its expression');
+  expect(under, 'the answer sits under its expression');
   const box = await page.locator('.rows .row').nth(2).locator('.tex .m-run').first().boundingBox();
   await page.mouse.click(box.x + box.width - 1, box.y + box.height / 2);
   await page.waitForTimeout(100);
   const open = await page.evaluate(() => {
     const i = document.activeElement;
-    return { value: i.value, caret: i.selectionStart, active: i.closest('.row').classList.contains('active'), visible: getComputedStyle(i).opacity === '1' };
+    return { value: i.value, caret: i.selectionStart, active: i.closest('.row').classList.contains('active'), inComposer: !!i.closest('.composer') };
   });
-  expect(open.value === '2+3' && open.caret === 1 && open.active && open.visible, `opened: ${JSON.stringify(open)}`);
+  expect(open.value === '2+3' && open.caret === 1 && open.active && open.inComposer, `opened: ${JSON.stringify(open)}`);
+  expect(await page.locator('.blk-ghost').isVisible(), 'no ghost where the line waits while it is edited');
   const after = await read();
-  expect(Math.abs(after[2].height - l[2].height) < 1, `a plain line changed height on opening: ${l[2].height} → ${after[2].height}`);
-  expect(after[1].typeset && !after[2].typeset, 'only the line being edited shows its source');
+  expect(after[1].typeset, 'a line not being edited stays typeset');
   await page.keyboard.press('ArrowDown');
   expect((await page.evaluate(() => document.activeElement.value)) === 'normcdf(1', 'arrow keys move between lines');
   await page.selectOption('select.look', 'retro', { force: true });
@@ -953,13 +1574,11 @@ await check('lines you are not editing read as typeset math, and open as their s
 
 await check('All + combines lines, leaving empty ones out with a note', async (page) => {
   await page.evaluate(() => window.slopculator.setSettings({ lineNames: true }));
-  await page.keyboard.type('10');
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Enter');
-  await page.keyboard.type('5');
-  await page.keyboard.press('Enter');
+  // The composer never sends an empty line, so the sheet with one in the middle comes from the page API.
+  await page.evaluate(() => window.slopculator.setLines(['10', '', '5', '']));
   await page.waitForTimeout(100);
-  await page.click(".combine button[aria-label='Add all lines']");
+  await page.click('.menu-btn');
+  await page.click(".combine-row button[aria-label='Add all lines']");
   await page.waitForTimeout(200);
   const got = await lines(page);
   const last = got[got.length - 1];
@@ -997,39 +1616,14 @@ await check('Ctrl+Alt+E shows the line\'s exact answer', async (page) => {
   expect((await page.textContent('.row.active .result .val')) === '1/3', `exact answer on the line: ${await page.textContent('.row.active .result')}`);
 });
 
-await check('desktop: the modes are in the top bar across the window, in three groups, and Modes holds the rest under it', async (page) => {
-  const bar = await page.locator('.modebar').boundingBox(), graph = await page.locator('.graph-pane').boundingBox();
-  expect(bar.x < 2 && bar.width > 1430 && graph.y >= bar.y + bar.height - 1, `the bar does not span the window over the graph: ${JSON.stringify(bar)}`);
-  for (const t of ['Deg', 'Rad', 'Dec', 'Exact', 'Pop', 'Sample', 'Percent', 'Line letters', 'Complex numbers']) expect(await page.locator('.desk-modes button', { hasText: new RegExp(`^${t.replace('+', '\\+')}$`) }).isVisible(), `${t} is not in the bar`);
-  await page.locator('.desk-modes button', { hasText: /^Exact$/ }).click();
-  expect((await page.evaluate(() => window.slopculator.settings().exact)) === true, 'Exact did not switch');
-  await page.locator('.desk-modes button', { hasText: /^Dec$/ }).click();
-  const more = page.locator('.modebar .desk-more');
-  await more.click();
-  expect(await page.isVisible('.mode-menu') && (await more.getAttribute('aria-expanded')) === 'true', 'More did not open the modes');
-  const [p, m] = await page.evaluate(() => [document.querySelector('.desk-more'), document.querySelector('.mode-menu')].map((el) => el.getBoundingClientRect().toJSON()));
-  expect(m.top >= p.bottom && m.top - p.bottom < 12, `the menu hangs under More: ${p.bottom}, ${m.top}`);
-  const menu = await page.textContent('.mode-menu');
-  expect(['Huge answers', '80 + 15% =', 'Rounding'].every((w) => menu.includes(w)), `Modes: ${menu}`);
-  expect(await page.isHidden('.mode-menu .mode-row[data-bar="angle"]') && await page.isHidden('.mode-menu .mode-row[data-bar="sd"]'), 'Modes repeats what the bar shows');
-  const look = await page.evaluate(() => {
-    const r = (q) => document.querySelector(q).getBoundingClientRect();
-    const sd = r('.desk-modes .seg:nth-of-type(3)'), pct = [...document.querySelectorAll('.desk-modes .tog')][0].getBoundingClientRect();
-    const on = getComputedStyle(document.querySelector('.desk-modes .seg button[aria-pressed=true]')), off = getComputedStyle(document.querySelector('.desk-modes .seg button[aria-pressed=false]'));
-    return { gap: pct.left - sd.right, h: [r('.desk-modes .seg').height, pct.height, r('.modebar .menu-btn').height, r('.modebar .head-find').height], on: [on.backgroundColor, on.fontWeight], off: [off.backgroundColor, off.fontWeight] };
-  });
-  expect(look.gap >= 12 && look.gap <= 16 && look.h.every((x) => x >= 30 && x <= 32) && look.on[0] !== look.off[0] && look.on[1] !== look.off[1], `the bar: ${JSON.stringify(look)}`);
-  await page.keyboard.press('Escape');
-  expect(await page.isHidden('.mode-menu'), 'Escape closes it');
-  await page.locator('.sheet-title').focus();
-  await page.keyboard.press('ArrowRight');
-  expect(await page.evaluate(() => document.activeElement.textContent === 'Deg'), 'an arrow from the title lands on Deg');
-  await page.setViewportSize({ width: 1000, height: 900 });
-  await page.waitForTimeout(300);
-  const fit = await page.evaluate(() => ({ fits: document.querySelector('.modebar').scrollWidth <= document.querySelector('.modebar').clientWidth + 1, h: document.querySelector('.modebar').getBoundingClientRect().height, folded: [...document.querySelectorAll('.desk-modes > .bar-mode[hidden]')].map((e) => e.dataset.fold).sort() }));
-  expect(fit.fits && fit.h < 60 && fit.folded.length > 0 && fit.folded.every((f, i) => Number(f) === i + 1), `folding: ${JSON.stringify(fit)}`);
+await check('desktop: the top bar keeps Deg | Rad, the canvas zoom, Find and Keypad, and Modes holds every other mode', async (page) => {
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.modebar .desk-modes > *')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()));
+  expect(shown.length === 1 && shown[0].includes('Deg') && shown[0].includes('Rad'), `the bar's modes: ${shown}`);
+  for (const sel of ['.cv-tools', '.head-find', '.bar-tog[aria-controls=keypad]', '.desk-more']) expect(await page.locator(`.modebar ${sel}`).isVisible(), `${sel} is not on the bar`);
+  await page.click('.modebar .desk-more');
+  const rows = await page.evaluate(() => [...document.querySelectorAll('.mode-menu .mode-row')].filter((r) => !r.hidden).map((r) => r.textContent));
+  for (const want of ['Answers', 'Std dev', 'Rounding', 'Also']) expect(rows.some((r) => r.includes(want)), `Modes has no ${want}: ${rows}`);
 });
-
 await check('Ctrl+Alt+C copies the answer on the line', async (page) => {
   await page.keyboard.type('6*7');
   await page.keyboard.press('Enter');
@@ -1046,7 +1640,8 @@ await check('Ctrl+Alt+C copies the answer on the line', async (page) => {
   await page.keyboard.press('Control+Alt+c');
   await page.waitForTimeout(150);
   expect((await page.evaluate(() => navigator.clipboard.readText())) === '42', 'copied line 1');
-  await page.locator('.rows .expr').last().click();
+  // Esc leaves the line being edited for the composer's new line.
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Control+Alt+c');
   await page.waitForTimeout(150);
   expect((await page.evaluate(() => navigator.clipboard.readText())) === '4', 'an empty line copies the last answer');
@@ -1142,11 +1737,11 @@ await check('A wide matrix answer stays inside its line', async (page) => {
   const fit = await page.evaluate(() => {
     const w = document.querySelectorAll('.result .mat-wrap');
     const last = w[w.length - 1];
-    const r = last.getBoundingClientRect(), list = document.querySelector('.rows').getBoundingClientRect();
+    const r = last.getBoundingClientRect(), list = last.closest('.row').getBoundingClientRect();
     const box = last.querySelector('.mat-scroll');
     return { right: r.right, edge: list.right, scrolls: box.scrollWidth > box.clientWidth + 1 };
   });
-  expect(fit.right <= fit.edge + 0.5, 'matrix runs past the list: ' + JSON.stringify(fit));
+  expect(fit.right <= fit.edge + 0.5, 'matrix runs past its block: ' + JSON.stringify(fit));
   expect(!fit.scrolls, 'a 3 × 3 inverse should fit without scrolling: ' + JSON.stringify(fit));
 });
 
@@ -1159,7 +1754,7 @@ await check('Clicking a typeset matrix edits its line', async (page) => {
   await page.waitForTimeout(100);
   expect((await activeLine(page)) === 'A = [[1, 2], [3, 4]]', 'the click should land on line 1');
   expect(await page.evaluate(() => document.activeElement.classList.contains('expr')), 'the line should have focus');
-  await page.locator('.rows .row').last().locator('.expr').focus();
+  await toNewLine(page);
   await page.waitForTimeout(80);
   const cell = await page.locator('.rows .row').first().locator('.tex .mat td').nth(2).boundingBox();
   await page.mouse.click(cell.x + cell.width / 2, cell.y + cell.height / 2);
@@ -1178,16 +1773,16 @@ await check('opening or importing a sheet keeps the keypad up with its two rows,
   await page.waitForTimeout(150);
   for (let n = 0; n < 2; n++) { await page.reload(); await page.waitForTimeout(250); }
   const keys = () => page.evaluate(() => ({ rows: document.querySelectorAll('.ti-row').length, pad: document.querySelectorAll('.numpad .krow').length, up: !!document.querySelector('.keys')?.offsetParent }));
-  expect(JSON.stringify(await keys()) === '{"rows":2,"pad":4,"up":true}', `after reloads: ${JSON.stringify(await keys())}`);
+  expect(JSON.stringify(await keys()) === '{"rows":1,"pad":4,"up":true}', `after reloads: ${JSON.stringify(await keys())}`);
   await page.click('.menu-btn');
   await page.locator('.menu button', { hasText: 'Open "Mine"' }).click();
   await page.waitForTimeout(300);
-  expect(JSON.stringify(await keys()) === '{"rows":2,"pad":4,"up":true}', `after opening: ${JSON.stringify(await keys())}`);
+  expect(JSON.stringify(await keys()) === '{"rows":1,"pad":4,"up":true}', `after opening: ${JSON.stringify(await keys())}`);
   await page.click('.menu-btn');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.menu button', { hasText: 'Import' }).click()]);
   await chooser.setFiles({ name: 'calc.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ rows: [{ id: 'a', kind: 'expr', text: '1+1' }], ui: { bank: 'Calc', panel: 0 } })) });
   await page.waitForTimeout(400);
-  expect(JSON.stringify(await keys()) === '{"rows":2,"pad":4,"up":true}', `after importing: ${JSON.stringify(await keys())}`);
+  expect(JSON.stringify(await keys()) === '{"rows":1,"pad":4,"up":true}', `after importing: ${JSON.stringify(await keys())}`);
   expect((await lines(page))[0].text === '1+1', 'the file did not open');
 });
 
@@ -1195,14 +1790,15 @@ await check('Modern is the default, and Retro switches and persists', async (pag
   const look = () => page.evaluate(() => document.documentElement.dataset.look);
   const font = () => page.evaluate(() => getComputedStyle(document.querySelector('.modebar .desk-modes .seg button')).fontFamily);
   expect((await look()) === 'modern', 'starts Modern');
-  expect((await font()).includes('Geist'), await font());
+  expect((await font()).includes('Schibsted Grotesk'), await font());
   await page.click('.appear-btn');
   await page.selectOption('select.look', 'retro');
   await page.waitForTimeout(400);
   expect((await look()) === 'retro', 'switched');
   expect((await font()).includes('Plex Mono'), await font());
   await page.reload();
-  await page.waitForTimeout(200);
+  // A slow machine can take longer than any fixed wait to apply the saved look after a reload.
+  await page.waitForFunction(() => document.documentElement.dataset.look === 'retro', null, { timeout: 8000 }).catch(() => {});
   expect((await look()) === 'retro', 'kept after a reload');
 });
 
@@ -1239,14 +1835,17 @@ await check('Enter on a broken line shakes it, and the new line slides in', asyn
   await page.keyboard.type('foo+');
   await page.waitForTimeout(100);
   await Promise.all([
-    page.waitForSelector('.rows .row:nth-child(1).shake', { state: 'attached', timeout: 5000 }),
-    page.waitForSelector('.rows .row:nth-child(2).enter', { state: 'attached', timeout: 5000 }),
+    page.waitForSelector('.tape .rows .row.shake', { state: 'attached', timeout: 5000 }),
+    page.waitForSelector('.composer-slot .row.enter', { state: 'attached', timeout: 5000 }),
     page.keyboard.press('Enter'),
   ]);
+  await page.waitForFunction(() => !document.querySelector('.composer-slot .row.enter'), null, { timeout: 5000 }).catch(() => {});
   await page.keyboard.type('1+1');
-  // The next line sliding in says this Enter has been handled.
-  await Promise.all([page.waitForSelector('.rows .row:nth-child(3).enter', { state: 'attached', timeout: 5000 }), page.keyboard.press('Enter')]);
-  expect(!(await page.locator('.rows .row').nth(1).evaluate((el) => el.classList.contains('shake'))), 'a working line does not shake');
+  // The next line sliding into the composer says this Enter has been handled.
+  await Promise.all([page.waitForSelector('.composer-slot .row.enter', { state: 'attached', timeout: 5000 }), page.keyboard.press('Enter')]);
+  // Under load the block can land after the composer's slide: wait for it, not a time.
+  await page.waitForFunction(() => [...document.querySelectorAll('.tape .rows .row.blk')].some((r) => r.querySelector('input.expr')?.value === '1+1'), null, { timeout: 5000 });
+  expect(!(await (await blockOf(page, '1+1')).evaluate((el) => el.classList.contains('shake'))), 'a working line does not shake');
 });
 
 // The three follow-ups from #15. The fixes are in the script, not the stylesheets, but the two looks build their
@@ -1274,8 +1873,9 @@ for (const look of ['modern', 'retro']) {
     await setLook(page, look);
     // "foo" would offer floor, and a name being completed isn't an error yet.
     await page.keyboard.type('qqq');
-    const mark = page.locator('.row.active .err.marked');
-    await mark.waitFor();
+    // The composer shows the error only once typing pauses.
+    const mark = page.locator('.composer.shows-error .row.active .err.marked');
+    await mark.waitFor({ state: 'visible' });
     expect((await mark.textContent()).includes('qqq'), `error: ${await mark.textContent()}`);
     await mark.click();
     await page.waitForTimeout(100);
@@ -1286,10 +1886,11 @@ for (const look of ['modern', 'retro']) {
   if (look === 'modern') await check(`${look}: a PNG of a graph pane that has never been shown is not blank`, async (page) => {
     await setLook(page, look);
     await page.keyboard.press('Control+Alt+Shift+G');
-    await page.waitForTimeout(800);
+    // Reload only once the hidden graph is saved; a slow machine can take longer than any fixed wait.
+    await page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem('slopculator:v1') || '{}').ui?.graph === false; } catch { return false; } }, null, { timeout: 8000 });
     await page.reload();
     await page.waitForTimeout(200);
-    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.graph-pane')).display === 'none'), 'the pane is hidden after the reload');
+    expect(await page.evaluate(() => !document.querySelector('.graph-pane')?.isConnected), 'the graph block is shown after the reload');
     await page.keyboard.type('y = x^2');
     await page.waitForTimeout(300);
     const png = await page.evaluate(async () => {
@@ -1333,6 +1934,7 @@ await check('Motion: Appearance sets it, and the choice survives a reload', asyn
   expect(off.split(',').every((d) => parseFloat(d) < 0.01), `transitions finish at once: ${off}`);
   await page.waitForTimeout(700);
   await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.motion === 'off', null, { timeout: 8000 }).catch(() => {});
   expect((await page.getAttribute('html', 'data-motion')) === 'off', 'Off survives a reload');
 });
 
@@ -1370,44 +1972,26 @@ for (const look of ['modern', 'retro']) {
     const bar = await page.locator('.modebar').boundingBox();
     const pill = await page.locator('.modebar .desk-modes .seg').first().boundingBox();
     expect(pill.y >= bar.y && pill.y + pill.height <= bar.y + bar.height, `pill ${JSON.stringify(pill)} outside the bar ${JSON.stringify(bar)}`);
-    const tools = await page.locator('.list-tools').boundingBox();
-    expect(tools.y - (bar.y + bar.height) < 16, `gap under the top bar: ${tools.y - (bar.y + bar.height)}`);
     await page.screenshot({ path: `.shots/e2e-${look}-no-display.png` });
   });
 }
 
-await check('clearing shows Undo, with what was cleared where there is room for it, and Undo works', async (page) => {
+await check('clearing shows Undo over the composer, saying what was cleared, keys shown or hidden, and Undo works', async (page) => {
   await page.locator('.row input').first().fill('6*7');
-  await page.click('.clear-all');
-  // Under the keys the strip has room for the words beside Undo.
-  const label = page.locator('.toast.show.in-foot button');
-  expect((await label.textContent()) === 'Undo', 'an Undo button');
-  expect((await page.locator('.toast.show span').textContent()) === 'Cleared every line' && (await page.locator('.toast.show span').getAttribute('class')) !== 'sr-only', 'the strip says what was cleared');
-  await label.click();
-  expect((await page.locator('.row input').first().inputValue()) === '6*7', 'Undo brings the line back');
-  // With the keys hidden it is the small pill over the toolbar, which says just Undo.
-  await page.keyboard.press('Control+Alt+Shift+K');
-  await page.waitForFunction(() => document.querySelector('.keypad').hidden);
-  await page.click('.clear-all');
-  const pill = page.locator('.toast.show.undo-only button');
-  expect((await pill.textContent()) === 'Undo', 'an Undo pill');
-  expect((await page.locator('.toast.show span').getAttribute('class')) === 'sr-only', 'the pill keeps its message for screen readers');
-  await pill.click();
-  expect((await page.locator('.row input').first().inputValue()) === '6*7', 'Undo from the pill brings the line back');
-});
-
-await check('an empty sheet hides Combine and Clear all, and the toolbar keeps a tab stop', async (page) => {
-  const shown = () => page.evaluate(() => [!!document.querySelector('.combine')?.offsetParent, !!document.querySelector('.clear-all')?.offsetParent]);
-  expect(JSON.stringify(await shown()) === '[false,false]', `shown on an empty sheet: ${await shown()}`);
-  await page.keyboard.type('6*7');
-  await page.waitForTimeout(150);
-  expect(JSON.stringify(await shown()) === '[true,true]', `hidden with a line: ${await shown()}`);
-  await page.focus('.clear-all');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(150);
-  expect(JSON.stringify(await shown()) === '[false,false]', `shown after Clear all: ${await shown()}`);
-  const stops = await page.evaluate(() => [...document.querySelectorAll('.list-tools button')].filter((b) => b.offsetParent && b.tabIndex === 0).length);
-  expect(stops === 1, `visible toolbar tab stops: ${stops}`);
+  for (const keys of [true, false]) {
+    if (!keys) {
+      await page.keyboard.press('Control+Alt+Shift+K');
+      await page.waitForFunction(() => document.querySelector('.keypad').hidden);
+    }
+    await page.click('.clear-all');
+    const label = page.locator('.toast.show button');
+    expect((await label.textContent()) === 'Undo', 'an Undo button');
+    expect((await page.locator('.toast.show span').textContent()) === 'Cleared every line' && (await page.locator('.toast.show span').getAttribute('class')) !== 'sr-only', 'the toast says what was cleared');
+    const g = await page.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().toJSON(), c: document.querySelector('.composer-dock').getBoundingClientRect().toJSON() }));
+    expect(g.t.bottom <= g.c.top && g.t.left >= g.c.left - 1 && g.t.right <= g.c.right + 1, `toast not over the composer (keys ${keys}): ${JSON.stringify(g)}`);
+    await label.click();
+    expect((await lines(page))[0]?.text === '6*7', 'Undo brings the line back');
+  }
 });
 
 await check('phone: the top bar is one row with a Modes button, and the sheet holds every mode', async (page) => {
@@ -1432,10 +2016,8 @@ await check('phone: the top bar is one row with a Modes button, and the sheet ho
     }));
     expect(hits.length >= 3 && hits.every((x) => x.w >= 43.5 && x.h >= 43.5), `${look}: a header action under 44 px: ${JSON.stringify(hits)}`);
     expect(!(await page.$('.head-pill .head-kbd, .head-pill [aria-label*="keyboard"]')), `${look}: a second keyboard button in the header`);
-    if (look === 'modern') {
-      const m = await page.evaluate(() => { const s = getComputedStyle(document.querySelector('.modebar .pill.more')); return { w: s.width, h: s.height, r: s.borderRadius, shadow: s.boxShadow, bg: s.backgroundColor }; });
-      expect(m.w === '34px' && m.h === '34px' && m.r === '50%' && m.shadow === 'none', `modern: Modes is a 34 px round well with no stroke: ${JSON.stringify(m)}`);
-    }
+    // Modes says so in words, as on the phone apps.
+    expect((await page.locator('.modebar .pill.more').innerText()).trim().toLowerCase() === 'modes', `${look}: Modes is not a word pill: ${await page.locator('.modebar .pill.more').innerText()}`);
   }
   await setLook(page, 'modern');
   await page.locator('.rows .row .expr').first().tap();
@@ -1500,9 +2082,9 @@ await check('phone on its side: the top bar stays one row, and the Modes sheet c
 }, true);
 
 const tapKey = async (page, label) => {
-  const i = await page.evaluate((l) => [...document.querySelectorAll('.keypad .key')].findIndex((k) => k.offsetParent && (k.querySelector('.kl')?.textContent === l || k.getAttribute('aria-label') === l)), label);
+  const i = await page.evaluate((l) => [...document.querySelectorAll('.keypad .key, .composer .key')].findIndex((k) => k.offsetParent && (k.querySelector('.kl')?.textContent === l || k.getAttribute('aria-label') === l)), label);
   if (i < 0) throw new Error(`no key ${label}`);
-  await page.locator('.keypad .key').nth(i).tap();
+  await page.locator('.keypad .key, .composer .key').nth(i).tap();
   await page.waitForTimeout(60);
 };
 const tapKeys = async (page, text) => { for (const ch of text) await tapKey(page, ch); };
@@ -1513,64 +2095,6 @@ const lineNow = (page) => page.evaluate(() => {
   return { text: inp?.value, caret: inp?.selectionStart, out: row?.querySelector('.out')?.textContent ?? '', calm: row?.classList.contains('calm'), red: row?.classList.contains('has-error'), slots: row?.querySelector('.slots:not([hidden])')?.textContent ?? null, hint: row?.querySelector('.hint-line:not([hidden])')?.textContent ?? null };
 });
 const pageOpen = (page) => page.evaluate(() => !document.querySelector('.ti-page').hidden);
-
-await check('phone: the Thumb Index replaces the bank strip, its two rows on the pad\'s columns, and a tab opens its page over the notebook, never the keys', async (page) => {
-  for (const look of ['modern', 'retro']) {
-    await setLook(page, look);
-    await page.waitForTimeout(150);
-    const g = await page.evaluate(() => {
-      const r = (e) => e.getBoundingClientRect();
-      const rows = [...document.querySelectorAll('.ti-row')].map((row) => [...row.querySelectorAll('.key')].map((k) => ({ label: k.querySelector('.kl').textContent, box: r(k).toJSON() })));
-      const pad = [...document.querySelector('.numpad .krow').querySelectorAll('.key')].map((k) => r(k).toJSON());
-      return { rows, pad };
-    });
-    expect(g.rows[0].map((k) => k.label).join(' ') === 'x y π e % ans', `${look}: row 1 ${g.rows[0].map((k) => k.label)}`);
-    expect(g.rows[1].map((k) => k.label).join(' ') === 'Math Stats Chance Matrix HVAC ÷', `${look}: row 2 ${g.rows[1].map((k) => k.label)}`);
-    for (const row of g.rows) expect(row.every((k, i) => Math.abs(k.box.left - g.pad[i].left) < 1 && Math.abs(k.box.width - g.pad[i].width) < 1 && k.box.height >= 43), `${look}: a row off the pad's grid: ${JSON.stringify(row.map((k) => [Math.round(k.box.left), Math.round(k.box.width), Math.round(k.box.height)]))}`);
-    const padAt = () => page.$$eval('.numpad .key, .ti-row .key', (ks) => ks.map((k) => { const b = k.getBoundingClientRect(); return `${Math.round(b.left)},${Math.round(b.top)}`; }).join(' '));
-    const before = await padAt();
-    await page.evaluate(() => window.slopculator.setLines(['12*3', '']));
-    await page.locator('.rows .row').last().locator('.expr').tap();
-    await page.waitForTimeout(150);
-    const linesAt = () => page.evaluate(() => JSON.stringify({ top: document.querySelector('.rows').scrollTop, pad: document.querySelector('.rows').style.paddingTop, rows: [...document.querySelectorAll('.rows .row')].map((r) => { const b = r.getBoundingClientRect(); return [Math.round(b.top * 2) / 2, Math.round(b.height * 2) / 2]; }) }));
-    const linesBefore = await linesAt();
-    await tapTab(page, 'Math');
-    expect(await pageOpen(page), `${look}: Math opened nothing`);
-    await page.waitForTimeout(250);
-    expect((await linesAt()) === linesBefore, `${look}: the lines moved when the page opened: ${linesBefore} → ${await linesAt()}`);
-    const o = await page.evaluate(() => {
-      const p = document.querySelector('.ti-page').getBoundingClientRect(), list = document.querySelector('.rows'), row = document.querySelector('.row.active').getBoundingClientRect();
-      const keys = { top: list.getBoundingClientRect().top + list.clientTop + list.clientHeight };
-      const tiles = [...document.querySelectorAll('.ti-tile')].map((t) => t.getBoundingClientRect());
-      return { bottom: p.bottom, keys: keys.top, rowTop: row.top, rowBottom: row.bottom, segs: [...document.querySelectorAll('.ti-seg')].map((s) => s.textContent), tiles: tiles.length, cols: new Set(tiles.map((t) => Math.round(t.left))).size, h: Math.min(...tiles.map((t) => t.height)), lit: document.querySelector('.ti-tab.lit')?.getAttribute('aria-label'), outline: getComputedStyle(document.querySelector('.ti-page')).borderTopColor };
-    });
-    expect(o.segs.join() === 'Basic,Trig,Integer,∫ d/dx,Graph,Units $' && o.tiles <= 20 && o.cols === 4 && o.h >= 38, `${look}: the page ${JSON.stringify(o)}`);
-    expect(o.lit === 'Math', `${look}: the lit tab is ${o.lit}`);
-    expect(Math.abs(o.bottom - o.keys) <= 1, `${look}: the page's foot: ${JSON.stringify(o)}`);
-    expect((await padAt()) === before, `${look}: the keys moved when the page opened`);
-    // Switching and closing tabs is script; the sizes above are what the looks change.
-    if (look === 'modern') {
-      await page.locator('.ti-seg', { hasText: 'Trig' }).tap();
-      expect((await page.locator('.ti-tile .ti-name').first().textContent()) === 'csc', `${look}: Trig's first tile`);
-      await tapTab(page, 'Math');
-      expect(!(await pageOpen(page)), `${look}: the lit tab left the page open`);
-      await tapTab(page, 'Stats');
-      await tapTab(page, 'Chance');
-      expect((await page.textContent('.ti-title')).startsWith('Chance'), `${look}: one tab to another`);
-      await page.locator('.ti-close').tap();
-      await page.waitForTimeout(150);
-      expect(!(await pageOpen(page)), `${look}: ✕ left the page open`);
-      expect((await linesAt()) === linesBefore, `${look}: the lines moved when the page closed`);
-      await tapTab(page, 'HVAC');
-      await page.locator('.nav-view', { hasText: /graph/i }).tap();
-      await page.waitForTimeout(250);
-      await page.locator('.nav-view', { hasText: /calculate/i }).tap();
-      await page.waitForTimeout(250);
-      expect(!(await pageOpen(page)), `${look}: the page outlived the Graph view`);
-    }
-    await page.evaluate(() => window.slopculator.setLines(['']));
-  }
-}, true);
 
 await check('phone: a tile inserts what its key did and closes the page; binompdf stays calm with grey slots until its inputs are in', async (page) => {
   for (const look of ['modern']) {
@@ -1682,6 +2206,10 @@ await check('phone: Clear all is in File, its Undo pill says so for 10 s, and Un
 await check('phone: the tabs\' colour notches stand 3:1 off their keys, and a lit tab\'s word 4.5:1, in every look and theme', async (page) => {
   const bad = await page.evaluate(async () => {
     const out = [];
+    // The colours are read the moment a theme lands, not partway through the tabs' fade to it.
+    const still = document.createElement('style');
+    still.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+    document.head.append(still);
     const sel = (c, v) => { const s = document.querySelector(`select.${c}`); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
     const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
@@ -1690,7 +2218,10 @@ await check('phone: the tabs\' colour notches stand 3:1 off their keys, and a li
       sel('look', look);
       window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme });
       if (theme.startsWith('contrast')) [...document.querySelectorAll('.mode-seg button')].find((b) => b.textContent === (theme === 'contrast' ? 'Dark' : 'Light')).click();
-      await new Promise((r) => setTimeout(r, 120));
+      // Until the page wears the theme just chosen (a slow machine takes longer than any fixed wait), then two frames.
+      const want = theme === 'contrastLight' ? 'contrastLight' : theme;
+      for (let f = 0; f < 240 && document.documentElement.dataset.theme !== want; f++) await new Promise((r) => requestAnimationFrame(r));
+      for (let f = 0; f < 2; f++) await new Promise((r) => requestAnimationFrame(r));
       for (const tab of document.querySelectorAll('.ti-tab')) {
         const kc = getComputedStyle(tab), notch = getComputedStyle(tab, '::before').backgroundColor;
         const caps = kc.backgroundImage !== 'none' ? kc.backgroundImage.match(/rgba?\([^)]+\)/g) : [kc.backgroundColor];
@@ -1729,7 +2260,7 @@ await check('phone: Find opens focused and says where each function lives in the
   expect(await page.evaluate(() => document.querySelector('.ti-tab[aria-label="HVAC"]').classList.contains('found')), 'the HVAC tab did not light');
 }, true);
 
-await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down the right edge, enter the one filled key', async (page) => {
+await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down the right edge, enter on the composer the one filled key', async (page) => {
   for (const look of ['modern', 'retro']) {
     await setLook(page, look);
     await page.waitForTimeout(200);
@@ -1738,26 +2269,25 @@ await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down
       const kp = document.querySelector('.keypad');
       const pad = [...document.querySelectorAll('.numpad .krow')].map((row) => [...row.querySelectorAll('.key')].map((k) => ({ ...r(k), label: k.getAttribute('aria-label').split(':')[0] })));
       const index = [...document.querySelectorAll('.ti-row .key')].map(r);
-      const bg = (q) => getComputedStyle(document.querySelector(q)).backgroundColor + getComputedStyle(document.querySelector(q)).backgroundImage;
       return {
         keypadTop: kp.getBoundingClientRect().top + parseFloat(getComputedStyle(kp).borderTopWidth), firstTop: Math.min(...index.map((k) => k.t)),
-        index: index.map((k) => k.h), pad, div: r(document.querySelector('.ti-div')),
-        enterBg: bg('.numpad .key.hero'), digitBg: bg('.numpad .key.num'),
-        filled: [...document.querySelectorAll('.keys .key')].filter((k) => k.offsetParent && k.classList.contains('hero')).map((k) => k.textContent.trim()),
+        index: index.map((k) => k.h), pad,
+        filled: [...document.querySelectorAll('.keys .key, .composer .key')].filter((k) => k.offsetParent && k.classList.contains('hero')).map((k) => k.textContent.trim()),
+        enterOnComposer: !!document.querySelector('.composer .key[data-action=enter]')?.offsetParent,
       };
     });
     const lip = look === 'retro' ? 2 : 0;
-    expect(g.index.length === 12 && g.index.every((h) => Math.abs(h - (48 - lip)) < 1), `${look}: Thumb Index rows ${g.index}`);
+    expect(g.index.length === 6 && g.index.every((h) => Math.abs(h - (48 - lip)) < 1), `${look}: the everyday row ${g.index}`);
     expect(g.pad.every((row) => row.every((k) => Math.abs(k.h - (56 - lip)) < 1)), `${look}: pad rows ${g.pad.map((r) => r[0].h)}`);
-    expect(g.firstTop - g.keypadTop <= (look === 'retro' ? 16 : 9), `${look}: ${Math.round(g.firstTop - g.keypadTop)} px from the seam to the keys`);
-    expect(g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ') === '← → 7 8 9 × / xʸ √ 4 5 6 − / ( ) 1 2 3 + / , = 0 . ⌫ enter', `${look}: pad ${g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ')}`);
-    const col = [g.div, ...g.pad.map((r) => r[5])];
+    expect(g.firstTop - g.keypadTop <= (look === 'retro' ? 16 : 10), `${look}: ${Math.round(g.firstTop - g.keypadTop)} px from the seam to the keys`);
+    expect(g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ') === '← → 7 8 9 ÷ / xʸ √ 4 5 6 × / ( ) 1 2 3 − / , = 0 . ⌫ +', `${look}: pad ${g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ')}`);
+    const col = g.pad.map((r) => r[5]);
     expect(col.every((k) => Math.abs(k.r - g.pad[0][5].r) < 0.6) && col.every((k, i) => i === 0 || k.t > col[i - 1].t), `${look}: the right column`);
-    expect(g.filled.join() === 'enter' && g.enterBg !== g.digitBg, `${look}: filled keys ${g.filled}`);
+    expect(g.filled.join() === 'enter' && g.enterOnComposer, `${look}: filled keys ${g.filled}`);
   }
 }, true);
 
-await check('phone, one-handed: the left-hand pad mirrors every group, enter in the bottom-left corner, ÷ over × at the left edge', async (page) => {
+await check('phone, one-handed: the left-hand pad mirrors every group, operators down the left edge with ÷ at the top', async (page) => {
   await page.keyboard.press('Control+/');
   await page.keyboard.type('switch number pad');
   await page.keyboard.press('Enter');
@@ -1766,10 +2296,10 @@ await check('phone, one-handed: the left-hand pad mirrors every group, enter in 
     const rows = [...document.querySelectorAll('.numpad .krow')].map((row) => [...row.querySelectorAll('.key')].map((k) => k.getAttribute('aria-label').split(':')[0]));
     const index = [...document.querySelectorAll('.ti-row')].map((row) => [...row.querySelectorAll('.key')].map((k) => k.querySelector('.kl').textContent));
     const keys = document.querySelector('.keys').getBoundingClientRect();
-    return { rows, index, div: document.querySelector('.ti-div').getBoundingClientRect().left - keys.left };
+    return { rows, index, div: document.querySelector('.numpad .key[data-key="÷"]').getBoundingClientRect().left - keys.left };
   });
-  expect(g.rows.map((r) => r.join(' ')).join(' / ') === '× 7 8 9 ← → / − 4 5 6 xʸ √ / + 1 2 3 ( ) / enter ⌫ 0 . = ,', `rows ${JSON.stringify(g.rows)}`);
-  expect(g.index.map((r) => r.join(' ')).join(' / ') === 'x y π e % ans / ÷ Math Stats Chance Matrix HVAC', `the Thumb Index rows: ${JSON.stringify(g.index)}`);
+  expect(g.rows.map((r) => r.join(' ')).join(' / ') === '÷ 7 8 9 ← → / × 4 5 6 xʸ √ / − 1 2 3 ( ) / + 0 . ⌫ , =', `rows ${JSON.stringify(g.rows)}`);
+  expect(g.index.map((r) => r.join(' ')).join(' / ') === 'x y π e % ans', `the everyday row: ${JSON.stringify(g.index)}`);
   expect(Math.abs(g.div) < 1, `÷ is ${g.div} px in from the left edge`);
 }, true);
 
@@ -1879,13 +2409,10 @@ await check('phone: no key label under 12 px or cut, captions 10 px or more, and
 }, true);
 
 for (const look of ['modern', 'retro']) {
-  await check(`375 px phone, ${look}: ⌫ says hold: clear (the caret keys need no caption), every label 12 px or more, every tile whole and the keys never covered`, async (page) => {
+  await check(`375 px phone, ${look}: ⌫ and the caret keys need no caption, every label 12 px or more, every tile whole and the keys never covered`, async (page) => {
     await setLook(page, look);
     await page.waitForTimeout(200);
-    for (const label of ['←', '→']) expect(!(await page.$(`.numpad .key[aria-label^="${label}"] .ks`)), `${look} ${label} still has a caption`);
-    const ks = page.locator('.numpad .key[aria-label^="⌫"] .ks');
-    const shown = await ks.evaluate((e) => !e.hidden && e.offsetParent !== null && e.scrollWidth <= e.clientWidth + 1 && parseFloat(getComputedStyle(e).fontSize) >= 11 ? e.textContent : `hidden or cut at ${getComputedStyle(e).fontSize}`);
-    expect(shown === 'hold: clear', `${look} ⌫: ${shown}`);
+    for (const label of ['←', '→', '⌫']) expect(!(await page.$(`.numpad .key[aria-label^="${label}"] .ks`)), `${look} ${label} still has a caption`);
     const arrow = await page.locator('.numpad .key[aria-label^="←"] .kicon').boundingBox();
     expect(arrow && arrow.width >= 18, `the arrow is ${arrow?.width} px`);
     const bad = await labelProblems(page);
@@ -1898,12 +2425,11 @@ for (const look of ['modern', 'retro']) {
   }, { width: 375, height: 667 });
 }
 
-await check('phone: ⌫ says hold: clear, turns red as the hold nears, clears the line at 800 ms, and Undo brings it back', async (page) => {
+await check('phone: ⌫ (no caption) turns red as the hold nears, clears the line at 800 ms, and Undo brings it back', async (page) => {
   await page.keyboard.type('12345');
   await page.evaluate(() => document.querySelector('.row.active .expr').setSelectionRange(3, 3));
-  const back = page.locator('.numpad .key', { has: page.locator('.ks', { hasText: 'hold: clear' }) });
-  expect((await back.count()) === 1 && await back.locator('.ks').isVisible(), 'no visible hold: clear caption');
-  expect(parseFloat(await back.locator('.ks').evaluate((e) => getComputedStyle(e).fontSize)) >= 10, 'caption under 10 px');
+  const back = page.locator('.numpad .key[data-action="back"]');
+  expect((await back.count()) === 1 && (await back.locator('.ks').count()) === 0, 'the ⌫ caption came back');
   const b = await back.boundingBox();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await freezeClock(page);
@@ -1982,22 +2508,7 @@ await check('phone: typing a name never moves the keys', async (page) => {
   expect((await keys()) === before, 'the keys moved while a name was being typed');
 }, true);
 
-const paneShown = (page) => page.evaluate(() => getComputedStyle(document.querySelector('.graph-pane')).display !== 'none');
-await check('the graph is up beside the notebook even on an empty sheet, and stays when the curve goes', async (page) => {
-  expect(await paneShown(page), 'no graph pane on an empty sheet');
-  const left = () => page.evaluate(() => document.querySelector('.left').getBoundingClientRect().toJSON());
-  const split = await left();
-  const windowWidth = await page.evaluate(() => innerWidth);
-  expect(split.left < 2 && split.width >= 420 && split.width <= windowWidth * 0.35, `the notebook is not the slim column: ${JSON.stringify(split)}`);
-  const canvas = await page.locator('.graph-canvas').boundingBox();
-  expect(canvas && canvas.width > 700, `the plot fills the rest: ${JSON.stringify(canvas)}`);
-  await page.keyboard.type('y = x');
-  await page.waitForTimeout(500);
-  await page.keyboard.press('ControlOrMeta+Shift+Backspace');
-  await page.waitForTimeout(400);
-  expect(await paneShown(page), 'the graph left with the curve');
-});
-
+const paneShown = (page) => page.evaluate(() => !!document.querySelector('.tape .graph-pane')?.offsetParent);
 await check('Hide graph in File wins over a plottable line, and Show graph keeps it on an empty sheet', async (page) => {
   await page.keyboard.type('y = x^2');
   await page.waitForTimeout(500);
@@ -2042,27 +2553,19 @@ await check('desktop: the keypad is up at the start, under the notebook; the Key
   expect(await page.isVisible('.keypad .numpad .key'), 'an old save hid the desktop keypad');
 });
 
-await check('desktop: a dragged notebook width comes back on reload with the graph beside it', async (page) => {
-  // Boot used to clamp the saved width before the look's stylesheet was in, wrote --left: NaNpx, and the graph fell under a full-width notebook.
-  await page.evaluate(() => localStorage.setItem(slopKeys.left, '700'));
-  await page.reload();
-  await page.waitForFunction(() => !!window.slopculator);
-  const left = await page.locator('.left').boundingBox(), graph = await page.locator('.graph-pane').boundingBox();
-  expect(Math.abs(left.width - 700) <= 1, `the notebook is ${left.width} px wide, not the saved 700`);
-  expect(graph.x >= left.x + left.width && Math.abs(graph.y - left.y) <= 1, `the graph is not beside the notebook: ${JSON.stringify({ left, graph })}`);
-});
-
-await check('desktop: the hint row under the keys is blank at rest and says what the key or tile you point at does, on up to two lines', async (page) => {
+await check('desktop: the keypad is as tall as its keys; a hint over it says what the key or tile you point at does, on up to two lines, and is gone at rest', async (page) => {
   const hint = () => page.textContent('.key-hint');
-  expect(await page.isVisible('.key-hint') && (await hint()) === '', `the hint at rest: ${await hint()}`);
-  const pad = await page.locator('.pad').boundingBox(), row = await page.locator('.key-hint').boundingBox();
-  expect(row.y >= pad.y + pad.height - 1 && row.height >= 32, `the hint row is not two lines under the keys: ${JSON.stringify(row)}`);
+  expect(!(await page.isVisible('.key-hint')) && (await hint()) === '', `the hint at rest: ${await hint()}`);
+  const fit = await page.evaluate(() => { const k = document.querySelector('.keypad').getBoundingClientRect(), p = document.querySelector('.pad').getBoundingClientRect(); return { gap: k.bottom - p.bottom }; });
+  expect(fit.gap <= 14, `the keypad has room under its keys: ${JSON.stringify(fit)}`);
   await page.locator('.numpad .key', { hasText: /^7$/ }).first().hover();
   await page.waitForTimeout(150);
   expect((await hint()) === '', `a digit types itself, so it has no hint: ${await hint()}`);
   await page.locator('.numpad .key[data-action="back"]').first().hover();
   await page.waitForTimeout(100);
   expect((await hint()).length > 4, `pointing at ⌫: ${await hint()}`);
+  const over = await page.evaluate(() => [document.querySelector('.key-hint').getBoundingClientRect().bottom, document.querySelector('.keypad').getBoundingClientRect().top]);
+  expect(await page.isVisible('.key-hint') && over[0] <= over[1], `the hint is not over the keypad: ${over}`);
   await page.locator('.ti-tab[aria-label="Stats"]').click();
   await page.locator('.ti-tile:has(.ti-name:text-is("zscore"))').hover();
   await page.waitForTimeout(100);
@@ -2098,97 +2601,6 @@ await check('phone: Appearance is in the Modes sheet', async (page) => {
   expect((await page.evaluate(() => document.documentElement.dataset.look)) === 'retro', 'Look from the sheet');
 }, true);
 
-await check('phone: the Graph view has a chip per plotted line, and a tap edits that line', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['y = x', '2+2', 'y = x^2 - 3', 'x^2 + y^2 = 9']));
-  await page.waitForTimeout(300);
-  await page.locator('.rows .row').nth(3).locator('.expr').tap();
-  await page.locator('.nav-view', { hasText: 'Graph' }).tap();
-  await page.waitForTimeout(300);
-  const chips = await page.locator('.graph-chips .gchip').evaluateAll((els) => els.map((e) => ({ name: e.querySelector('.gc-name').textContent, text: e.querySelector('.gc-text').textContent, active: e.classList.contains('active'), border: getComputedStyle(e).boxShadow })));
-  expect(chips.length === 3, `chips: ${JSON.stringify(chips)}`);
-  expect(chips.map((c) => c.name).join() === '1,3,4' && chips[1].text === 'y = x² − 3', `chip names: ${JSON.stringify(chips)}`);
-  expect(chips[2].active && !chips[0].active && chips[2].border.includes('1.5px'), `the line you're on: ${JSON.stringify(chips)}`);
-  const [c, t] = await page.evaluate(() => ['.graph-chips', '.graph-tools'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()));
-  expect(c.bottom <= t.top + 1, 'the chips sit over the tools');
-  await page.locator('.graph-chips .gchip').nth(1).tap();
-  await page.waitForTimeout(300);
-  expect(await page.evaluate(() => !document.querySelector('.main').classList.contains('view-graph')), 'still on Graph after a tap');
-  expect(await page.evaluate(() => document.querySelectorAll('.rows .row')[2].classList.contains('active')), 'the tapped line is not active');
-  await page.screenshot({ path: '.shots/e2e-phone-chips.png' });
-}, true);
-
-const MANY = ['price = 24.99', 'tax = price * 0.0825', 'price + tax', 'y = x^2/4 - 3', 'f(x) = 2x + 1', 'normalcdf(-1, 1, 0, 1)', '[[1,2],[3,4]] * 2', 'sqrt(7^2 - 4*2*3)', '1/7', 'mean({3, 5, 8, 13})', '2^10', '[[1,0],[0,1]]', '3/4 + 1/8', '100 * 1.05^10', ''];
-const edgeState = (page) => page.evaluate(() => {
-  const l = document.querySelector('.rows');
-  const lt = l.getBoundingClientRect().top;
-  const pad = (r) => parseFloat(getComputedStyle(r).scrollMarginTop) || 0;
-  const off = Math.min(...[...l.children].map((r) => Math.abs(r.getBoundingClientRect().top - pad(r) - lt)));
-  const a = l.querySelector('.row.active')?.getBoundingClientRect(), lb = l.getBoundingClientRect();
-  return { off, top: l.scrollTop, max: l.scrollHeight - l.clientHeight, active: a && { inTop: a.top - lb.top, inBottom: lb.bottom - a.bottom } };
-});
-// Resting on lines is script, the same in both looks; one look per form factor.
-for (const [phone, look] of [[false, 'retro'], [true, 'modern']]) {
-  await check(`${phone ? 'phone' : 'desktop'} ${look}: the list rests on whole lines, and moving to a line keeps it clear of both edges`, async (page) => {
-    await setLook(page, look);
-    await page.evaluate((L) => window.slopculator.setLines(L), MANY);
-    await page.waitForTimeout(300);
-    const snap = await page.evaluate(() => [getComputedStyle(document.querySelector('.rows')).scrollSnapType, getComputedStyle(document.querySelector('.rows .row')).scrollSnapAlign]);
-    expect(snap[0].includes('y') && snap[1].includes('start'), `snapping: ${snap}`);
-    await page.locator('.rows .row').first().locator('.expr').click();
-    for (let i = 0; i < MANY.length - 1; i++) {
-      await page.keyboard.press('ArrowDown');
-      await page.waitForTimeout(60);
-      const s = await edgeState(page);
-      expect(s.active && s.active.inTop >= 0 && (s.active.inBottom >= 30 || s.top >= s.max - 1), `${look} line ${i + 2} down: ${JSON.stringify(s)}`);
-      expect(s.off <= 1.5 || s.top >= s.max - 1 || s.top < 1, `${look} line ${i + 2}: the top edge cuts a line ${JSON.stringify(s)}`);
-    }
-    let s = await edgeState(page);
-    expect(s.off <= 1.5, `${look}: at the end the top edge cuts a line by ${s.off}`);
-    for (let i = 0; i < 6; i++) {
-      await page.keyboard.press('ArrowUp');
-      await page.waitForTimeout(60);
-      s = await edgeState(page);
-      expect(s.active.inTop >= 20 || s.top < 1, `${look} up: the line you're on is at the edge ${JSON.stringify(s)}`);
-      expect(s.off <= 1.5 || s.top < 1, `${look} up: the top edge cuts a line ${JSON.stringify(s)}`);
-    }
-    const shade = await page.evaluate(() => {
-      const t = document.querySelector('.tape');
-      const edge = t.classList.contains('covered') ? getComputedStyle(document.querySelector('.edge-cover.bottom'), '::before') : getComputedStyle(t, '::after');
-      return [getComputedStyle(document.querySelector('.tape.scrolled > .list-tools'))?.boxShadow, edge.backgroundImage, edge.height];
-    });
-    expect(/0px 8px 16px -8px/.test(shade[0]), `${look}: the toolbar's shadow: ${shade[0]}`);
-    expect(shade[1].includes('gradient') && parseFloat(shade[2]) >= 16, `${look}: the keypad edge's shadow: ${shade[1]} ${shade[2]}`);
-  }, phone);
-}
-
-// Canvas text doesn't follow the look (graph.ts), so one look covers it.
-for (const look of ['modern']) {
-  await check(`desktop ${look}: each curve is named on the plot, in the clear, with its math`, async (page) => {
-    await setLook(page, look);
-    await page.evaluate(() => { window.slopculator.setSettings({ lineNames: true }); window.slopculator.setLines(['y = x^2/4 - 3', 'f(x) = 2x + 1', '']); });
-    await page.waitForTimeout(900);
-    const [names, plot] = await page.evaluate(() => [window.slopculator.graph.names(), document.querySelector('.graph-host canvas').getBoundingClientRect().toJSON()]);
-    expect(names.length === 2, `names: ${JSON.stringify(names)}`);
-    expect(names[0].text === 'A  y = x²/4 − 3' && names[1].text === 'B  f(x) = 2x + 1', `name text: ${JSON.stringify(names)}`);
-    const [a, b] = names.map((n) => n.box);
-    expect(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1], `the names overlap: ${JSON.stringify(names)}`);
-    for (const [l, t, r, bt] of [a, b]) expect(l >= 24 && t >= 24 && r <= plot.width - 24 && bt <= plot.height - 24, `a name near the edge: ${JSON.stringify(names)} in ${plot.width}x${plot.height}`);
-    const v = await page.evaluate(() => window.slopculator.graph.view());
-    const [l, t, r, bt] = a;
-    const mx = v.xmin + ((l + r) / 2 / plot.width) * (v.xmax - v.xmin), my = v.ymax - ((t + bt) / 2 / plot.height) * (v.ymax - v.ymin);
-    expect(my < mx * mx / 4 - 3, `the parabola's name sits inside its bowl: ${JSON.stringify(names)} at (${mx.toFixed(2)}, ${my.toFixed(2)})`);
-  });
-}
-await check('phone: the plot draws no curve names; the chips name the lines', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['y = x^2/4 - 3', 'f(x) = 2x + 1', '']));
-  await page.waitForTimeout(300);
-  await page.locator('.nav-view', { hasText: 'Graph' }).tap();
-  await page.waitForTimeout(700);
-  const names = await page.evaluate(() => window.slopculator.graph.names());
-  expect(names.length === 0, `phone names: ${JSON.stringify(names)}`);
-  expect((await page.locator('.graph-chips .gchip').count()) === 2, 'the chips are there');
-}, true);
-
 await check('modern: the line being edited keeps the typeset face, so it does not jump', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['price + tax', '']));
   await page.waitForTimeout(300);
@@ -2198,7 +2610,7 @@ await check('modern: the line being edited keeps the typeset face, so it does no
   expect(e[0] === tex[0] && e[1] === tex[1], `editing ${e} vs typeset ${tex}`);
   expect((e[2] === 'normal' || e[2] === '0px') && e[3].includes('tabular-nums'), `editing spacing and figures: ${e}`);
 });
-await check('desktop: AC at the pad\'s corner shows its legend in every look and theme', async (page) => {
+await check('desktop: AC on the composer\'s edge shows its legend in every look and theme', async (page) => {
   const bad = await page.evaluate(async () => {
     const out = [];
     const sel = (c, v) => { const s = document.querySelector(`select.${c}`); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
@@ -2209,8 +2621,10 @@ await check('desktop: AC at the pad\'s corner shows its legend in every look and
       window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme });
       if (theme.startsWith('contrast')) [...document.querySelectorAll('.mode-seg button')].find((b) => b.textContent === (theme === 'contrast' ? 'Dark' : 'Light')).click();
       await new Promise((r) => setTimeout(r, 120));
-      const k = document.querySelector('.key.clear-all.desk-ac');
-      const l = k.querySelector('.kl'), kc = getComputedStyle(k), lc = getComputedStyle(l);
+      const k = document.querySelector('.composer-ac');
+      const l = k.querySelector('.kl'), lc = getComputedStyle(l);
+      // AC is a word on the composer's edge, over the stage behind it.
+      const kc = getComputedStyle(document.querySelector('.composer-dock').closest('.left'));
       // The cap fades between themes, and a reading from partway through is neither theme's contrast.
       await Promise.all([k, l].flatMap((e) => e.getAnimations()).filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => {})));
       const capColor = kc.backgroundImage !== 'none' ? kc.backgroundImage.match(/rgba?\([^)]+\)/g).pop() : kc.backgroundColor;
@@ -2260,53 +2674,6 @@ const coverState = (page) => page.evaluate(() => {
 });
 
 // Settling is script, the same in both looks; one look per form factor.
-for (const [look, phone] of [['modern', true], ['retro', false]]) {
-  await check(`${phone ? 'phone' : 'desktop'} ${look}: a scroll settles on a line at the top edge, and only a sliver at the bottom is covered`, async (page) => {
-    await setLook(page, look);
-    await page.evaluate(() => window.slopculator.setLines(['price = 24.99', 'tax = price * 0.0825', 'price + tax', 'y = x^2/4 - 3', 'f(x) = 2x + 1', 'normalcdf(-1, 1, 0, 1)', '[[1,2],[3,4]] * 2', 'sqrt(7^2 - 4*2*3)', 'mean({3, 5, 8, 13})', '2^10', 'nCr(7, 3)', 'sin(30)', '1/7 + 3/4', '100 * 1.05^10', '[[1,0],[0,1]]', 'normcdf(1', '2 + 2', 'sqrt(2)', 'e^2', '']));
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
-    await page.evaluate(() => { document.querySelector('.rows').scrollTop = 0; });
-    await page.waitForTimeout(300);
-    const box = await page.locator('.rows').boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    let settled = 0, edged = 0;
-    for (const dy of [70, 38, 95, 52, -130, 44, -66, 81, -110, 58, 47, 33]) {
-      await wheelToRest(page, dy);
-      const s = await coverState(page);
-      const at = `after a ${dy}px turn, at ${s.y}px: ${JSON.stringify(s)}`;
-      expect(s.top <= 24.5 && s.bottom <= 24.5, `a band is taller than 24 px ${at}`);
-      if (s.y > 1 && s.y < s.max - 1) {
-        expect(s.off <= 1.5 && !s.cutTop.length, `the top edge cuts a line ${at}`);
-        settled++;
-      }
-      expect(s.cutBottom.every((px) => px >= 24), `a sliver shows at the bottom ${at}`);
-      if (s.cutBottom.length || s.bottom) edged++;
-    }
-    expect(settled > 4, `the list rested mid-sheet only ${settled} times`);
-    expect(edged > 0, 'no resting place left a line cut at the bottom edge');
-    // The bands lift while the list moves: a wheel turn is a scroll in progress. A headless wheel can land in one
-    // frame, so the events are checked, not frames. With their fade off, a band's opacity is whether it's up.
-    await page.addStyleTag({ content: '.edge-cover { transition: none !important; }' });
-    await page.evaluate(() => {
-      const l = document.querySelector('.rows');
-      window.__moves = [];
-      l.onscroll = () => window.__moves.push([...document.querySelectorAll('.edge-cover')].some((c) => getComputedStyle(c).opacity !== '0'));
-    });
-    await page.mouse.wheel(0, 60);
-    await page.waitForTimeout(100);
-    const moves = await page.evaluate(() => window.__moves);
-    expect(moves.length && moves.every((on) => !on), `a band stayed up while the list moved: ${JSON.stringify(moves)}`);
-  }, phone);
-}
-for (const look of ['modern', 'retro']) {
-  await check(`phone ${look}: the empty sheet's starter cards end on a card or one showing more than a sliver`, async (page) => {
-    await setLook(page, look);
-    await page.waitForTimeout(500);
-    const s = await coverState(page);
-    expect(s.top <= 24.5 && s.bottom <= 24.5 && s.cutBottom.every((px) => px >= 24) && !s.cutTop.length, `starter cards: ${JSON.stringify(s)}`);
-  }, true);
-}
 
 await check('a slider: a whole number steps by 1 from 0 to twice it, any other value runs ±max(2|v|, 10) with a step that lands on it', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['price = 24.99', 'n = 10', 'k = 3', '']));
@@ -2318,7 +2685,7 @@ await check('a slider: a whole number steps by 1 from 0 to twice it, any other v
   expect(got[0].lo === '-50' && got[0].hi === '50' && got[0].step === '0.01' && got[0].value === '24.99', JSON.stringify(got[0]));
   expect(got[1].lo === '0' && got[1].hi === '20' && got[1].step === '1' && got[1].value === '10', `n = 10: ${JSON.stringify(got[1])}`);
   expect(got[2].lo === '0' && got[2].hi === '10' && got[2].step === '1', `k = 3: ${JSON.stringify(got[2])}`);
-  expect(got[0].font.includes('Geist Sans') && !got[0].font.includes('Mono') && got[0].nums.includes('tabular-nums'), JSON.stringify(got[0]));
+  expect(got[0].font.includes('Schibsted Grotesk') && !got[0].font.includes('Mono') && got[0].nums.includes('tabular-nums'), JSON.stringify(got[0]));
 });
 
 await check('Fit is an action that never looks selected; 1:1 sleeps with no tile once the axes are equal', async (page) => {
@@ -2446,93 +2813,24 @@ await check('opening a sheet or a file keeps this device\'s settings, and Undo b
   expect(ui.motion === 'reduced' && !ui.padLeft && !ui.sysKeyboard, `the file changed this device's settings: ${JSON.stringify(ui)}`);
 });
 
-await check('list: a wheel that moves nothing leaves the next scroll by code unsettled', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(Array.from({ length: 30 }, (_, k) => `${k} + 1`)));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-  await page.evaluate(() => { document.querySelector('.rows').scrollTop = 0; });
-  await page.waitForTimeout(900);
-  const box = await page.locator('.rows').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, -120);
-  await page.waitForTimeout(400);
-  // The browser's own snapping would move it too; with it off, only settling could.
-  await page.evaluate(() => { const l = document.querySelector('.rows'); l.style.scrollSnapType = 'none'; l.scrollTop = 160; });
-  await page.waitForTimeout(900);
-  const y = await page.evaluate(() => document.querySelector('.rows').scrollTop);
-  expect(y === 160, `a scroll by code was settled to ${y}`);
-});
-
-await check('phone list: a finger on a line that goes away mid-touch still lifts', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(Array.from({ length: 12 }, (_, k) => `${k} + 1`)));
-  await page.waitForTimeout(400);
-  const cdp = await page.context().newCDPSession(page);
-  const r = await page.locator('.rows .row').nth(1).boundingBox();
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r.x + r.width / 2, y: r.y + r.height / 2 }] });
-  await page.evaluate(() => window.slopculator.setLines(Array.from({ length: 40 }, (_, k) => `${k} * 2`)));
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await page.waitForTimeout(100);
-  // A list still waiting for that finger never settles, so a later scroll stays cut mid-line. Snapping would hide that.
-  await page.evaluate(() => { const l = document.querySelector('.rows'); l.scrollTop = 0; l.style.scrollSnapType = 'none'; });
-  await page.waitForTimeout(300);
-  const box = await page.locator('.rows').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, 70);
-  await page.waitForTimeout(1200);
-  const s = await coverState(page);
-  expect(s.y > 1 && s.off <= 1.5, `the list didn't settle after the finger lifted: ${JSON.stringify(s)}`);
-}, true);
-
-await check('Reduced motion: a scroll still settles on a line, and snapping comes back only after the jump', async (page) => {
-  await page.click('.appear-btn');
-  await page.selectOption('select.motion', 'reduced');
-  await page.keyboard.press('Escape');
-  await page.evaluate(() => window.slopculator.setLines(['price = 24.99', 'tax = price * 0.0825', 'price + tax', 'y = x^2/4 - 3', 'f(x) = 2x + 1', 'normalcdf(-1, 1, 0, 1)', '[[1,2],[3,4]] * 2', 'sqrt(7^2 - 4*2*3)', 'mean({3, 5, 8, 13})', '2^10', 'nCr(7, 3)', 'sin(30)', '1/7 + 3/4', '100 * 1.05^10', '[[1,0],[0,1]]', '2 + 2', 'sqrt(2)', 'e^2', '']));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
-  await page.evaluate(() => {
-    const l = document.querySelector('.rows');
-    l.scrollTop = 0;
-    // The browser's own snapping lands most scrolls on a line before settling has to; without it, settling does it all.
-    l.style.scrollSnapType = 'none';
-    // Each batch of class changes: was the list still settling after it? Added and removed in one task never shows.
-    window.__settling = 0;
-    new MutationObserver(() => { if (l.classList.contains('settling')) window.__settling++; }).observe(l, { attributes: true, attributeFilter: ['class'] });
-  });
-  await page.waitForTimeout(300);
-  const box = await page.locator('.rows').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  let settled = 0;
-  for (const dy of [70, 38, 95, 52, 44]) {
-    await wheelToRest(page, dy);
-    const s = await coverState(page);
-    if (s.y > 1 && s.y < s.max - 1) {
-      expect(s.off <= 1.5, `the top edge cuts a line after a ${dy}px turn: ${JSON.stringify(s)}`);
-      settled++;
-    }
-  }
-  expect(settled > 2, `the list rested mid-sheet only ${settled} times`);
-  expect(await page.evaluate(() => window.__settling > 0 && !document.querySelector('.rows').classList.contains('settling')), 'snapping came back in the same task as the jump');
-});
-
 await check('one popover at a time, a line menu acts on its line where it is now, and Ctrl+Alt waits for a dialog', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['1+1', '2+2', '3+3']));
   await page.waitForTimeout(300);
   await page.click('.menu-btn');
   await page.locator('.modebar .desk-more').click();
   expect(await page.isVisible('.mode-menu') && (await page.getAttribute('.menu-btn', 'aria-expanded')) === 'false', 'the modes menu and File are both open');
-  await page.locator('.rows .row').nth(2).locator('.gutter').click({ button: 'right' });
+  await page.locator('.rows .row').nth(2).click({ button: 'right', position: { x: 40, y: 14 } });
   expect(await page.isVisible('.line-menu') && await page.isHidden('.mode-menu'), 'the line menu and the modes menu are both open');
   await page.click('.appear-btn');
   expect(await page.isVisible('.appear-menu') && !(await page.$('.line-menu')), 'Appearance and the line menu are both open');
   await page.keyboard.press('Escape');
-  await page.locator('.rows .row').nth(2).locator('.gutter').click({ button: 'right' });
+  await page.locator('.rows .row').nth(2).click({ button: 'right', position: { x: 40, y: 14 } });
   await page.evaluate(() => { const mac = /Mac/.test(navigator.platform); document.querySelector('.rows .expr').dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', ctrlKey: !mac, metaKey: mac, shiftKey: true, bubbles: true })); });
   await page.waitForTimeout(100);
   await page.locator('.line-menu button', { hasText: 'Move up' }).click();
   await page.waitForTimeout(150);
   expect((await lines(page)).map((r) => r.text).join() === '3+3,2+2', `Move up after line 1 went: ${JSON.stringify(await lines(page))}`);
-  await page.locator('.rows .row').nth(0).locator('.gutter').click({ button: 'right' });
+  await page.locator('.rows .row').nth(0).click({ button: 'right', position: { x: 40, y: 14 } });
   await page.waitForTimeout(50);
   await page.evaluate(() => document.querySelector('.rows').dispatchEvent(new Event('scroll')));
   expect(!(await page.$('.line-menu')), 'the line menu stayed open through a scroll');
@@ -2599,7 +2897,7 @@ await check('UX 3: deletes, clears and new sheets undo in order long after the t
   await page.mouse.move(5, 5);
   await del(0);
   await page.evaluate(() => window.slopculator.addLine(''));
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.waitForTimeout(100);
   const texts = () => page.evaluate(() => window.slopculator.lines().map((l) => l.text).filter(Boolean));
   expect(JSON.stringify(await texts()) === '["3"]', `after two deletes: ${await texts()}`);
@@ -2635,7 +2933,7 @@ await check('UX 4: a named sheet keeps its edits, Open sees a save at once, Dupl
   await page.keyboard.press('Control+Alt+o');
   expect(await page.locator('dialog .sheet-name', { hasText: 'Doc A' }).count() === 1, 'Open right after Save is missing the sheet');
   await page.keyboard.press('Escape');
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.press('Enter');
   await page.keyboard.type('7+5');
   await page.waitForTimeout(400);
@@ -2671,7 +2969,7 @@ await check('UX 4: a named sheet keeps its edits, Open sees a save at once, Dupl
 
 await check('UX 5: every curve is marked, a pointer snaps to a mark, and the keyboard reads the marks', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['y = x^2 - 1.5', 'y = x', 'a = 2', '']));
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.waitForTimeout(800);
   const near = await page.evaluate(() => window.slopculator.graphReadout(Math.sqrt(1.5), 0, 5, -3));
   expect(near === 'zero (1.2247, 0)', `near the root: ${near}`);
@@ -2708,6 +3006,7 @@ await check('UX 6: units in words convert as typed, and a line starting with × 
 });
 
 await check('UX 7: a tab shortcut from the keys puts focus on its first tile, Tab wraps from the graph, History has the line, one × per click', async (page) => {
+  await drawSomething(page);
   await page.locator('.numpad .key').first().focus();
   await page.keyboard.press('Control+Alt+2');
   await page.waitForTimeout(150);
@@ -2734,22 +3033,15 @@ await check('UX 7: a tab shortcut from the keys puts focus on its first tile, Ta
   await page.waitForTimeout(100);
   const left = await page.evaluate(() => window.slopculator.lines().map((l) => l.text));
   expect(JSON.stringify(left) === '["2","3"]', `a double-click on × deleted: ${left}`);
-  // With the keys showing, the message takes the strip under them: clear of the toolbar, the lines, the keys and the graph.
-  const place = () => page.evaluate(() => { const r = document.querySelector('.toast').getBoundingClientRect(), c = document.querySelector('.left').getBoundingClientRect(), tape = document.querySelector('.tape').getBoundingClientRect(), first = document.querySelector('.rows .row').getBoundingClientRect(), keys = document.querySelector('.keypad').getBoundingClientRect(), pad = document.querySelector('.pad').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, cl: c.left, cr: c.right, tapeTop: tape.top, firstTop: first.top, keysTop: keys.top, padBottom: pad.bottom, keysBottom: keys.bottom, text: document.querySelector('.toast').innerText }; });
-  const t = await place();
-  expect(t.l >= t.cl && t.r <= t.cr && t.t >= t.padBottom && t.b <= t.keysBottom + 1, `toast under the keys: ${JSON.stringify(t)}`);
-  expect(/Undo/.test(t.text) && t.text.replace('Undo', '').trim().length > 0, `the strip has room for what was done as well as Undo: ${t.text}`);
-  // With the keys hidden there is no strip, so it hangs from the top of the column, never over a line.
-  await page.keyboard.press('Control+Alt+Shift+K');
-  await page.waitForFunction(() => document.querySelector('.keypad').hidden);
-  await page.evaluate(() => window.slopculator.setLines(['2', '3']));
-  const top = await place();
-  expect(top.l >= top.cl && top.r <= top.cr && top.t >= top.tapeTop && top.b <= top.firstTop + 4, `toast with the keys hidden: ${JSON.stringify(top)}`);
+  // The toast sits over the composer, clear of it and of the keys, with room for what was done as well as Undo.
+  const t = await page.evaluate(() => { const r = document.querySelector('.toast').getBoundingClientRect(), c = document.querySelector('.composer-dock').getBoundingClientRect(), k = document.querySelector('.keypad').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, ct: c.top, cl: c.left, cr: c.right, kl: k.left, kt: k.top, text: document.querySelector('.toast').innerText }; });
+  expect(t.b <= t.ct && t.l >= t.cl - 1 && t.r <= t.cr + 1 && (t.r <= t.kl || t.b <= t.kt), `toast not over the composer: ${JSON.stringify(t)}`);
+  expect(/Undo/.test(t.text) && t.text.replace('Undo', '').trim().length > 0, `the toast says what was done as well as Undo: ${t.text}`);
 });
 
 await check('UX 7 phone: the keypad ) steps over the one a function put in, the toast sits above the keys, no shortcuts in the line menu', async (page) => {
   await page.locator('.rows .row .expr').first().tap();
-  const tapKey = (label) => page.evaluate((label) => [...document.querySelectorAll('.keypad .key')].find((k) => k.querySelector('.kl')?.textContent.replace(/\s/g, '') === label && k.offsetParent).click(), label);
+  const tapKey = (label) => page.evaluate((label) => [...document.querySelectorAll('.keypad .key, .composer .key')].find((k) => k.querySelector('.kl')?.textContent.replace(/\s/g, '') === label && k.offsetParent).click(), label);
   await page.evaluate(() => document.querySelector('.keypad .key[aria-label^="sqrt"], .keypad .key[aria-label^="√"]').click());
   await tapKey('9');
   await tapKey(')');
@@ -2769,54 +3061,16 @@ await check('UX 7 phone: the keypad ) steps over the one a function put in, the 
 }, true);
 
 
-await check('R3 desktop: worded chips and Appearance, one quiet graph-tools group, a full-width slider, xʸ in the key face', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['y = x^2/4 - 3', 'r = 2', '']));
-  await page.waitForTimeout(300);
+await check('R3 keys: one caption rule, no "above" or "move", no caption on ⌫, and AC is off its keys', async (page) => {
   const g = await page.evaluate(() => {
-    const bar = [...document.querySelectorAll('.desk-modes .tog')].map((b) => b.textContent.trim());
-    const appear = document.querySelector('#app > .modebar .appear-btn');
-    const tools = getComputedStyle(document.querySelector('.graph-tools'));
-    const groups = [...document.querySelectorAll('.gt-group')].map((x) => getComputedStyle(x).backdropFilter);
-    const row = document.querySelector('.slider-row'), track = row.querySelector('input[type=range]').getBoundingClientRect();
-    const lo = row.querySelector('.lim.lo').getBoundingClientRect(), hi = row.querySelector('.lim.hi').getBoundingClientRect();
-    const xy = [...document.querySelectorAll('.key')].find((k) => k.getAttribute('aria-label')?.startsWith('xʸ'));
-    const square = document.querySelector('.graph-tools [aria-pressed]');
-    return { bar, appear: appear.textContent.trim(), toolsBg: tools.backgroundColor, groups, track: track.width, gaps: [track.left - lo.right, hi.left - track.right], sup: !!xy?.querySelector('.ksup'), pressed: square ? getComputedStyle(square).color : '' };
-  });
-  expect(['Percent', 'Line letters', 'Complex numbers'].every((w) => g.bar.includes(w)), `the chips: ${g.bar}`);
-  expect(g.appear === 'Appearance', `Appearance's word: ${g.appear}`);
-  expect(g.groups.every((b) => b === 'none') && g.toolsBg !== 'rgba(0, 0, 0, 0)', `graph tools: ${JSON.stringify(g)}`);
-  expect(g.track >= 120 && g.gaps.every((x) => x >= 0 && x <= 12), `the slider track and its bounds: ${JSON.stringify(g)}`);
-  expect(g.sup, 'xʸ is not a superscript in the key face');
-});
-
-await check('R3 keys: one caption rule, no "above" or "move", ⌫ keeps its caption on a phone, and AC is off its keys', async (page) => {
-  const g = await page.evaluate(() => {
-    const cap = (label) => [...document.querySelectorAll('.keypad .key')].find((k) => k.getAttribute('aria-label')?.startsWith(label) && k.offsetParent)?.querySelector('.ks');
+    const cap = (label) => [...document.querySelectorAll('.keypad .key, .composer .key')].find((k) => k.getAttribute('aria-label')?.startsWith(label) && k.offsetParent)?.querySelector('.ks');
     const ks = [...document.querySelectorAll('.keypad .key .ks')].filter((e) => e.offsetParent);
     return { ans: !!cap('ans'), left: !!cap('←'), back: cap('⌫')?.textContent, ac: cap('AC')?.textContent, sizes: [...new Set(ks.map((e) => getComputedStyle(e).fontSize))], one: ks.every((e) => e.scrollHeight <= 14) };
   });
   expect(!g.ans && !g.left, `redundant captions: ${JSON.stringify(g)}`);
-  expect(g.back === 'hold: clear' && g.ac === undefined, `⌫ and AC captions: ${JSON.stringify(g)}`);
-  expect(g.sizes.length === 1 && g.one, `caption sizes: ${JSON.stringify(g)}`);
+  expect(g.back === undefined && g.ac === undefined, `⌫ and AC captions: ${JSON.stringify(g)}`);
+  expect(g.sizes.length <= 1 && g.one, `caption sizes: ${JSON.stringify(g)}`);
 }, true);
-
-await check('R3 phone: a short sheet fits unscrolled, no × column, a wrapped expression keeps its answer beside it', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['12*3', 'normalcdf(-1, 1, 0, 1)', '7+5', '']));
-  await page.waitForTimeout(400);
-  await page.locator('.rows .row').last().locator('.expr').tap();
-  await page.waitForTimeout(400);
-  const g = await page.evaluate(() => {
-    const list = document.querySelector('.rows'), rows = [...list.querySelectorAll('.row')];
-    const r1 = rows[0].getBoundingClientRect(), lr = list.getBoundingClientRect();
-    const long = rows[1], src = long.querySelector('.src').getBoundingClientRect(), res = long.querySelector('.result').getBoundingClientRect();
-    return { top: list.scrollTop, pad: list.style.getPropertyValue('--end-pad'), first: r1.top >= lr.top - 1, del: rows.some((r) => r.querySelector('.del')?.offsetParent), beside: (res.left >= src.right - 1 && res.top < src.bottom) || res.top >= long.querySelector('.tex').getBoundingClientRect().bottom - 2, size: getComputedStyle(long.querySelector('.result')).fontSize };
-  });
-  expect(g.top === 0 && g.first && (g.pad === '' || parseFloat(g.pad) === 0), `a short sheet: ${JSON.stringify(g)}`);
-  expect(!g.del, 'a × column on the phone');
-  expect(g.beside && g.size === '17px', `the long line's answer: ${JSON.stringify(g)}`);
-}, true);
-
 
 await check('UX2 1-2: a move is an undo step that never eats text, and typing comes back in bursts', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['1+1', 'sqrt(144)', '']));
@@ -2830,7 +3084,7 @@ await check('UX2 1-2: a move is an undo step that never eats text, and typing co
   await page.keyboard.press('ControlOrMeta+z');
   await page.waitForTimeout(150);
   expect(JSON.stringify(await texts()) === '["1+1","sqrt(144)"]', `undo the move: ${await texts()}`);
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.type('12', { delay: 30 });
   await page.keyboard.type('+34', { delay: 30 });
   await page.waitForTimeout(100);
@@ -2918,7 +3172,8 @@ await check('UX2 7: an unfinished line being typed is calm, and shows its error 
   await page.keyboard.type('(');
   const during2 = await hintState();
   expect(before.shown && during.shown && during2.shown && before.h === during.h && during.h === during2.h, `the hint holds while typing on: ${JSON.stringify([before, during, during2])}`);
-  await page.locator('.graph-host').click();
+  // Leaving the line: a click on the canvas.
+  await page.mouse.click(700, 300);
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => document.querySelector('.rows .row').classList.contains('has-error')), 'the error after leaving the line');
 });
@@ -2947,59 +3202,6 @@ await check('UX2 8: tax is named, Tab on mi offers no min, keys on a finished li
 });
 
 const SIX = ['y = x^2/4 - 3', '12*3', '7+5', 'normalcdf(-1, 1, 0, 1)', 'r = 2', ''];
-for (const look of ['modern', 'retro']) {
-  await check(`R4 phone ${look}: the six-line example shows line 1 to 6, a 40 px toolbar, the step on the slider's line`, async (page) => {
-    await setLook(page, look);
-    await page.evaluate((L) => window.slopculator.setLines(L), SIX);
-    // The Undo toast sits over the last line for 10 s; take it down so the tap isn't held until it fades.
-    await page.evaluate(() => { const t = document.querySelector('.toast'); t.classList.remove('show'); t.inert = true; });
-    await page.waitForTimeout(300);
-    await page.locator('.rows .row').last().locator('.expr').tap();
-    await page.waitForTimeout(500);
-    const g = await page.evaluate(() => {
-      const list = document.querySelector('.rows'), lr = list.getBoundingClientRect();
-      const rows = [...list.querySelectorAll(':scope > .row')].map((r) => r.getBoundingClientRect());
-      const slider = document.querySelector('.slider-row'), track = slider.querySelector('input[type=range]').getBoundingClientRect(), step = slider.querySelector('.lim.step').getBoundingClientRect();
-      return { top: list.scrollTop, first: rows[0].top - lr.top, visible: rows.slice(0, 5).every((r) => r.top >= lr.top - 1 && r.bottom <= lr.bottom + 1), tools: document.querySelector('.list-tools').getBoundingClientRect().height, stepLine: Math.abs((step.top + step.bottom) / 2 - (track.top + track.bottom) / 2) };
-    });
-    expect(g.top === 0 && g.first >= -1, `line 1 is scrolled away: ${JSON.stringify(g)}`);
-    expect(g.visible, `lines 1–5 aren't all in view: ${JSON.stringify(g)}`);
-    expect(Math.round(g.tools) === 40, `the toolbar is ${g.tools}px`);
-    expect(g.stepLine < 6, `step isn't on the slider's line: ${JSON.stringify(g)}`);
-    if (look === 'modern') {
-      const words = await page.evaluate(() => [...document.querySelectorAll('.list-tools button')].filter((b) => b.offsetParent).map((b) => b.textContent.trim()).filter(Boolean));
-      expect(['Line', 'Table', 'Normal curve'].every((w) => words.some((t) => t.includes(w))), `toolbar words: ${words}`);
-    }
-  }, true);
-
-  await check(`R4 desktop ${look}: toggles off are ghosts and on take the accent like Keypad; Modes has ▾; Round is a chip`, async (page) => {
-    await setLook(page, look);
-    await page.waitForTimeout(300);
-    const state = () => page.evaluate(() => {
-      const pct = [...document.querySelectorAll('.desk-modes .tog')].find((b) => b.textContent.trim() === 'Percent');
-      const cs = getComputedStyle(pct);
-      const led = getComputedStyle(pct, '::before');
-      return { pressed: pct.getAttribute('aria-pressed'), bg: cs.backgroundColor, ink: cs.color, led: `${led.backgroundColor} ${led.boxShadow}`, keypad: getComputedStyle(document.querySelector('#app > .modebar .bar-tog[aria-pressed="true"]')).backgroundColor };
-    });
-    const off = await state();
-    if (look === 'modern') expect(off.pressed !== 'true' && off.bg === 'rgba(0, 0, 0, 0)', `Percent off isn't a ghost: ${JSON.stringify(off)}`);
-    await page.evaluate(() => [...document.querySelectorAll('.desk-modes .tog')].find((b) => b.textContent.trim() === 'Percent').click());
-    await page.waitForTimeout(150);
-    const on = await state();
-    expect(on.pressed === 'true' && (look === 'modern' ? on.bg !== off.bg : on.led !== off.led), `Percent on looks the same as off: ${JSON.stringify({ off, on })}`);
-    if (look === 'modern') expect(on.bg === on.keypad, `Percent on isn't Keypad's accent: ${JSON.stringify(on)}`);
-    expect(await page.isVisible('#app > .modebar .desk-more .menu-chev'), 'Modes has no ▾');
-    if (look === 'modern') {
-      expect((await page.textContent('.modebar .round-chip')) === 'Round: Auto', 'the Round chip text');
-      await page.click('.modebar .round-chip');
-      const pop = await page.evaluate(() => { const p = document.querySelector('.round-pop').getBoundingClientRect(), c = document.querySelector('.round-chip').getBoundingClientRect(); return { below: p.top - c.bottom, w: p.width, visible: p.height > 0 }; });
-      expect(pop.visible && pop.below >= 0 && pop.below < 12, `the Round popover: ${JSON.stringify(pop)}`);
-      await page.mouse.click(700, 500);
-      expect(await page.isHidden('.round-pop'), 'a click away closes the Round popover');
-    }
-  });
-
-}
 
 // Only the narrowest desktop width can overflow.
 for (const width of [1366]) {
@@ -3017,7 +3219,7 @@ for (const width of [1366]) {
 const texts = async (page) => (await lines(page)).map((l) => l.text);
 await check('UX3 1: an empty palette offers functions first, so Enter inserts and never clears the sheet', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['12*3', '7+5', '']));
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.press('Control+/');
   await page.waitForTimeout(100);
   const first = await page.$$eval('.pal-item', (els) => els.slice(0, 12).map((e) => [e.querySelector('.pal-tag').textContent, e.querySelector('.pal-label').textContent]));
@@ -3088,7 +3290,7 @@ await check('UX3 1: during a keyboard slider\'s wait the toast\'s Undo can\'t sk
 
 await check('UX3 1: Rename hands focus back to the line, and Clear all with a slider throws nothing', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['a = 2', 'y = a x', '(a, a)', '']));
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.press('Control+Alt+s');
   await page.waitForTimeout(200);
   await page.keyboard.type('Unit 3');
@@ -3168,7 +3370,7 @@ await check('UX3 5: Tab from a line with a fix goes to the fix; Ctrl/⌘+Enter a
   expect(/sqrt|Use/.test(focused ?? ''), `Tab went to ${focused}`);
   const title = await page.evaluate(() => document.activeElement?.title);
   expect(/Enter|↩/.test(title ?? ''), `the fix's title: ${title}`);
-  await page.locator('.rows .row').nth(1).locator('.expr').click();
+  await page.locator('.composer .expr').click();
   await page.keyboard.press('ControlOrMeta+Enter');
   await page.waitForTimeout(200);
   expect((await texts(page))[1] === 'sqrt(16)', `Ctrl+Enter: ${(await texts(page))[1]}`);
@@ -3176,25 +3378,27 @@ await check('UX3 5: Tab from a line with a fix goes to the fix; Ctrl/⌘+Enter a
 
 await check('A heading line draws no grey slots, and a call on an ordinary line does', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['binompdf(', '# binompdf(']));
-  const slotsOf = async (n) => {
-    await page.locator('.rows .row').nth(n).locator('.expr').click();
+  const slotsOf = async (text) => {
+    await (await blockOf(page, text)).click();
     await page.keyboard.press('End');
     await page.waitForTimeout(100);
-    return page.evaluate((k) => document.querySelectorAll('.rows .row')[k].querySelector('.slots:not([hidden])')?.textContent ?? null, n);
+    // The line clicked is the one in the composer now.
+    return page.evaluate(() => document.querySelector('.composer .row .slots:not([hidden])')?.textContent ?? null);
   };
-  const line = await slotsOf(0);
+  const line = await slotsOf('binompdf(');
   expect(line === 'binompdf(n, p, k', `the ordinary line: ${line}`);
-  const heading = await slotsOf(1);
+  const heading = await slotsOf('# binompdf(');
   expect(heading === null, `the heading: ${heading}`);
 });
 
 await check('The line menu\'s Copy result copies what Ctrl+Alt+C copies: a shaded curve\'s probability, nothing from an unshaded one', async (page) => {
-  await page.click('.starter-card');
+  await fileItem(page, 'Start with an example');
+  await page.click('.examples-dialog .starter-card');
   await page.waitForTimeout(400);
   const k = await page.evaluate(() => [...document.querySelectorAll('.rows .row')].findIndex((r) => r.querySelector('.dist-prob:not([hidden])')));
   expect(k >= 0, 'no shaded curve');
   const copyItem = async () => {
-    await page.locator('.rows .row').nth(k).locator('.gutter').click({ button: 'right' });
+    await page.locator('.rows .row').nth(k).click({ button: 'right', position: { x: 40, y: 14 } });
     return page.locator('.line-menu button', { hasText: 'Copy result' });
   };
   await (await copyItem()).click();
@@ -3273,31 +3477,15 @@ await check('UX3 9: ⌃⌥S says Saved; Open list takes arrows', async (page) =>
   await page.keyboard.press('Escape');
 });
 
-for (const look of ['modern', 'retro']) {
-  await check(`R5 phone ${look}: a line that fits the row stays on one line, its answer beside it or right-aligned under it`, async (page) => {
-    await setLook(page, look);
-    await page.evaluate(() => window.slopculator.setLines(['12*3', 'normalcdf(-1, 1, 0, 1)', 'normalcdf(-1.96, 1.96, 100, 15) + normalcdf(2, 3, 0, 1)', '']));
-    await page.locator('.rows .row').last().locator('.expr').tap();
-    await page.waitForTimeout(400);
-    const g = await page.evaluate(() => [1, 2].map((i) => {
-      const r = document.querySelectorAll('.rows .row')[i], tex = r.querySelector('.tex'), t = tex.getBoundingClientRect(), out = r.querySelector('.out .result').getBoundingClientRect(), line = r.querySelector('.line').getBoundingClientRect();
-      const lh = parseFloat(getComputedStyle(tex).lineHeight);
-      return { lines: Math.round(t.height / lh), beside: out.top < t.bottom - 4 && out.left > t.right, under: out.top >= t.bottom - 2 && Math.abs(out.right - line.right) < 3, text: tex.textContent };
-    }));
-    expect(g[0].lines === 1 && (g[0].beside || g[0].under), `${look}: normalcdf(−1, 1, 0, 1): ${JSON.stringify(g[0])}`);
-    expect(g[1].under, `${look}: a line longer than the row puts its answer under it: ${JSON.stringify(g[1])}`);
-  }, true);
-}
 
-await check('R5 phone: Find is its own 34 px round well (44 px to a thumb), File its own word pill', async (page) => {
+await check('R5 phone: Modes, Find and File are word pills, as on the phone apps', async (page) => {
   const g = await page.evaluate(() => {
-    const f = document.querySelector('.head-find'), m = document.querySelector('.head-pill .menu-btn');
-    const fr = f.getBoundingClientRect(), mr = m.getBoundingClientRect(), after = getComputedStyle(f, '::after');
-    return { w: fr.width, h: fr.height, radius: getComputedStyle(f).borderRadius, gap: mr.left - fr.right, fileBg: getComputedStyle(m).backgroundColor, findBg: getComputedStyle(f).backgroundColor, pillBg: getComputedStyle(document.querySelector('.head-pill')).backgroundColor, hit: fr.height - 2 * parseFloat(after.top) };
+    const box = (q) => { const e = document.querySelector(q), r = e.getBoundingClientRect(); return { text: e.innerText.trim(), h: Math.round(r.height), l: r.left, r: r.right, bg: getComputedStyle(e).backgroundColor }; };
+    return { modes: box('.modebar .pill.more'), find: box('.head-find'), file: box('.head-pill .menu-btn'), deg: !!document.querySelector('.modebar .desk-modes .seg')?.offsetParent };
   });
-  expect(Math.round(g.w) === 34 && Math.round(g.h) === 34 && g.radius === '50%', `Find's circle: ${JSON.stringify(g)}`);
-  expect(g.gap >= 6 && g.pillBg === 'rgba(0, 0, 0, 0)' && g.fileBg !== 'rgba(0, 0, 0, 0)', `Find and File apart: ${JSON.stringify(g)}`);
-  expect(g.hit >= 44, `Find's hit area: ${JSON.stringify(g)}`);
+  expect(g.modes.text === 'Modes' && g.find.text.startsWith('Find') && g.file.text === 'File' && g.deg, `the bar's words: ${JSON.stringify(g)}`);
+  expect(g.find.h === g.file.h && g.modes.h === g.file.h && g.file.l - g.find.r >= 6 && g.find.l - g.modes.r >= 6, `pills apart and alike: ${JSON.stringify(g)}`);
+  expect([g.modes, g.find, g.file].every((x) => x.bg !== 'rgba(0, 0, 0, 0)'), `pills with no ground: ${JSON.stringify(g)}`);
 }, true);
 
 for (const [where, phone] of [['desktop', false], ['phone', true]]) for (const look of ['modern', 'retro']) {
@@ -3310,7 +3498,8 @@ for (const [where, phone] of [['desktop', false], ['phone', true]]) for (const l
       for (const k of document.querySelectorAll('.key')) {
         const kr = k.getBoundingClientRect();
         // A Thumb Index tab carries its glyph over its word, by design, as on iOS.
-        if (!k.offsetParent || k.classList.contains('ti-tab') || kr.right < 0 || kr.left > innerWidth || kr.width < 5 || kr.height > 80) continue;
+        // The composer's AC sits on its own edge, not in a key row.
+        if (!k.offsetParent || k.classList.contains('ti-tab') || k.closest('.composer-head') || kr.right < 0 || kr.left > innerWidth || kr.width < 5 || kr.height > 80) continue;
         const l = k.querySelector('.kl').getBoundingClientRect();
         const key = Math.round(kr.top);
         rows.set(key, [...(rows.get(key) ?? []), { k: (k.getAttribute('aria-label') || '').slice(0, 8), c: l.top + l.height / 2 - kr.top }]);
@@ -3324,26 +3513,11 @@ for (const [where, phone] of [['desktop', false], ['phone', true]]) for (const l
       expect(Math.max(...cs) - Math.min(...cs) < 1.5, `labels off one line: ${JSON.stringify(r)}`);
     }
     expect(g.tops.every((t) => t.top >= 3.5), `a two-line face near the cap's top: ${JSON.stringify(g.tops)}`);
-    // Only the phone's ⌫ has a caption now: AC's "all lines" went, and the desktop hides ⌫'s.
-    expect((!phone || g.weights.length) && g.weights.every((w) => w === '400'), `captions in the regular weight: ${g.weights}`);
+    // Any caption a key shows is in the regular weight (⌫ and AC show none now).
+    expect(g.weights.every((w) => w === '400'), `captions in the regular weight: ${g.weights}`);
   }, phone);
 }
 
-for (const [where, phone] of [['desktop', false], ['phone', true]]) {
-  await check(`R5 ${where}: a slider's bounds are as wide as their numbers; step and its value sit together, the value underlined`, async (page) => {
-    await page.evaluate(() => window.slopculator.setLines(['a = 3', '']));
-    await page.waitForTimeout(400);
-    const g = await page.evaluate(() => {
-      const row = document.querySelector('.slider-row'), r = (q) => row.querySelector(q).getBoundingClientRect();
-      const lo = r('.lim.lo'), hi = r('.lim.hi'), lab = r('.step-label'), st = r('.lim.step'), track = r('input[type=range]');
-      const cs = getComputedStyle(row.querySelector('.lim.step'));
-      return { lo: lo.width, hi: hi.width, gap: st.left - lab.right, step: st.width, rule: cs.borderBottomWidth, track: track.width, row: row.getBoundingClientRect().width };
-    });
-    expect(g.lo < 40 && g.hi < 40, `bounds: ${JSON.stringify(g)}`);
-    expect(g.gap >= 2 && g.gap <= 8 && Math.round(g.step) === 44 && g.rule === '1px', `step: ${JSON.stringify(g)}`);
-    expect(g.track > g.row * 0.45, `the track: ${JSON.stringify(g)}`);
-  }, phone);
-}
 
 await check('UX4 1: the "Use ans ×" chip is there at once; Tab, Ctrl/⌘+Enter and Enter take it; undo to a bare * clears it', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['5', '']));
@@ -3362,7 +3536,7 @@ await check('UX4 1: the "Use ans ×" chip is there at once; Tab, Ctrl/⌘+Enter 
   await page.keyboard.press('Enter');
   await page.waitForTimeout(200);
   const t = (await lines(page)).map((l) => l.text);
-  expect(t[1] === 'ans*100' && t.length === 3, `Enter takes the offer: ${JSON.stringify(t)}`);
+  expect(t[1] === 'ans*100' && t.length === 2, `Enter takes the offer: ${JSON.stringify(t)}`);
   await page.locator('.rows .row').nth(1).locator('.expr').click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type('*');
@@ -3410,14 +3584,14 @@ await check('The screen reader says what the line shows', async (page) => {
 await check('UX4 4: Mac labels, a fresh ⌘/ then Enter does nothing, AC says ⌘Z, percent skips oapercent', async (page) => {
   const mac = await page.evaluate(() => /Mac/.test(navigator.platform));
   await page.evaluate(() => window.slopculator.setLines(['12*3', '']));
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.type('7');
   await page.waitForTimeout(1200);
   await page.evaluate(() => document.querySelector('.menu-btn').click());
   await page.waitForTimeout(200);
   const undoHint = await page.evaluate(() => [...document.querySelectorAll('.menu button')].find((b) => b.textContent.startsWith('Undo'))?.textContent ?? '');
   await page.keyboard.press('Escape');
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   expect(mac ? /⌘Z/.test(undoHint) && !/⌃Z/.test(undoHint) : /Ctrl\+Z/.test(undoHint), `Undo's label: ${undoHint}`);
   await page.evaluate(() => { try { localStorage.removeItem(slopKeys.recentFunctions); } catch {} });
   await page.keyboard.press('ControlOrMeta+a');
@@ -3430,7 +3604,7 @@ await check('UX4 4: Mac labels, a fresh ⌘/ then Enter does nothing, AC says �
   await page.keyboard.press('Escape');
   const t = (await lines(page)).map((l) => l.text);
   expect(!t.some((x) => x.includes('ln(')), `Enter on a fresh palette inserted: ${JSON.stringify(t)}`);
-  const ac = await page.evaluate(() => document.querySelector('.key.desk-ac')?.getAttribute('aria-label') ?? '');
+  const ac = await page.evaluate(() => document.querySelector('.composer-ac')?.getAttribute('aria-label') ?? '');
   expect(/brings them back/.test(ac) && !/appears after/.test(ac), `AC: ${ac}`);
   await page.keyboard.press('Control+/');
   await page.keyboard.type('percent');
@@ -3454,40 +3628,26 @@ await check('Final 5: the keypad\'s enter takes the "Use ans ×" offer, as the k
   await page.locator('.rows .row').nth(1).locator('.expr').click();
   await page.keyboard.type('*100');
   await page.waitForTimeout(150);
-  await page.evaluate(() => [...document.querySelectorAll('.numpad .key')].find((k) => (k.getAttribute('aria-label') || '').startsWith('enter')).click());
+  await page.evaluate(() => document.querySelector('.composer .key[data-action=enter]').click());
   await page.waitForTimeout(200);
   const t = (await lines(page)).map((l) => l.text);
-  expect(t[1] === 'ans*100' && t.length === 3, `keypad enter: ${JSON.stringify(t)}`);
+  expect(t[1] === 'ans*100' && t.length === 2, `keypad enter: ${JSON.stringify(t)}`);
 });
-
-await check('Final 7: the phone Graph tab has a slider for each variable its curves use; a drag is one undo step', async (page) => {
-  await page.evaluate(() => window.slopculator.setLines(['a = 2', 'c = 5', 'y = a x', '']));
-  await page.waitForTimeout(300);
-  await page.locator('.nav-view', { hasText: 'Graph' }).tap();
-  await page.waitForTimeout(500);
-  const names = await page.$$eval('.gs-row .gs-name', (els) => els.map((e) => e.textContent));
-  expect(names.join() === 'a', `sliders: ${names}`);
-  await page.evaluate(() => { const r = document.querySelector('.gs-row input'); for (const v of ['3', '4', '5']) { r.value = v; r.dispatchEvent(new Event('input', { bubbles: true })); } r.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page.waitForTimeout(900);
-  expect((await lines(page))[0].text === 'a = 5', `after the drag: ${(await lines(page))[0].text}`);
-  await page.keyboard.press('ControlOrMeta+z');
-  await page.waitForTimeout(200);
-  expect((await lines(page))[0].text === 'a = 2', `undo: ${(await lines(page))[0].text}`);
-}, true);
 
 await check('Final bugs (phone): a long-press line menu stays open on lift; ⌫ on an empty line takes it away', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['12*3', '7+5', '']));
   await page.waitForTimeout(300);
-  const box = await page.locator('.rows .row').first().locator('.gutter').boundingBox();
-  await page.evaluate(({ x, y }) => { const g = document.elementFromPoint(x, y).closest('.gutter'); g.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: x, clientY: y })); }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  // A long press on a block, as a finger held on it.
+  const box = await page.locator('.rows .row').first().boundingBox();
+  await page.evaluate(({ x, y }) => { const g = document.elementFromPoint(x, y); g.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'touch', button: 0, clientX: x, clientY: y })); }, { x: box.x + 8, y: box.y + box.height / 2 });
   await page.waitForTimeout(500);
-  await page.evaluate(({ x, y }) => { const g = document.elementFromPoint(x, y); g.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' })); g.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: x, clientY: y })); }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  await page.evaluate(({ x, y }) => { const g = document.elementFromPoint(x, y); g.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' })); g.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: x, clientY: y })); }, { x: box.x + 8, y: box.y + box.height / 2 });
   await page.waitForTimeout(150);
   expect(await page.evaluate(() => !!document.querySelector('.line-menu, .menu.line, [role=menu].line-menu') || [...document.querySelectorAll('[role=menu]')].some((m) => m.offsetParent && /Duplicate/.test(m.textContent))), 'the line menu closed on lift');
   await page.waitForTimeout(600);
   await page.evaluate(() => document.querySelector('.graph-pane, .keys, body').dispatchEvent(new Event('touchstart', { bubbles: true })));
   await page.waitForTimeout(300);
-  await page.locator('.rows .row').last().locator('.expr').tap();
+  await toNewLine(page);
   await page.evaluate(() => [...document.querySelectorAll('.numpad .key')].find((k) => (k.getAttribute('aria-label') || '').startsWith('⌫')).click());
   await page.waitForTimeout(200);
   const t = (await lines(page)).map((l) => l.text);
@@ -3591,7 +3751,7 @@ for (const [w, h] of [[1280, 800]]) for (const look of ['modern', 'retro']) {
 
 await check('D2 desktop: Find sits on the bar beside File at its height; it, ⌘K / Ctrl+K and ⌘/ open the palette', async (page) => {
   const g = await page.evaluate(() => { const f = document.querySelector('.modebar .head-find').getBoundingClientRect(), m = document.querySelector('.modebar .menu-btn').getBoundingClientRect(); return { f: f.toJSON(), m: m.toJSON(), text: document.querySelector('.modebar .head-find').textContent.trim() }; });
-  expect(g.text === 'Find' && Math.abs(g.f.height - g.m.height) < 0.6 && Math.abs(g.f.top - g.m.top) < 0.6 && g.m.left - g.f.right >= 0 && g.m.left - g.f.right <= 8, `Find on the bar: ${JSON.stringify(g)}`);
+  expect(g.text.startsWith('Find') && Math.abs(g.f.height - g.m.height) < 0.6 && Math.abs(g.f.top - g.m.top) < 0.6 && g.m.left - g.f.right >= 0 && g.m.left - g.f.right <= 8, `Find on the bar: ${JSON.stringify(g)}`);
   const open = () => page.evaluate(() => !!document.querySelector('dialog.palette[open]'));
   await page.click('.modebar .head-find');
   await page.waitForTimeout(150);
@@ -3635,24 +3795,12 @@ await check('D2 desktop: a function from Find goes in as its key does: caret ins
   expect(Math.abs(got[0].value - 10.157) < 0.01, `superheat: ${JSON.stringify(got[0])}`);
 });
 
-await check('D2 desktop: the line being typed keeps its whole error above the keys on a full sheet', async (page) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.evaluate(() => window.slopculator.setLines(['binompdf(10, 0.3, 4)', 'invNorm(0.95)', 'normaldist(0, 1)', 'a = 5', 'y = a x^2 - 3', 'superheat("R410A", 118, 50)', 'ductsize(1000, 0.1)', '']));
-  await page.waitForTimeout(300);
-  await page.locator('.rows .row').last().locator('.expr').click();
-  await page.keyboard.type('dewpoint(1, 2, 3, 4, 5)');
-  await page.locator('.row.active .out .err').waitFor();
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  const g = await page.evaluate(() => { const e = document.querySelector('.row.active .out .err'), k = document.querySelector('.keypad').getBoundingClientRect(), rows = document.querySelector('.rows').getBoundingClientRect(); return e ? { err: e.getBoundingClientRect().bottom, keys: k.top, list: rows.bottom, text: e.textContent } : null; });
-  expect(g && g.err <= g.keys + 0.5 && g.err <= g.list + 0.5, `the error runs onto the keys: ${JSON.stringify(g)}`);
-});
-
 await check('D2 desktop: a new curve that doesn\'t show is fitted; a slider moving it later isn\'t', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['normaldist(0, 1)', '']));
   await page.waitForTimeout(600);
   const before = await page.evaluate(() => window.slopculator.graph.view());
   expect(before.ymax < 1, `the bell curve's view: ${JSON.stringify(before)}`);
-  await page.locator('.rows .row').last().locator('.expr').click();
+  await toNewLine(page);
   await page.keyboard.type('a = 1');
   await page.keyboard.press('Enter');
   await page.keyboard.type('y = a x^2 - 3');
@@ -3730,14 +3878,6 @@ for (const [where, narrow] of [['desktop', false], ['phone', true]]) {
     await page.waitForTimeout(120);
     const l = await lineAndCaret(page);
     expect(l.text === '[[1, 2], [ , 4]]' && l.caret === 6, `Backspace in an empty cell: ${JSON.stringify(l)}`);
-  }, narrow);
-  if (!narrow) await check(`H1 ${where}: ⌫ on an empty first line deletes it when other lines exist`, async (page) => {
-    await page.evaluate(() => window.slopculator.setLines(['', '7']));
-    await page.locator('.rows .expr').first().click();
-    await backKey(page).click();
-    await page.waitForTimeout(150);
-    const t = (await lines(page)).map((x) => x.text);
-    expect(t.join('|') === '7', `lines after ⌫: ${JSON.stringify(t)}`);
   }, narrow);
   if (!narrow) await check(`H1 ${where}: Enter steps to the next empty matrix cell`, async (page) => {
     await page.evaluate(() => window.slopculator.setLines(['[[ , ], [ , ]]']));

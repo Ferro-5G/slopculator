@@ -5,11 +5,15 @@ import { lineLabel, spokenLine } from '../ui/linestate';
 import type { Drawable } from './graph';
 import { prettyText } from '../ui/typeset';
 import { type GraphChip, findDraggables, showGraphChips, syncGraphSliders, graphSummary, syncMarksHint, scheduleCurveFit } from './graphpane';
-import { graph, listEl, graphHost, keypadEl, announcer } from './layout';
+import { exampleGraph, graph, listEl, graphHost, keypadEl, announcer } from './layout';
+import { onSheetGraph } from '../ui/canvas';
+import { namesKey, sheetNames } from '../ui/typeset';
 import { lineCalm } from './lineeditor';
 import { batchLayout, renderOut, renderTex, renderExtra } from './lineoutput';
 import { syncListEdges } from './listscroll';
-import { starter, syncListTools } from './listtools';
+import { syncListTools } from './listtools';
+import { layoutCanvas } from './canvas';
+import { syncComposer } from './composer';
 import { narrow } from './platform';
 import { syncRowTabStops } from './rows';
 import { views } from './rowviews';
@@ -22,7 +26,12 @@ export function renderResults(): void {
   const o = opts();
   const pal = curveColors;
   const drawables: Drawable[] = [];
+  /** The example's curves, which draw on its own small graph and never on the sheet's. */
+  const exampleDrawables: Drawable[] = [];
   const chips: GraphChip[] = [];
+  // Typeset lines read a word as letters only where the engine would, which depends on what the sheet defines.
+  const names = sheetNames(doc.rows, results, doc.settings.lineNames);
+  const nk = namesKey(names);
   batchLayout(() => results.forEach((r, k) => {
     const row = doc.rows[k];
     // A focus change can redraw between a sheet's lines changing and its results catching up.
@@ -53,22 +62,26 @@ export function renderResults(): void {
     v.idx.title = r.lineName ? `Line ${k + 1}: use ${r.lineName} for its answer` : '';
     if (graphable && !row.hidden) {
       const math = row.kind === 'expr' ? prettyText(row.text) : undefined;
-      for (const item of r.graph) drawables.push({ rowId: row.id, color, item, label: shown, text: math });
-      chips.push({ id: row.id, color, label: shown, text: math ?? 'table' });
+      const onSheet = onSheetGraph(row);
+      for (const item of r.graph) (onSheet ? drawables : exampleDrawables).push({ rowId: row.id, color, item, label: shown, text: math });
+      if (onSheet) chips.push({ id: row.id, color, label: shown, text: math ?? 'table' });
     }
     renderOut(v, r, o);
-    if (row.kind === 'expr') renderTex(v, row, r);
+    if (row.kind === 'expr') renderTex(v, row, r, names, nk);
     if (row.kind === 'expr') renderExtra(v, row, r, o);
     else renderTableFoot(v, r, o);
   }));
-  const piTicks = wantsPiTicks(doc.rows, results, doc.settings.deg);
   showGraphChips(chips);
   syncGraphSliders();
-  graph.update({ piTicks, degreeWaves: wantsDegreeWaves(doc.rows, results, doc.settings.deg), asymptotes: doc.settings.working, draggables: findDraggables(), items: drawables });
-  const empty = isBlankSheet(doc.rows);
-  if (empty && !starter.isConnected) listEl.append(starter);
-  if (!empty && starter.isConnected) starter.remove();
-  syncListTools(empty);
+  const sheetRows = doc.rows.filter(onSheetGraph);
+  const sheetResults = results.filter((_, k) => doc.rows[k] && onSheetGraph(doc.rows[k]));
+  graph.update({ piTicks: wantsPiTicks(sheetRows, sheetResults, doc.settings.deg), degreeWaves: wantsDegreeWaves(sheetRows, sheetResults, doc.settings.deg), asymptotes: doc.settings.working, draggables: findDraggables(), items: drawables });
+  const exRows = doc.rows.filter((r) => !onSheetGraph(r));
+  const exResults = results.filter((_, k) => doc.rows[k] && !onSheetGraph(doc.rows[k]));
+  exampleGraph.update({ piTicks: wantsPiTicks(exRows, exResults, doc.settings.deg), degreeWaves: wantsDegreeWaves(exRows, exResults, doc.settings.deg), asymptotes: doc.settings.working, items: exampleDrawables });
+  syncListTools(isBlankSheet(doc.rows));
+  layoutCanvas();
+  syncComposer();
   graphHost.setAttribute('aria-label', graphSummary());
   syncMarksHint();
   syncRowTabStops();

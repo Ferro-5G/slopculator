@@ -13,6 +13,7 @@ import { h } from './dom';
 import { addRow, applyFix, asOwnStep, moveRow, deleteRow, nextLine } from './edits';
 import { pulse } from './feedback';
 import { views, focusRow, viewOfInput } from './rowviews';
+import { draftId, editingId } from './composer';
 import { currentResults, rowIndex, doc, results, activeId, rowsChanged, activeInput } from './sheet';
 
 export function commitLine(id: string): void {
@@ -61,7 +62,8 @@ export function rowKeys(e: KeyboardEvent, id: string, input: HTMLInputElement): 
     if (i < doc.rows.length - 1) { e.preventDefault(); focusRow(doc.rows[i + 1].id); }
   } else if (e.key === 'Backspace' && cmdOrCtrl(e) && e.shiftKey) {
     e.preventDefault();
-    deleteRow(id);
+    // A block deleted from the composer leaves the composer on its new line, not on the line above.
+    if (editingId === id) { deleteRow(id, false); focusRow(draftId()); } else deleteRow(id);
   } else if (e.key === 'Backspace' && input.value === '' && doc.rows.length > 1) {
     e.preventDefault();
     deleteRow(id);

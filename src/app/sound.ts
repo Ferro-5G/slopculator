@@ -1,4 +1,4 @@
-import { synth, VARIANTS, type SoundCue } from '../ui/sounds';
+import { VARIANTS, type SoundCue } from '../ui/sounds';
 
 export type Cue = SoundCue;
 
@@ -7,39 +7,25 @@ let out: GainNode | null = null;
 let enabled = true;
 const VOLUME = 0.35;
 const cache = new Map<string, AudioBuffer>();
-/** Rendered samples by rate, cue and variant. They don't need an AudioContext, so they can be made before the first tap. */
-const samples = new Map<string, Float32Array>();
 const last = new Map<Cue, { variant: number; at: number }>();
 
-function render(rate: number, cue: Cue, variant: number): Float32Array {
-  const key = `${rate}:${cue}:${variant}`;
-  let x = samples.get(key);
-  if (!x) samples.set(key, (x = synth(cue, variant, rate)));
-  return x;
-}
-
 /**
- * Renders every sound at a rate while the page is idle, one at a time with a yield between: all of them at
- * once held the main thread for about 100 ms. Keys come first, since they're pressed first.
+ * The recorded clips, each as a data: URL in the bundle (scripts/make-sounds.mjs writes the files). The page is one
+ * file with nothing to fetch, so a clip is read out of its own text when it is first played.
  */
-function warm(rate: number): void {
-  const queue = (Object.keys(VARIANTS) as Cue[]).flatMap((cue) => Array.from({ length: VARIANTS[cue] }, (_, v) => [cue, v] as const));
-  const idle = 'requestIdleCallback' in window;
-  const next = () => (idle ? window.requestIdleCallback(step, { timeout: 3000 }) : setTimeout(step, 50));
-  function step(deadline?: IdleDeadline): void {
-    if (!enabled) return;    do {
-      const item = queue.shift();
-      if (!item) return;
-      render(rate, item[0], item[1]);
-    } while (deadline && !deadline.didTimeout && deadline.timeRemaining() > 8);
-    next();
-  }
-  next();
+const CLIPS = import.meta.glob<string>('../assets/sounds/*.wav', { eager: true, query: '?inline', import: 'default' });
+
+/** A clip's samples and rate, from a 16-bit mono WAV file. */
+function clip(cue: Cue, variant: number): { samples: Float32Array<ArrayBuffer>; rate: number } {
+  const url = CLIPS[`../assets/sounds/${variant === 0 ? cue : `${cue}-${variant}`}.wav`];
+  const text = atob(url.slice(url.indexOf(',') + 1));
+  const bytes = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+  const view = new DataView(bytes.buffer);
+  const samples = new Float32Array((bytes.length - 44) >> 1);
+  for (let i = 0; i < samples.length; i++) samples[i] = view.getInt16(44 + i * 2, true) / 32768;
+  return { samples, rate: view.getUint32(24, true) };
 }
-// Most phones and desktops run audio at 48 kHz. Render for that before anything is pressed; a context that
-// turns out to run at another rate renders its own set when it starts.
-const GUESS_RATE = 48000;
-warm(GUESS_RATE);
 
 export function setSound(on: boolean): void {
   enabled = on;
@@ -49,9 +35,10 @@ function buffer(c: AudioContext, cue: Cue, variant: number): AudioBuffer {
   const key = `${cue}:${variant}`;
   let b = cache.get(key);
   if (!b) {
-    const x = render(c.sampleRate, cue, variant);
-    b = c.createBuffer(1, x.length, c.sampleRate);
-    b.getChannelData(0).set(x);
+    // The buffer keeps the file's own rate, and the context resamples it as it plays.
+    const { samples, rate } = clip(cue, variant);
+    b = c.createBuffer(1, samples.length, rate);
+    b.copyToChannel(samples, 0);
     cache.set(key, b);
   }
   return b;
@@ -69,7 +56,6 @@ function context(): AudioContext {
   out = ctx.createGain();
   out.gain.value = VOLUME;
   out.connect(limiter).connect(ctx.destination);
-  if (ctx.sampleRate !== GUESS_RATE) warm(ctx.sampleRate);
   return ctx;
 }
 

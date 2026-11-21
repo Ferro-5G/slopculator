@@ -70,7 +70,7 @@ function fitRecord(title: string, coef: [string, number, number?][], r: number |
   return record(title, [
     ...coef.map(([label, value, scale]) => ({ label, value: tidy(value, scale) as Value })),
     ...(rt === null ? [] : [{ label: 'r', value: rt as Value }]),
-    { label: r === null ? 'R²' : 'r²', value: rt === 0 ? 0 : tidy(r2, 1) },
+    { label: r === null ? 'R²' : 'r²', value: rt === 0 ? 0 : tidy(r2, 1), key: r === null ? 'R2' : 'r2' },
   ]);
 }
 
@@ -239,12 +239,24 @@ export function registerMore(def: Def): void {
   def('quadreg', {
     min: 2, max: 2, usage: 'quadreg(xs, ys) fits y = ax² + bx + c', fn: (a) => {
       const [xs, ys] = pairs(a, 'quadreg', 3);
-      const S = (p: number) => xs.reduce((s, x) => s + x ** p, 0);
-      const T = (p: number) => xs.reduce((s, x, k) => s + x ** p * ys[k], 0);
+      // Fit in t = (x − m)/w, centered and scaled, then expand back to x. Raw x like 2020…2023 make x⁴ sums whose
+      // matrix looks singular.
+      const m = xs.reduce((p, q) => p + q, 0) / xs.length;
+      const w = maxOf(xs.map((x) => Math.abs(x - m))) || 1;
+      const ts = xs.map((x) => (x - m) / w);
+      const S = (p: number) => ts.reduce((s, t) => s + t ** p, 0);
       const A = [[S(4), S(3), S(2)], [S(3), S(2), S(1)], [S(2), S(1), xs.length]];
       const inv = matInverse(A);
       if (!inv) fail('quadreg needs at least 3 different x values');
-      const [qa, qb, qc] = matMul(inv, [[T(2)], [T(1)], [T(0)]]).map((r) => r[0]);
+      const solve = (zs: number[]): number[] => {
+        const T = (p: number) => ts.reduce((s, t, k) => s + t ** p * zs[k], 0);
+        return matMul(inv, [[T(2)], [T(1)], [T(0)]]).map((r) => r[0]);
+      };
+      // One round of refinement on the residuals takes back most of what the normal equations lose.
+      let [ta, tb, tc] = solve(ys);
+      const [da, db, dc] = solve(ys.map((y, k) => y - (ta * ts[k] * ts[k] + tb * ts[k] + tc)));
+      ta += da; tb += db; tc += dc;
+      const qa = ta / (w * w), qb = tb / w - 2 * qa * m, qc = qa * m * m - (tb / w) * m + tc;
       const my = ys.reduce((p, q) => p + q, 0) / ys.length;
       let ssr = 0, sst = 0;
       xs.forEach((x, k) => { ssr += (ys[k] - (qa * x * x + qb * x + qc)) ** 2; sst += (ys[k] - my) ** 2; });
@@ -505,8 +517,11 @@ export function registerMore(def: Def): void {
       const pts = polyPoints(a, 'area');
       if (pts.length < 3) fail('area needs at least 3 points');
       let s = 0, size = 0;
+      // Measured from the first point, so far-off coordinates don't cancel away the area: x1·y2 − x2·y1 at 1e9 is 1e18.
+      const [x0, y0] = pts[0];
       for (let k = 0; k < pts.length; k++) {
-        const [x1, y1] = pts[k], [x2, y2] = pts[(k + 1) % pts.length];
+        const [px, py] = pts[k], [qx, qy] = pts[(k + 1) % pts.length];
+        const x1 = px - x0, y1 = py - y0, x2 = qx - x0, y2 = qy - y0;
         s += x1 * y2 - x2 * y1;
         size += Math.abs(x1 * y2) + Math.abs(x2 * y1);
       }
@@ -647,6 +662,49 @@ export function registerMore(def: Def): void {
     min: 1, max: 1, usage: 'eigen(A): eigenvalues of a 2×2 or 3×3 matrix', fn: (a, env) => {
       const given = square(mat(a[0]), 'eigen');
       const n = given.length;
+      // A triangular matrix's eigenvalues are its diagonal, exactly. The polynomial route can't hold entries as far
+      // apart as 1e-160 and 1 at once.
+      const upper = given.every((r, i) => r.every((x, j) => j >= i || x === 0));
+      const lower = given.every((r, i) => r.every((x, j) => j <= i || x === 0));
+      if (n <= 3 && (upper || lower)) return list(given.map((r, i) => r[i] || 0).sort((p, q) => p - q));
+      if (n === 2) {
+        // Non-triangular 2×2 (so q and r are both nonzero). A diagonal similarity (q, r) → (q/2^k, r·2^k) preserves
+        // eigenvalues exactly while matching |q| and |r|, so [[0, 1e200], [1e-200, 0]] doesn't underflow when scaled.
+        const [[p, q], [r, s]] = given;
+        const k = Math.round((Math.floor(Math.log2(Math.abs(q))) - Math.floor(Math.log2(Math.abs(r)))) / 2);
+        const k1 = Math.trunc(k / 2), k2 = k - k1;
+        const f1 = Math.pow(2, k1), f2 = Math.pow(2, k2);
+        const qb = (q / f1) / f2;
+        const rb = (r * f1) * f2;
+        const big = Math.max(Math.abs(p), Math.abs(qb), Math.abs(rb), Math.abs(s));
+        // Power-of-2 scaling keeps every mantissa bit exact, so repeated roots like [[3, 1], [-1, 1]] don't pick up rounding noise.
+        const s2 = Math.pow(2, Math.floor(Math.log2(big)));
+        const A = p / s2, B = qb / s2, C = rb / s2, D = s / s2;
+        const halfDiff = 0.5 * (A - D);
+        const halfTrace = 0.5 * (A + D);
+        const disc4 = halfDiff * halfDiff + B * C;
+        const discTol = 1e-14 * (halfDiff * halfDiff + Math.abs(B * C));
+        if (disc4 >= -discTol) {
+          const sd = disc4 <= discTol ? 0 : Math.sqrt(disc4);
+          const l1 = halfTrace >= 0 ? halfTrace + sd : halfTrace - sd;
+          const l1Full = l1 * s2;
+          let l2Full: number;
+          if (Math.abs(halfTrace) <= 0.5 * sd) {
+            l2Full = (halfTrace >= 0 ? halfTrace - sd : halfTrace + sd) * s2;
+          } else {
+            const ad = Math.abs(p) >= Math.abs(s) ? (p / l1Full) * s : p * (s / l1Full);
+            const bc = Math.abs(qb) >= Math.abs(rb) ? (qb / l1Full) * rb : qb * (rb / l1Full);
+            const diff = ad - bc;
+            l2Full = Math.abs(diff) <= 1e-14 * (Math.abs(ad) + Math.abs(bc)) ? 0 : diff;
+          }
+          return list([tidy(l1Full) || 0, tidy(l2Full) || 0].sort((x, y) => x - y));
+        }
+        if (!env.settings.complex) fail('This matrix has complex eigenvalues. Turn on Complex mode to see them');
+        const rawRe = Math.abs(halfTrace) <= 1e-14 * (Math.abs(A) + Math.abs(D)) ? 0 : halfTrace * s2;
+        const re = tidy(rawRe) || 0;
+        const im = tidy(Math.sqrt(-disc4) * s2);
+        return list([complex(re, -im), complex(re, im)]);
+      }
       // Worked out on the matrix divided by its smallest entry, then scaled back: the root finder's idea of "zero" is
       // absolute, so a matrix of 1e-20s came back with made-up imaginary parts. The smallest entry, not the largest,
       // so that a matrix of mixed sizes keeps its small eigenvalues: [[1, 0], [0, 1e20]] still has 1.
@@ -656,7 +714,6 @@ export function registerMore(def: Def): void {
       const m = given.map((r) => r.map((x) => x / scale));
       let coeffs: number[];
       if (n === 1) coeffs = [1, -m[0][0]];
-      else if (n === 2) coeffs = [1, -(m[0][0] + m[1][1]), determinant(m)];
       else if (n === 3) {
         const minors = m[0][0] * m[1][1] - m[0][1] * m[1][0] + m[0][0] * m[2][2] - m[0][2] * m[2][0] + m[1][1] * m[2][2] - m[1][2] * m[2][1];
         coeffs = [1, -(m[0][0] + m[1][1] + m[2][2]), minors, -determinant(m)];

@@ -228,13 +228,23 @@ export class Graph {
     return this.placed && goodSpan(v.xmin, v.xmax) && goodSpan(v.ymin, v.ymax);
   }
 
+  /** How much the canvas the graph sits on is zoomed, so the plot draws at the pixels it covers on screen. */
+  private zoomScale = 1;
+  setZoom(scale: number): void {
+    if (Math.abs(scale - this.zoomScale) < 0.01) return;
+    this.zoomScale = scale;
+    this.resize();
+  }
+
   private resize(): void {
-    const r = this.host.getBoundingClientRect();
+    // Layout size, not the on-screen box: the graph block can sit on a zoomed canvas, and the plot works in its own
+    // pixels (pointer offsets are in them too).
+    const r = { width: this.host.clientWidth, height: this.host.clientHeight };
     if (r.width === 0 || r.height === 0) return;
     const oldW = this.w, oldH = this.h;
     this.w = r.width;
     this.h = r.height;
-    this.dpr = window.devicePixelRatio || 1;
+    this.dpr = (window.devicePixelRatio || 1) * Math.max(0.5, Math.min(2, this.zoomScale));
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     this.canvas.style.width = `${this.w}px`;
@@ -256,7 +266,8 @@ export class Graph {
   }
 
   refreshTheme(): void {
-    this.theme = readTheme(this.host);
+    // A graph block that isn't on the page (nothing draws yet, or it's hidden) reads the page's colors instead.
+    this.theme = readTheme(this.host.isConnected ? this.host : document.body);
     this.sceneKey = '';
     this.redraw();
   }
@@ -449,6 +460,35 @@ export class Graph {
 
   get hoveredRow(): string | null {
     return this.hoverRowId;
+  }
+
+  /** Curves traced faintly, dotted, where they were when a held slider's drag began. */
+  private traces: Drawable[] = [];
+  setTraces(items: Drawable[]): void {
+    if (!items.length && !this.traces.length) return;
+    this.traces = items;
+    this.sceneKey = '';
+    this.redraw();
+  }
+  private drawTraces(): void {
+    const { ctx } = this;
+    for (const d of this.traces) {
+      const it = d.item;
+      if (it.type !== 'fx' && it.type !== 'fy') continue;
+      const runs = it.type === 'fx' ? this.sampleFx(it.f) : this.sampleFy(it.f);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = d.color;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.setLineDash([2, 5]);
+      for (const run of runs) {
+        ctx.beginPath();
+        run.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   private setItems(items: Drawable[]): void {
@@ -688,6 +728,7 @@ export class Graph {
     this.plottedSegs = [];
     this.owners = [];
     for (const d of this.items) clipped(d, () => this.drawFill(d));
+    this.drawTraces();
     for (const d of this.items) {
       const p0 = this.plotted.length, s0 = this.plottedSegs.length;
       clipped(d, () => this.drawStroke(d));
@@ -697,7 +738,7 @@ export class Graph {
     this.drawCurveNames();
     this.ctx = main;
     const live = new Set<unknown>();
-    for (const d of this.items) if ('f' in d.item) live.add(d.item.f); else if (d.item.type === 'region') live.add(d.item.test);
+    for (const d of [...this.items, ...this.traces]) if ('f' in d.item) live.add(d.item.f); else if (d.item.type === 'region') live.add(d.item.test);
     for (const cache of [this.runCache, this.poleCache, this.contourCache, this.fillCache] as Map<unknown, unknown>[])
       for (const k of cache.keys()) if (!live.has(k)) cache.delete(k);
     return animating;
@@ -1292,7 +1333,9 @@ export class Graph {
   private drawCurveNames(): void {
     const { ctx, w, h, theme } = this;
     this.curveNames = [];
-    if (this.isPhone()) return;
+    // Where the plot has no room to name its curves (a phone, or the canvas, whose blocks name them), the names are
+    // still worked out, for the page API and the graph's description, but not painted.
+    const paint = !this.isPhone();
     const rows = new Map<string, { d: Drawable; p0: number; p1: number; s0: number; s1: number }[]>();
     for (const o of this.owners) if (o.d.label) rows.set(o.d.rowId, [...(rows.get(o.d.rowId) ?? []), o]);
     if (!rows.size) return;
@@ -1326,7 +1369,7 @@ export class Graph {
       if (!box && full !== label) { text = label; box = spotFor(label, 3); }
       if (!box) { text = label; box = spotFor(label, 0, true); }
       if (!box) continue;
-      this.nameTag(text, box, line.d.color);
+      if (paint) this.nameTag(text, box, line.d.color);
       this.curveNames.push({ rowId: line.d.rowId, text, box });
     }
   }
@@ -1576,6 +1619,7 @@ export class Graph {
    * treated as the first. toBlob and toDataURL copy the bitmap when called, so fn can hand them straight back.
    */
   private drawn<T>(fn: () => T): T {
+    if (!this.host.isConnected) this.theme = readTheme(document.body);
     const hover = this.hover;
     this.hover = null;
     this.still = true;

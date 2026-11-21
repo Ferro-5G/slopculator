@@ -33,16 +33,16 @@
 
 [data-theme='ink'] {
   --edge-shade: rgb(0 0 0 / 0.6);
-  --glass: rgba(27, 27, 31, 0.82);
-  --glass-strong: rgba(27, 27, 31, 0.97);
-  --menu: #1b1b1f;
-  --label-2: #a1a1aa;
+  --glass: rgba(31, 35, 44, 0.86);
+  --glass-strong: rgba(31, 35, 44, 0.97);
+  --menu: #1f232c;
+  --label-2: #9aa3b2;
   --hover: rgba(255, 255, 255, 0.05);
   --press: rgba(255, 255, 255, 0.1);
   --ok: #4ade80;
   --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.55);
   --key-depth: inset 0 -1px 0 #000000, inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 1px rgba(0, 0, 0, 0.35);
-  --hero-depth: inset 0 -1px 0 #1c48b8, inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px -6px color-mix(in srgb, var(--hero-glow) 45%, transparent);
+  --hero-depth: inset 0 -1px 0 #3f6fe0, inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px -6px color-mix(in srgb, var(--hero-glow) 45%, transparent);
   --blur: blur(16px);
   --active-bar-w: 3px;
   --caret: var(--accent);
@@ -2367,8 +2367,7 @@ dialog.palette::backdrop {
   }
 
   .splitter,
-  .main.view-graph .left,
-  .main:not(.view-graph) .graph-pane {
+  .main.view-graph .left {
     display: none !important;
   }
 

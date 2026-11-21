@@ -1,17 +1,17 @@
 import { USAGE } from '../ui/complete';
-import { DIV } from '../ui/keypad';
 import { play } from './sound';
 import { matrixAddRow } from '../ui/slots';
 import { FLUIDS, TABS, ROW1, type Tile, tileKey, faceRuns, tileLabel, tileCaption, COLUMNS, type Page, tileFor, hasFluidChips, rowsOf, tileHeight, TILE_MAX } from '../ui/thumbindex';
 import { h } from './dom';
 import { pulse } from './feedback';
 import { keyButton, keyHint, cancelKeyHintTimer, clearKeyHintSoon, runKeyAction } from './keypad';
-import { tape, listEl } from './layout';
+import { tape, listEl, composerDock, leftPane } from './layout';
+import { composerHead, composerTabs } from './composer';
 import { openMatrixEditor, openShapeEditor, openVectorEditor } from './editors';
 import { editText, insertFromSearch } from './lineeditor';
 import { narrow, kb } from './platform';
 import { focusLine, views } from './rowviews';
-import { doc, activeId } from './sheet';
+import { activeId } from './sheet';
 
 export const ti = { tab: null as number | null, page: 0, fluid: FLUIDS[0].key.ins! };
 export const tiRows = h('div', { class: 'ti-rows' });
@@ -28,8 +28,6 @@ const TAB_ICONS = [
 ];
 const CLOSE_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>';
 export function buildThumbRows(): void {
-  const div = keyButton(DIV);
-  div.classList.add('ti-div');
   tiTabs.length = 0;
   TABS.forEach((t, i) => {
     const b = h('button', {
@@ -51,10 +49,9 @@ export function buildThumbRows(): void {
     });
     tiTabs.push(b);
   });
-  tiRows.replaceChildren(
-    h('div', { class: 'ti-row', role: 'group', 'aria-label': 'Everyday keys' }, ...ROW1.map((k) => keyButton(k))),
-    h('div', { class: 'ti-row', role: 'group', 'aria-label': 'Function tabs' }, ...(doc.ui.padLeft ? [div, ...tiTabs] : [...tiTabs, div])),
-  );
+  // The everyday row tops the keypad; the tabs sit on the composer's top edge, and ÷ is on the pad.
+  tiRows.replaceChildren(h('div', { class: 'ti-row', role: 'group', 'aria-label': 'Everyday keys' }, ...ROW1.map((k) => keyButton(k))));
+  composerTabs.replaceChildren(...tiTabs);
   syncTabs();
 }
 function syncTabs(): void {
@@ -189,17 +186,27 @@ const DESK_TILE_MAX = 64;
 const DESK_TILE_MIN = 30;
 /** Desktop tiles keep one comfortable size, and the page sits on the keys rather than covering the notebook. */
 const DESK_TILE = 50;
-const FIVE_ACROSS = 560;
 export function placeThumbPage(): void {
   if (ti.tab === null || tiPage.hidden) return;
   const t = TABS[ti.tab];
   const tapeR = tape.getBoundingClientRect(), listR = listEl.getBoundingClientRect();
   const desk = !narrow.matches;
-  const cols = desk && tapeR.width >= FIVE_ACROSS ? 5 : COLUMNS;
+  // Four across on every width, as the canvas design's pages have it.
+  const cols = COLUMNS;
   const rowsAt = (q: Page) => rowsOf(q, cols);
   const sized = desk ? TABS.flatMap((x) => x.pages) : t.pages;
   tiPage.style.setProperty('--ti-cols', String(cols));
-  const foot = listR.top + listEl.clientTop + listEl.clientHeight - tapeR.top;
+  void listR;
+  // Over the canvas, never over the keys or the tabs: on a wide window it rises from the composer's top edge, on a
+  // narrow one it fills the canvas down to the tabs. Placed in the stage (leftPane), measured from it.
+  const dockR = composerDock.getBoundingClientRect();
+  const baseR = (tiPage.offsetParent ?? tape).getBoundingClientRect();
+  const top0 = tapeR.top - baseR.top + TI_TOP;
+  const foot = desk ? dockR.top - baseR.top - 8 : composerHead.getBoundingClientRect().top - baseR.top;
+  if (desk) {
+    tiPage.style.left = `${Math.round(dockR.left - baseR.left)}px`;
+    tiPage.style.width = `${Math.round(dockR.width)}px`;
+  } else tiPage.style.left = tiPage.style.width = '';
   const cs = getComputedStyle(tiPage);
   const px = (name: string) => parseFloat(cs.getPropertyValue(name));
   const fit = (compact: boolean) => {
@@ -209,7 +216,7 @@ export function placeThumbPage(): void {
     const sizeFor = (room: number) => Math.min(...sized.map((q) => Math.floor((room - chrome(q)) / rowsAt(q))));
     return { chrome, sizeFor };
   };
-  const room = foot - TI_TOP;
+  const room = foot - top0;
   const deskNeed = desk ? Math.max(...sized.map((q) => fit(false).chrome(q) + rowsAt(q) * DESK_TILE)) : Infinity;
   if (deskNeed <= room) {
     tiPage.classList.remove('compact', 'scrolling');
@@ -226,19 +233,38 @@ export function placeThumbPage(): void {
   const scrolling = desk && tileH < DESK_TILE_MIN;
   tiPage.classList.toggle('scrolling', scrolling);
   tiPage.style.setProperty('--tile-h', `${scrolling ? DESK_TILE_MIN : tileH}px`);
-  tiPage.style.top = `${TI_TOP}px`;
+  tiPage.style.top = `${top0}px`;
   tiPage.style.height = `${room}px`;
   fitTiles();
 }
-/** Keep the line being edited in view above a desktop page that covers the foot of the notebook. */
+/**
+ * Keep the line being edited in view above a desktop page that covers the foot of the notebook. A notebook that
+ * already scrolls gains room for the whole page, so its last line can come up above it. One that fits gains only what
+ * the line being edited needs, often nothing, so opening a page doesn't give a short notebook a scrollbar. A line
+ * taller than the room left above the page can't show there, so it isn't chased.
+ */
 function revealAbove(cover: number): void {
-  listEl.style.paddingBottom = cover ? `${cover + 8}px` : '';
+  // The line being written is in the composer, under the page, so the canvas has nothing to bring into view.
+  if (listEl.isConnected) return;
+  const top = listEl.scrollTop;
+  listEl.style.paddingBottom = '';
   if (!cover) return;
+  const scrolls = listEl.scrollHeight > listEl.clientHeight;
+  const lr = listEl.getBoundingClientRect();
+  // Dropping the padding can pull scrollTop back, so measure against where the list is now.
+  const at = listEl.scrollTop;
+  const inList = (y: number) => y - lr.top - listEl.clientTop + at;
   const row = (activeId ? views.get(activeId)?.input : undefined)?.closest<HTMLElement>('.row');
-  if (!row) return;
-  const lr = listEl.getBoundingClientRect(), rr = row.getBoundingClientRect();
-  const limit = lr.top + listEl.clientTop + listEl.clientHeight - cover - 8;
-  if (rr.bottom > limit) listEl.scrollTop += rr.bottom - limit;
+  const room = listEl.clientHeight - cover - 8;
+  const rr = row?.getBoundingClientRect();
+  const need = rr && rr.height <= room ? inList(rr.bottom) - room : 0;
+  if (scrolls) listEl.style.paddingBottom = `${cover + 8}px`;
+  else if (need > 0) {
+    const last = listEl.lastElementChild?.getBoundingClientRect().bottom;
+    const end = last === undefined ? 0 : inList(last);
+    listEl.style.paddingBottom = `${Math.max(parseFloat(getComputedStyle(listEl).paddingBottom), listEl.clientHeight + need - end)}px`;
+  }
+  listEl.scrollTop = Math.max(top, need);
 }
 /** A face or name too wide for its tile shrinks to fit rather than run off it: a face to 10 px, a name to 8.25 (¾ of 11, as iOS). */
 function fitTiles(): void {
@@ -258,7 +284,8 @@ export function flashTab(name: string): void {
 }
 
 export function initThumb(): void {
-  tape.append(tiPage);
+  // In the stage, over the canvas and the composer, under nothing: never inside the keys.
+  leftPane.append(tiPage);
   new ResizeObserver(() => placeThumbPage()).observe(tape);
   tiPage.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {

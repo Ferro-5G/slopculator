@@ -4,7 +4,7 @@ import { type AppearancePrefs, type DocRow, type LookName, type SheetView, asObj
 import { deskKeys } from './platform';
 
 export type Row = DocRow;
-export interface DocUI extends AppearancePrefs, SheetView { graph: boolean; keypad: boolean; /** Kept apart from the phone's, which older saves set to hidden on wide windows. */ deskKeypad?: boolean; sound?: boolean; sysKeyboard?: boolean }
+export interface DocUI extends AppearancePrefs, SheetView { graph: boolean; keypad: boolean; /** Kept apart from the phone's, which older saves set to hidden on wide windows. */ deskKeypad?: boolean; sound?: boolean; sysKeyboard?: boolean; }
 export interface Doc {
   rows: Row[];
   settings: Required<Settings>;

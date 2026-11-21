@@ -11,6 +11,8 @@ export const KEYS = {
   pride: 'slopculator:pride',
   left: 'slopculator:left',
   recentFunctions: 'slopculator.recentFunctions',
+  /** Set once the first run's example has been put on a sheet, so it never comes back by itself. */
+  firstRun: 'slopculator:first-run',
 };
 /**
  * localStorage without its exceptions. It throws when site data is blocked (even on reading the property, in some

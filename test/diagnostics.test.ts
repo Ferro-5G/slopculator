@@ -25,11 +25,13 @@ describe('lineWarnings', () => {
   });
   it('flags a fraction whose bottom may run on', () => {
     const w = first('1/2(4)');
-    expect(w.fix).toBe('1/(2(4))');
-    expect(value('1/2(4)')).toBe(2);
-    expect(value(w.fix!)).toBe(0.125);
-    expect(first('1/2x')?.fix).toBe('1/(2x)');
-    expect(first('1/2x^2')?.fix).toBe('1/(2x^2)');
+    expect(w.fix).toBe('1/2*(4)');
+    expect(value('1/2(4)')).toBe(0.125);
+    expect(value(w.fix!)).toBe(2);
+    expect(first('1/2x')?.fix).toBe('1/2*x');
+    expect(first('1/2x^2')?.fix).toBe('1/2*x^2');
+    expect(first('1/2xy')?.message).toContain('xy is under');
+    expect(first('1/2*x')).toBeUndefined();
     expect(first('1/2 + 3')).toBeUndefined();
     expect(first('1/(2x)')).toBeUndefined();
     expect(first('1/sin(30)')).toBeUndefined();
@@ -77,7 +79,7 @@ describe('lineWarnings', () => {
   it('never warns on blanks, headings, or text it cannot read', () => {
     expect(lineWarnings('', { deg: true })).toEqual([]);
     expect(lineWarnings('# -3^2', { deg: true })).toEqual([]);
-    expect(lineWarnings('1 $ 2', { deg: true })).toEqual([]);
+    expect(lineWarnings('1 @ 2', { deg: true })).toEqual([]);
   });
   it('keeps positions and the fix right around outer spaces', () => {
     const w = first('  -3^2 ');
@@ -134,10 +136,10 @@ describe('long expressions in messages', () => {
     expect(w.message).toContain('(1+2+3+4+5+…');
     expect(w.message).not.toContain('11+12');
     expect(w.message.length).toBeLessThan(120);
-    expect(w.fix).toBe('1/(2(1+2+3+4+5+6+7+8+9+10+11+12))');
+    expect(w.fix).toBe('1/2*(1+2+3+4+5+6+7+8+9+10+11+12)');
   });
   it('leaves short ones whole', () => {
-    expect(lineWarnings('1/2x', { deg: true })[0].message).toContain('and x multiplies');
+    expect(lineWarnings('1/2x', { deg: true })[0].message).toContain('x is under the fraction too');
   });
 });
 

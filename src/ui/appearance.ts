@@ -98,7 +98,7 @@ export interface StoredAppearance {
 
 export const MODE_NAMES: [ModePref, string][] = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']];
 
-/** The choices a stored preference makes, reading the old `theme` when the new fields aren't there. */
+/** The choices a stored preference makes, reading the old `theme` when the new fields aren't there. Dark when nothing is stored. */
 export function appearanceOf(p: StoredAppearance): AppearanceChoice {
   if (p.mode) return { mode: p.mode, pureBlack: !!p.pureBlack, contrast: !!p.contrast };
   switch (p.theme) {
@@ -106,7 +106,9 @@ export function appearanceOf(p: StoredAppearance): AppearanceChoice {
     case 'ink': return { mode: 'dark', pureBlack: false, contrast: false };
     case 'oled': return { mode: 'dark', pureBlack: true, contrast: false };
     case 'contrast': return { mode: 'system', pureBlack: false, contrast: true };
-    default: return { mode: 'system', pureBlack: false, contrast: false };
+    case 'system': return { mode: 'system', pureBlack: false, contrast: false };
+    // Slopculator is designed dark first: with nothing chosen, it's dark whatever the system says.
+    default: return { mode: 'dark', pureBlack: false, contrast: false };
   }
 }
 

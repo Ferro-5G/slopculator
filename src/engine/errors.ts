@@ -217,6 +217,13 @@ export const unknownFunctionText = (name: string, hint: string | null = null): s
   `Unknown function "${name}"${hint ? `. Did you mean ${hint}?` : ''}`;
 export const emptyLineText = (name: string): string => `Line ${name} is empty`;
 export const varErrorText = (name: string, message: string): string => `"${name}" has an error: ${message}`;
+/** Every division by zero says this first; some say why after it ("…: total heat is 0"). */
+export const DIVISION_BY_ZERO = 'Division by zero';
+export const divisionByZeroText = (why = ''): string => `${DIVISION_BY_ZERO}${why}`;
+/** what is "√" or "Even root"; complex says Complex mode would give a value. */
+export const notRealText = (what: string, x: number, complex = false): string =>
+  `${what} of a negative number (${x}) isn't real${complex ? '. Turn on Complex mode to get i' : ''}`;
+export const logDomainText = (name: string, x: number): string => `${name} is only defined for positive numbers, got ${x}`;
 const WARNING = 'Warning: ';
 export const warningNote = (text: string): string => `${WARNING}${text}`;
 export const isWarningNote = (note: string): boolean => note.startsWith(WARNING);
@@ -228,6 +235,9 @@ export type ErrorForm =
   | { k: 'arity'; name: string; inputs: string; got: number }
   | { k: 'unknown'; name: string; hint: string | null; example: string | null }
   | { k: 'emptyLine'; name: string }
+  | { k: 'divZero' }
+  | { k: 'notReal' }
+  | { k: 'logDomain'; name: string }
   | { k: 'inVar'; name: string; inner: ErrorForm };
 
 export function readError(message: string): ErrorForm {
@@ -248,6 +258,10 @@ export function readError(message: string): ErrorForm {
     const example = m[1] === 'name' ? /^\. (?:Did you mean [^?]+\? Or define|Define) it on its own line, like (.+)$/.exec(m[3]) : null;
     return { k: 'unknown', name: m[2], hint: /Did you mean ([^?]+)\?/.exec(m[3])?.[1] ?? null, example: example?.[1] ?? null };
   }
+  if (message.startsWith(DIVISION_BY_ZERO)) return { k: 'divZero' };
+  if (/^(?:√|Even root) of a negative number \(.*\) isn't real/.test(message)) return { k: 'notReal' };
+  m = /^(.+?) is only defined for positive numbers, got /.exec(message);
+  if (m) return { k: 'logDomain', name: m[1] };
   m = /^Line ([A-Z]+) is empty/.exec(message);
   return m ? { k: 'emptyLine', name: m[1] } : { k: 'other' };
 }

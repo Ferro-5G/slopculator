@@ -11,6 +11,8 @@ Type one calculation per line. The answer appears beside it.
 - Anything with an `x` is drawn on the graph: `y = 2x + 1`, `x = 3`, `x^2 + y^2 = 16`, `y > x^2`.
 - Start a line with `#` to make a heading.
 - Pasting several lines makes several lines.
+- `y1 ~ m x1 + b` is a regression: it fits `m` and `b` to the lists `x1` and `y1` and draws the fit. With a table headed `x` and `y`, write `y ~ mx + b`.
+- A line copied out of Desmos or typed the way a TI takes it mostly works as it is. [functions.md](functions.md#written-the-way-other-calculators-take-it) lists what is read.
 
 Write math the way you would on paper. `2x`, `3(4 + 5)`, `sin 30`, `√16`, `|x|`, `5!` and `x²` all work. Brackets close themselves, and typing the closing bracket steps over it. Select text and type `(` to wrap it.
 
@@ -28,7 +30,7 @@ The app points out lines that are wrong or that may not mean what you intended, 
 | You type | What happens |
 | --- | --- |
 | `normcdf(1)` | "Did you mean normalcdf?" with a one-click fix. Only close spellings are suggested, so `mi` never becomes `min`. |
-| `-3^2` or `1/2x` | The answer stands, with a **Check this** note and a rewrite that says which reading you get. |
+| `-3^2` or `1/2x` | The answer stands, with a **Check this** note and a rewrite that says which reading you get. As in Desmos, a product written without a sign stays under a `/`: `1/2x` is 1/(2x) and `4/3πr^3` is 4/(3πr³). Write `1/2*x` or `4/3*πr^3` for the other reading. |
 | `2 3` | Read as 2 × 3, with both readings offered: **Use 2 * 3** or **Use 23**. `1 000 000` is a million. |
 | `tax * 2` | "tax isn't defined. Define it on its own line, like tax = 5". |
 | `1,250` | Read as two numbers, with **Use 1250** offered. |
