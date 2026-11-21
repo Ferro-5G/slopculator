@@ -63,6 +63,8 @@ export interface Palette {
   axis: string;
   hatch: boolean;
   glow: boolean;
+  /** Keyboard Glow is on: the keyboard's bed lets the canvas's atmosphere through and the keys take its colour. */
+  keyGlow?: boolean;
   curves: string[];
   flag?: string[];
   tapeBars?: string[];

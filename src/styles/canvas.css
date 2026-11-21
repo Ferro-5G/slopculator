@@ -110,11 +110,37 @@
   letter-spacing: -0.01em;
 }
 #app.canvas-ui > .modebar .sheet-title {
+  position: relative;
   font-size: 15px;
   font-weight: 400;
   color: var(--ink-2);
-  padding-left: 12px;
-  border-left: 1px solid var(--cv-edge-2);
+  margin-left: 0;
+  padding: 4px 10px 4px 14px;
+  border-left: 0;
+  border-radius: 8px;
+  transition: background 0.12s, color 0.12s;
+}
+#app.canvas-ui > .modebar .sheet-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 15px;
+  transform: translateY(-50%);
+  background: var(--cv-edge-2);
+  pointer-events: none;
+}
+#app.canvas-ui > .modebar .sheet-title:hover {
+  background: var(--cv-raised);
+  color: var(--ink);
+}
+[data-theme^='contrast'] #app.canvas-ui > .modebar .sheet-title {
+  margin-left: 4px;
+  padding-left: 10px;
+}
+[data-theme^='contrast'] #app.canvas-ui > .modebar .sheet-title::before {
+  display: none;
 }
 /* The bar's groups are the mockup's segmented controls: a surface, a fine edge, the chosen one raised. One 34 px
    height across every group and button so the top bar sits on a single baseline. */
@@ -679,6 +705,14 @@
 .canvas-ui .rows > .blk-graph .graph-tools .gt-labeled .gl {
   display: none;
 }
+/* Retro hides .gi globally for its old text-only toolbar; in canvas mode the compact graph toolbar uses icons on both looks. */
+[data-look='retro'] .canvas-ui .rows > .blk-graph .graph-tools::before,
+[data-look='retro'] .canvas-ui .rows > .blk-graph .graph-tools button:not(.gt-word) .gl {
+  display: none;
+}
+[data-look='retro'] .canvas-ui .rows > .blk-graph .graph-tools button .gi {
+  display: block;
+}
 .canvas-ui .blk-grip {
   position: absolute;
   left: 0;
@@ -1067,6 +1101,7 @@
   transform: translateX(-50%);
   width: min(680px, calc(100% - var(--cv-keys-w, 352px) - 48px));
   z-index: 22;
+  transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .canvas-ui .composer-head {
   display: flex;
@@ -1115,14 +1150,21 @@
 .canvas-ui .deck-bar.has-ink .deck-ink {
   opacity: 1;
 }
-.canvas-ui .deck-bar .ti-tab .kl,
-.canvas-ui .deck-bar .deck-pad {
+.canvas-ui .deck-bar .composer-tabs,
+.canvas-ui .deck-bar .deck-pad,
+.canvas-ui .deck-bar .deck-kb,
+.canvas-ui .deck-bar .deck-ac {
   position: relative;
   z-index: 2;
 }
+.canvas-ui .deck-bar.has-ink .composer-tabs .key.ti-tab,
 .canvas-ui .deck-bar.has-ink .ti-tab.lit,
-.canvas-ui .deck-bar.has-ink .deck-pad.lit {
-  transition: background-color 0.08s linear 0.22s, color 0.08s linear 0.22s, border-color 0.08s linear 0.22s;
+.canvas-ui .deck-bar.has-ink .deck-pad.lit,
+.canvas-ui .deck-bar.has-ink .deck-kb.lit {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transition: color 0.14s ease;
 }
 [data-look='retro'] .canvas-ui .deck-ink,
 [data-theme^='contrast'] .canvas-ui .deck-ink {
@@ -1281,14 +1323,14 @@
 }
 .canvas-ui .composer-halo {
   position: absolute;
-  inset: -6px;
-  border-radius: calc(var(--cv-radius) + 6px);
+  inset: -8px;
+  border-radius: calc(var(--cv-radius) + 8px);
   pointer-events: none;
   opacity: 0;
   z-index: -1;
   transition: opacity 0.35s;
-  background: conic-gradient(from var(--cv-ang), transparent 0deg, var(--cv-sky) 30deg, var(--cv-accent) 70deg, var(--cv-iris) 110deg, transparent 150deg, transparent 360deg);
-  filter: blur(16px);
+  background: radial-gradient(closest-side at 50% 50%, color-mix(in srgb, var(--cv-accent) 42%, transparent), transparent);
+  filter: blur(18px);
 }
 .canvas-ui .composer[data-state='typing']::before {
   background: color-mix(in srgb, var(--cv-accent) 30%, var(--cv-edge-2));
@@ -1850,11 +1892,15 @@
     font: 600 12px/1 var(--sans);
     cursor: pointer;
   }
-  .canvas-ui .deck-kb:hover {
+  .canvas-ui .deck-kb:hover:not(.lit) {
     color: var(--ink);
     background: var(--cv-raised);
   }
-  .canvas-ui .keypad .deck-ac {
+  .canvas-ui .deck-kb.lit {
+    background: var(--cv-accent);
+    color: var(--hero-ink);
+  }
+  .canvas-ui .keypad .deck-bar .key.deck-ac {
     display: inline-flex;
     flex: none;
     align-items: center;
@@ -1868,11 +1914,11 @@
     background: transparent;
     box-shadow: none;
   }
-  .canvas-ui .keypad .deck-ac .kl {
+  .canvas-ui .keypad .deck-bar .key.deck-ac .kl {
     font: 600 13px/1 var(--sans);
     color: var(--cv-ac);
   }
-  .canvas-ui .keypad .deck-ac:hover {
+  .canvas-ui .keypad .deck-bar .key.deck-ac:hover {
     background: color-mix(in srgb, var(--cv-ac) 12%, transparent);
   }
   /* Tight enough that all five categories fit beside 123 and AC on a 390 px phone, as on iOS. */
@@ -2006,6 +2052,10 @@
 #app.canvas-ui > .modebar .wordmark {
   display: none;
 }
+[data-look='retro'] #app.canvas-ui > .modebar .wordmark {
+  display: inline-flex;
+  align-items: center;
+}
 #app.canvas-ui > .modebar .appear-btn svg {
   display: block;
 }
@@ -2037,7 +2087,8 @@
   }
 }
 @media (max-width: 900px) {
-  #app.canvas-ui > .modebar .brand-name {
+  #app.canvas-ui > .modebar .brand-name,
+  [data-look='retro'] #app.canvas-ui > .modebar .wordmark {
     display: none;
   }
 }
@@ -3553,10 +3604,17 @@ dialog.examples-dialog .sc-lines {
   }
   & dialog.mx,
   & dialog.examples-dialog,
-  & dialog.palette {
+  & dialog.palette,
+  & dialog.help,
+  & dialog.history-dialog {
     background: color-mix(in srgb, var(--panel) 84%, transparent);
     backdrop-filter: blur(28px) saturate(185%);
     -webkit-backdrop-filter: blur(28px) saturate(185%);
+  }
+  & .menu .seg button[aria-pressed='true'] {
+    background: var(--cv-raised);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--cv-edge-2), 0 1px 2px rgb(0 0 0 / 0.18);
   }
   @media (--phone) {
     & #app.canvas-ui .left > .modebar {
@@ -3598,6 +3656,11 @@ dialog.examples-dialog .sc-lines {
   & #app.canvas-ui > .modebar :is(.desk-modes .seg, .cv-tools, .head-pill, .bar-tog, .desk-more, .appear-btn, .help-btn) {
     background: color-mix(in srgb, var(--cv-block) 80%, transparent);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 1px 3px rgb(23 23 26 / 0.06);
+  }
+  & .menu .seg button[aria-pressed='true'] {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgb(23 23 26 / 0.12), 0 0 0 0.5px rgb(23 23 26 / 0.08);
   }
 }
 
@@ -3787,6 +3850,182 @@ dialog.examples-dialog .sc-lines {
     radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
     radial-gradient(46% 52% at 90% 54%, rgba(124, 92, 240, 0.786), transparent 72%);
   opacity: 0.14;
+}
+
+/* ---------- Keyboard Glow: the keys take the deck's color ----------
+   Its own switch, apart from Aurora Glow. The canvas's atmosphere carries on behind the keypad, so the light runs from
+   the canvas down behind the keys with no seam. Each key's cap is tinted with the open deck's color (--kg, set from the
+   deck bar), operators a step stronger; the legends stay as they are. Under Pride colors each key takes its stripe of
+   the flag, running diagonally across the keys (row plus column). The same as keyGlow.ts and the full-screen
+   atmosphere on the phones. */
+:root[data-look='modern'][data-keyglow]:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  & .canvas-ui .keypad {
+    isolation: isolate;
+  }
+  & .canvas-ui .keypad::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background:
+      radial-gradient(70% 70% at 18% 105%, var(--kg, var(--cv-accent)), transparent 75%),
+      radial-gradient(60% 65% at 86% -5%, color-mix(in srgb, var(--kg, var(--cv-accent)) 55%, #8e7bff), transparent 72%);
+    opacity: 0.32;
+  }
+  &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .keypad::before {
+    opacity: 0.22;
+  }
+  &[data-pride] .canvas-ui .keypad::before {
+    background:
+      radial-gradient(40% 60% at 4% 20%, var(--pr-6), transparent 72%),
+      radial-gradient(40% 60% at 30% 100%, var(--pr-5), transparent 72%),
+      radial-gradient(40% 60% at 70% 105%, var(--pr-4), transparent 72%),
+      radial-gradient(40% 60% at 98% 30%, var(--pr-3), transparent 72%);
+    opacity: var(--pr-glow, 0.34);
+  }
+  & .canvas-ui .keypad .pad .key:not(.hero) {
+    --kg-a: 24%;
+    background-image: linear-gradient(color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) var(--kg-a), transparent), color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) var(--kg-a), transparent));
+  }
+  & .canvas-ui .keypad .pad .key.op {
+    --kg-a: 42%;
+  }
+  /* A tab's tiles take its color the same way. */
+  & .canvas-ui .ti-grid .ti-tile {
+    background-image: linear-gradient(color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) 20%, transparent), color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) 20%, transparent));
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+1) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+2) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+3) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+4) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+5) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+6) {
+    --kg-c: var(--pr-6);
+  }
+  /* On a tinted cap an operator's accent-coloured sign would sink into it, so it turns white. */
+  & .canvas-ui .keypad .pad .key.op .kl {
+    color: #fff;
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-5);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+1) {
+    --kg-c: var(--pr-6);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+2) {
+    --kg-c: var(--pr-1);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+3) {
+    --kg-c: var(--pr-2);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+4) {
+    --kg-c: var(--pr-3);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+5) {
+    --kg-c: var(--pr-4);
+  }
+  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+6) {
+    --kg-c: var(--pr-5);
+  }
 }
 
 /* ---------- Pride colors (Modern): the flag in neon, lit the way Aurora Glow is ----------

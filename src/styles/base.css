@@ -713,6 +713,37 @@ dialog h1[tabindex]:focus-visible {
   outline: none;
 }
 
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.help-head h1 {
+  margin: 0;
+}
+
+.help-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 500 20px/1 var(--sans);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.help-close:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
 dialog h2 + table,
 dialog p {
   margin: 0 0 16px;

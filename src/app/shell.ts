@@ -10,7 +10,8 @@ import { lineInputMode } from './rows';
 import { views, focusLine, isLineField } from './rowviews';
 import { barKeypad, barGraph, refreshModeBar } from './settings';
 import { doc, saveSoon } from './sheet';
-import { closeThumb } from './thumb';
+import { closeThumb, syncTabs } from './thumb';
+import { replaceToast } from './toast';
 import { finishPresence, initialPresence, presenceOpen, requestPresence } from '../ui/presence';
 import { registerMotionSettler } from './motion';
 import { layoutCanvas } from './canvas';
@@ -70,6 +71,8 @@ function foldKeypad(open: boolean, glide: boolean): void {
     keypadEl.style.overflow = '';
     if (!open) keypadEl.hidden = true;
     keypadFold = null;
+    if (views.size) layoutCanvas();
+    replaceToast();
   };
   anim.oncancel = () => { if (keypadPresence.generation === next.generation) keypadEl.style.overflow = ''; };
 }
@@ -100,8 +103,8 @@ export function applyUI({ glide = false } = {}): void {
   const onGraph = false;
   const sysKeyboard = !!doc.ui.sysKeyboard;
   const showPad = keypadOn() && !(coarse.matches && sysKeyboard);
-  // On a narrow window with a hardware keyboard (keypad off), keep the compact deck bar docked so categories remain one tap away.
-  const barOnly = narrow.matches && !showPad && !(coarse.matches && sysKeyboard);
+  // On a narrow window without the number pad (hardware or system keyboard), keep the deck bar docked at the same height.
+  const barOnly = narrow.matches && !showPad;
   keypadEl.classList.toggle('bar-only', barOnly);
   foldKeypad(showPad || barOnly, glide);
   keysToggle.setAttribute('aria-expanded', String(keypadOn()));
@@ -110,6 +113,7 @@ export function applyUI({ glide = false } = {}): void {
   for (const v of views.values()) if (v.input) v.input.inputMode = lineInputMode();
   syncers.forEach((s) => s());
   if (onGraph || (!showPad && !barOnly)) closeThumb();
+  syncTabs();
   refreshModeBar();
   syncMobileNav();
   buildMenu();

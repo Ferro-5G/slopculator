@@ -37,6 +37,8 @@ export interface AppearancePrefs {
   color?: ColorPref;
   /** Aurora Glow: the light over the canvas, the composer and the keys. */
   glow?: boolean;
+  /** Keyboard Glow: the keys backlit in the open tab's color (the flag's under Pride), on its own switch. */
+  keyGlow?: boolean;
   pride?: boolean;
   padLeft?: boolean;
 }
@@ -145,6 +147,7 @@ export function cleanAppearance(raw: Record<string, unknown>): AppearancePrefs {
     ...(graphRate ? { graphRate } : {}),
     ...(color ? { color } : {}),
     ...(typeof raw.glow === 'boolean' ? { glow: raw.glow } : {}),
+    ...(typeof raw.keyGlow === 'boolean' ? { keyGlow: raw.keyGlow } : {}),
     ...(typeof raw.pride === 'boolean' ? { pride: raw.pride } : {}),
     ...(typeof raw.padLeft === 'boolean' ? { padLeft: raw.padLeft } : {}),
   };

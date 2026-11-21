@@ -88,7 +88,10 @@ export function showHelp(): void {
   const dialog = h('dialog', { class: 'help' },
     h('form', { method: 'dialog' },
       // Focus lands on the title, so the dialog opens at the top instead of scrolled to Close.
-      h('h1', { tabindex: '-1', autofocus: true }, 'Keyboard shortcuts'),
+      h('div', { class: 'help-head' },
+        h('h1', { tabindex: '-1', autofocus: true }, 'Keyboard shortcuts'),
+        h('button', { type: 'submit', class: 'help-close', 'aria-label': 'Close', title: 'Close (Esc)' }, '×'),
+      ),
       ...groups.flatMap(([title, rows]) => [
         h('h2', {}, title),
         h('table', {}, ...rows.map(([k, d]) => h('tr', {}, h('th', {}, h('kbd', {}, kb(k))), h('td', {}, kb(d))))),

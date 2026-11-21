@@ -4,6 +4,13 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.2-alpha] - 2026-11-21
+
+- Keyboard Glow, on its own switch beside Aurora Glow in Appearance: keys softly take on the open tab's color, and the canvas's atmosphere continues behind the keypad.
+- Switching to the system keyboard (`ABC`) keeps the deck bar in place at the same height, with `ABC` beside `123` and `AC`, instead of swapping in a separate row above the composer.
+- Desktop polish: tab labels stay visible while the active pill slides across them, hiding the keypad re-centers the composer and any open toast, the composer's glow is even on dark and light themes, the sheet title keeps a clean divider beside the logo, and Retro shows its wordmark and graph toolbar icons again.
+- Appearance controls (`Mode` and `Number pad` Left | Right) read clearly in dark and light, `Help` and `History` match the frosted dialogs with a close button on `Help`, and the landing page shows the canvas screenshots.
+
 ## [0.2.1-alpha] - 2026-11-21
 
 - Function tabs open in place: Math, Stats, Chance, Matrix and HVAC swap the keypad for that tab's keys, with a 123 pill to come back, the tab's pages along the top, and its builder first. The canvas stays in view the whole time.

@@ -86,9 +86,10 @@ function graphShown(): boolean {
 function blockEl(id: string): HTMLElement | undefined {
   return id === GRAPH_BLOCK ? graphPane : id === EXAMPLE_GRAPH ? exampleGraphPane : id === PSYCH_BLOCK ? psychBlock : views.get(id)?.el;
 }
+const keypadVisible = (): boolean => !keypadEl.hidden && keypadEl.dataset.presence !== 'exiting' && keypadEl.dataset.presence !== 'exited';
 /** The part of the viewport the composer and keypad leave free, in viewport pixels. */
 function freeArea(): Rect {
-  const keys = !keypadEl.hidden && keypadEl.offsetParent ? keypadEl.offsetWidth : 0;
+  const keys = keypadVisible() && keypadEl.offsetParent ? keypadEl.offsetWidth : 0;
   // Under the top bar, which floats over the canvas.
   const top = modeBar.parentElement === app ? modeBar.offsetHeight + 8 : 0;
   return wideFreeArea({ w: tape.clientWidth, h: tape.clientHeight }, top, keys, composerDock.offsetHeight);
@@ -195,7 +196,7 @@ export function layoutCanvas(): void {
   for (const el of [exampleFrame, ghost]) if (el.parentElement !== listEl) listEl.prepend(el);
   if (svg.parentNode !== listEl) listEl.prepend(svg);
   // The composer centres in the room the keypad leaves.
-  app.style.setProperty('--cv-keys-w', !keypadEl.hidden && wide() ? `${KEYS_ROOM}px` : '0px');
+  app.style.setProperty('--cv-keys-w', keypadVisible() && wide() ? `${KEYS_ROOM}px` : '0px');
   for (const v of views.values()) if (!watched.has(v.el)) { watched.add(v.el); blockSizes?.observe(v.el); }
   if (tagLayer.parentElement !== listEl) listEl.append(tagLayer);
   // Tags and steps first: a narrow column keeps room above a block a tag rides into, and a wide line for its steps.
@@ -216,7 +217,7 @@ export function layoutCanvas(): void {
 /** Where the composer and the keys sit over the canvas, in its own coordinates at the default view. */
 function overlays(): Rect[] {
   const t = tape.getBoundingClientRect();
-  return [composerDock, ...(!keypadEl.hidden && keypadEl.offsetParent ? [keypadEl] : [])].map((el) => {
+  return [composerDock, ...(keypadVisible() && keypadEl.offsetParent ? [keypadEl] : [])].map((el) => {
     const r = el.getBoundingClientRect();
     return { x: r.left - t.left, y: r.top - t.top, w: r.width, h: r.height };
   }).filter((r) => r.w > 0 && r.h > 0);

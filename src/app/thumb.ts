@@ -13,7 +13,7 @@ import { openBuilder } from './editors';
 import { editText, insertFromSearch } from './lineeditor';
 import { coarse, narrow, kb } from './platform';
 import { focusLine, views } from './rowviews';
-import { activeId } from './sheet';
+import { activeId, doc } from './sheet';
 import { toggleSysKeyboard } from './shell';
 
 export const ti = { tab: null as number | null, page: 0, fluid: FLUIDS[0].key.ins! };
@@ -29,7 +29,10 @@ const deckPadBtn = h('button', {
 }, '123');
 deckPadBtn.addEventListener('mousedown', (e) => e.preventDefault());
 deckPadBtn.addEventListener('click', () => {
-  if (ti.tab !== null) {
+  if (coarse.matches && doc.ui.sysKeyboard) {
+    closeThumb();
+    toggleSysKeyboard();
+  } else if (ti.tab !== null) {
     play('toggle');
     closeThumb();
   }
@@ -100,19 +103,25 @@ export function buildThumbRows(): void {
   }
   syncTabs();
 }
-function syncTabs(): void {
-  const onPad = ti.tab === null;
-  // Aurora Glow takes the open deck's color (the number pad's is the accent); the dock, and the canvas behind the
+export function syncTabs(): void {
+  const onKb = coarse.matches && !!doc.ui.sysKeyboard;
+  const onPad = !onKb && ti.tab === null;
+  // Aurora Glow and Keyboard Glow take the open deck's color (the number pad's is the accent); the dock, and the canvas behind the
   // blocks, glide between them.
-  const deckColor = onPad ? 'var(--cv-accent)' : `var(--tab-${ti.tab})`;
+  const deckColor = onPad || onKb ? 'var(--cv-accent)' : `var(--tab-${ti.tab})`;
   composerDock.style.setProperty('--au-a', deckColor);
   tape.style.setProperty('--au-deck', deckColor);
+  // Keyboard Glow backlights the keys in the same color.
+  keypadEl.style.setProperty('--kg', deckColor);
+  tiPage.style.setProperty('--kg', deckColor);
   deckPadBtn.classList.toggle('lit', onPad);
   deckPadBtn.setAttribute('aria-pressed', String(onPad));
-  deckPadBtn.setAttribute('aria-label', onPad ? 'Number pad' : `Close ${TABS[ti.tab!].name}`);
+  deckPadBtn.setAttribute('aria-label', onPad ? 'Number pad' : onKb ? 'Use number pad' : `Close ${TABS[ti.tab!].name}`);
+  deckKbBtn.classList.toggle('lit', onKb);
+  deckKbBtn.setAttribute('aria-pressed', String(onKb));
   tiTabs.forEach((b, i) => {
-    b.classList.toggle('lit', ti.tab === i);
-    b.setAttribute('aria-expanded', String(ti.tab === i));
+    b.classList.toggle('lit', !onKb && ti.tab === i);
+    b.setAttribute('aria-expanded', String(!onKb && ti.tab === i));
   });
 }
 /** Where the ink is now (still moving, or on the selected deck's button), in the deck bar's own coordinates. */
@@ -158,6 +167,7 @@ function slideInk(from: Ink | null): void {
 }
 
 export function toggleTab(i: number, keyboard = false): void {
+  if (coarse.matches && doc.ui.sysKeyboard) toggleSysKeyboard();
   if (ti.tab === i) { closeThumb(); return; }
   const was = ti.tab;
   const ink = inkStart(was);
