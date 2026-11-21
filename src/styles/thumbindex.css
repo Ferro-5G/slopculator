@@ -63,44 +63,78 @@
 
 .ti-page:not([hidden]) {
   position: absolute;
-  left: 6px;
-  right: 6px;
-  z-index: 8;
+  inset: 0;
+  z-index: 4;
   display: flex;
   flex-direction: column;
-  /* placeThumbPage reads these to size the tiles (thumb.ts sets --tile-h and --ti-cols from them). */
-  --ti-strip: 44px;
-  --ti-strip-compact: 34px;
-  --ti-chips: 36px;
-  --ti-chips-compact: 30px;
+  /* placeThumbPage sets --tile-h and --ti-cols. */
+  --ti-strip: 32px;
+  --ti-strip-compact: 30px;
+  --ti-note: 20px;
+  --ti-chips: 32px;
+  --ti-chips-compact: 28px;
   --ti-gap: 6px;
   --ti-gap-compact: 4px;
-  --ti-pad: 8px;
-  --ti-pad-compact: 4px;
+  --ti-pad: 0px;
+  --ti-pad-compact: 0px;
   --ti-grid-top: 2px;
-  padding: 0 var(--ti-pad) var(--ti-pad);
-  border: 1px solid var(--rule-2);
-  border-radius: 14px;
-  background: var(--menu);
-  box-shadow: var(--shadow-float);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .ti-page.compact {
-  padding: 0 var(--ti-pad-compact) var(--ti-pad-compact);
+  padding: 0;
 }
 
+.ti-note {
+  flex: none;
+  height: var(--ti-note);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  font: 400 12px/1.2 var(--sans);
+  color: var(--ink-3);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ti-note-sig {
+  flex: none;
+  font: 600 12px/1.2 var(--mono);
+  color: var(--ink);
+}
+
+.ti-note-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+
+.ti-page.compact .ti-note {
+  display: none;
+}
+
+/* A deck slides in from the side of the tab it came from (--ti-dx: 1 from the left, -1 from the right, 0 straight in),
+   sideways only so it stays stacked under the deck bar. Timing mirrors DURATIONS.deckSlide and CURVES.snap in
+   src/ui/motiontokens.ts. */
 .ti-page.ti-in {
-  animation: ti-in 0.16s ease-out both;
+  animation: ti-in 0.22s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 @keyframes ti-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateX(calc(var(--ti-dx, 0) * 14px)) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: translateX(0) scale(1);
   }
 }
 
@@ -108,8 +142,9 @@
   flex: none;
   height: var(--ti-strip);
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: stretch;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 3px;
 }
 
 .ti-page.compact .ti-strip {
@@ -117,37 +152,132 @@
 }
 
 .ti-segs {
+  position: relative;
   flex: 1;
   min-width: 0;
-  height: 32px;
+  height: 100%;
   display: flex;
+  align-items: stretch;
   gap: 2px;
-  padding: 2px;
-  border-radius: 9px;
-  background: var(--well);
-  box-shadow: inset 0 0 0 1px var(--rule);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ti-segs::-webkit-scrollbar {
+  display: none;
 }
 
 .ti-seg {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0 1px;
+  position: relative;
+  flex: none;
+  height: 100%;
+  padding: 0 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 0;
   background: transparent;
-  font: 500 13px/1 var(--sans);
+  font: 500 12.5px/1 var(--sans);
   letter-spacing: -0.01em;
-  color: var(--ink-2);
+  color: var(--ink-3);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.ti-seg:hover:not([aria-selected='true']) {
+  color: var(--ink);
 }
 
 .ti-seg[aria-selected='true'] {
-  background: var(--panel);
+  background: transparent;
   color: var(--ink);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14), 0 0 0 1px var(--rule);
+}
+
+.ti-seg[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tab);
+}
+
+/* The page underline slides from the page you left to the one you chose; each page's own underline waits under it. */
+.ti-ink {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--tab);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ti-segs.has-ink .ti-ink {
+  opacity: 1;
+}
+
+.ti-segs.has-ink .ti-seg[aria-selected='true']::after {
+  visibility: hidden;
+}
+
+[data-look='retro'] .ti-ink,
+[data-theme^='contrast'] .ti-ink {
+  display: none;
+}
+
+.ti-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ti-gap, 6px);
+  padding-top: 4px;
+  scrollbar-width: thin;
+}
+
+.ti-tile.ti-hero {
+  flex: none;
+  width: 100%;
+  min-height: 46px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  gap: 10px;
+  text-align: left;
+  border-radius: 12px;
+}
+
+.ti-hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 1px;
+}
+
+.ti-hero-chev {
+  flex: none;
+  font: 600 18px/1 var(--sans);
+  color: var(--tab);
+  opacity: 0.9;
+}
+
+.ti-page.ti-deck .ti-grid {
+  margin-top: 0;
+  grid-auto-rows: var(--tile-h, 44px);
+}
+
+@media (--phone) {
+  .ti-page.ti-deck:not([hidden]) {
+    padding: 0;
+  }
 }
 
 .ti-title {
@@ -179,6 +309,11 @@
 
 .ti-page.compact .ti-close {
   height: 34px;
+}
+
+.ti-close:hover {
+  background: var(--hover);
+  color: var(--ink);
 }
 
 .ti-close:active {
@@ -242,19 +377,103 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 0 3px;
-  border: 0;
+  gap: 2px;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--rule) 75%, transparent);
   border-radius: 12px;
   background: var(--key-fn);
   box-shadow: var(--key-depth);
   color: var(--key-fn-ink);
-  transition: background 0.1s, transform 0.09s;
+  transition: background 0.12s, border-color 0.12s, transform 0.09s;
+}
+
+.ti-tile:hover {
+  background: color-mix(in srgb, var(--key-fn) 88%, var(--tab) 12%);
+  border-color: color-mix(in srgb, var(--tab) 48%, var(--rule-2));
 }
 
 .ti-tile:active {
   transform: scale(0.96);
-  background: color-mix(in srgb, var(--key-fn) 88%, var(--ink));
+  background: color-mix(in srgb, var(--key-fn) 85%, var(--ink));
+}
+
+/* Modern tiles are keycaps: the keys' specular depth in place of a ruled border, and their press physics
+   (PRESS_DEPTH and CURVES.pressIn in src/ui/motiontokens.ts). High contrast and Retro keep their ruled tiles. */
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile {
+  border-color: transparent;
+  box-shadow: var(--key-depth-fn, var(--key-depth));
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile:active {
+  transform: scale(0.955);
+  background: var(--key-fn);
+  box-shadow: var(--key-press-sheen, none);
+  transition: background 0.06s, box-shadow 0.06s, transform 0.06s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile.ti-hero:active {
+  transform: scale(0.975);
+}
+
+/* Sculpted tiles: the function keys' squircle, machined top edge and 2 px lip. A press drops the tile 1.5 px onto its
+   lip, which shrinks to match; with motion Reduced or Off it only shades. The scroll keeps room under the last row so
+   its lip shows. */
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile {
+  border-radius: 12px;
+}
+
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-scroll {
+  padding-bottom: 4px;
+}
+
+:root[data-look='modern']:is([data-theme='ink'], [data-theme='oled']) .ti-tile {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #050609, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+}
+
+:root[data-look='modern']:is([data-theme='ink'], [data-theme='oled']) .ti-tile:active {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 100px rgba(255, 255, 255, 0.04), 0 0.5px 0 #050609;
+}
+
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .ti-tile {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 0 rgba(23, 23, 26, 0.11), 0 2px 3px rgba(23, 23, 26, 0.06);
+}
+
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .ti-tile:active {
+  box-shadow: inset 0 1px 2px rgba(23, 23, 26, 0.14), inset 0 0 0 100px rgba(23, 23, 26, 0.035), 0 0.5px 0 rgba(23, 23, 26, 0.14);
+}
+
+:root[data-look='modern']:not([data-theme^='contrast'], [data-motion='off'], [data-motion='reduced']) .ti-tile:active {
+  transform: translateY(1.5px) scale(0.955);
+}
+
+:root[data-look='modern']:not([data-theme^='contrast'], [data-motion='off'], [data-motion='reduced']) .ti-tile.ti-hero:active {
+  transform: translateY(1.5px) scale(0.975);
+}
+
+.ti-tile.ti-editor {
+  background: color-mix(in srgb, var(--tab) 10%, var(--key-fn));
+  border: 1px dashed color-mix(in srgb, var(--tab) 52%, var(--rule-2));
+}
+
+.ti-tile.ti-editor:hover {
+  background: color-mix(in srgb, var(--tab) 18%, var(--key-fn));
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--tab) 70%, var(--rule-2));
+}
+
+/* The builder card: a clean solid rim in its category's color. */
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile.ti-editor {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--tab) 40%, var(--rule-2));
+}
+
+:root[data-look='modern']:not([data-theme^='contrast']) .ti-tile.ti-editor:hover {
+  border-color: color-mix(in srgb, var(--tab) 70%, var(--rule-2));
+}
+
+.ti-tile.ti-editor .ti-face {
+  font-weight: 600;
 }
 
 .ti-face,
@@ -276,7 +495,7 @@
 
 .ti-name {
   font: 11px/1.15 var(--mono);
-  color: var(--tab-name);
+  color: var(--ink-3);
 }
 
 .ti-page.compact .ti-name {
@@ -347,29 +566,20 @@
 
 @media (--desktop) {
   .ti-page.scrolling .ti-grid {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden auto;
     align-content: start;
     padding-bottom: 2px;
   }
 
   .ti-page:not([hidden]) {
-    --ti-pad: 10px;
-    --ti-pad-compact: 10px;
-    left: 8px;
-    right: 8px;
-    padding: 0 10px 10px;
-    border-radius: 12px;
+    padding: 0;
   }
 
   .ti-strip {
     height: var(--ti-strip);
-    gap: 8px;
   }
 
   .ti-segs {
-    height: 30px;
+    height: 100%;
   }
 
   .ti-seg {

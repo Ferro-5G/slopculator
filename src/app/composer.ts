@@ -2,7 +2,7 @@
 // being edited, so every line editor (completion, slots, fixes, the keypad, the tabs) works there as it always has.
 // Enter sends a draft to the canvas as a block, finishes an edit, or changes the line that already defines a name.
 import { composerIntent, composerPlaceholder, GRAPH_PREVIEW_LABEL, updatePreviewRows } from '../ui/canvas';
-import { composerAnswer, composerError, composerGlows, composerQuietFigure, composerSpark, composerState, sparkPath } from '../ui/composerline';
+import { composerAnswer, composerError, composerGlows, composerQuietFigure, composerSpark, composerState, sparkPath, type ComposerState } from '../ui/composerline';
 import { mirrorField } from './composermirror';
 import { isEmptyLine } from '../ui/document';
 import { AC, ENTER } from '../ui/keypad';
@@ -10,7 +10,7 @@ import { flashBlock, liftFrom } from './canvas';
 import { blankRow } from './docmodel';
 import { h } from './dom';
 import { addRow, dragEnds, pushStep, setEnterHandler, setLineText } from './edits';
-import { pulse } from './feedback';
+import { motionNow, pulse } from './feedback';
 import { slotForEnd } from '../ui/slots';
 import { slotInfo } from '../ui/linestate';
 import { keyButton } from './keypad';
@@ -20,6 +20,7 @@ import { views, focusRow, setFocusGuard } from './rowviews';
 import { setTypingPauseListener } from './rows';
 import { doc, opts, rowIndex, results, screen, renderNow, setEvalRows } from './sheet';
 import { ti, closeThumb } from './thumb';
+import { CURVES, DURATIONS } from '../ui/motiontokens';
 
 /** The composer's sparkline, as the mockup draws it. */
 const SPARK_W = 66, SPARK_H = 24;
@@ -42,7 +43,22 @@ export const composerBox = h('div', { class: 'composer', 'data-state': 'idle' },
 export const composerTabs = h('div', { class: 'composer-tabs', role: 'group', 'aria-label': 'Function tabs' });
 const acBtn = keyButton(AC);
 acBtn.classList.add('composer-ac');
-export const composerHead = h('div', { class: 'composer-head' }, composerTabs, h('span', { class: 'spacer' }), acBtn);
+export const composerHead = h('div', { class: 'composer-head' }, h('span', { class: 'spacer' }), acBtn);
+
+/** The state the composer showed last, so its answer rises in only when it first appears. */
+let shownState: ComposerState = 'idle';
+/** Set by a send: the cleared line takes a breath in on the next sync. */
+let breathe = false;
+/**
+ * Aurora Glow's atmosphere drifts once and rests; a change (the line's state, the open deck) sets it drifting again.
+ * Restarted by taking the class off and back on, with a reflow between.
+ */
+export function stirAurora(): void {
+  if (motionNow() !== 'full') return;
+  composerBox.classList.remove('stir');
+  void composerBox.offsetWidth;
+  composerBox.classList.add('stir');
+}
 
 /** The draft row, kept as the sheet's last line: added when a sheet has none, which also covers one loaded or undone. */
 export function draftId(): string {
@@ -127,6 +143,7 @@ function enter(id: string): boolean {
   }
   // The typed line becomes a block where the composer is; it settles into its place on the canvas from there.
   liftFrom(id, views.get(id)?.el.getBoundingClientRect() ?? null);
+  breathe = true;
   const next = addRow(id, { kind: 'expr', text: '' });
   draftRow = next;
   return true;
@@ -142,6 +159,8 @@ export function syncComposer(): void {
   const calm = !!v?.calm;
   const intent = !editingId && text ? composerIntent(text, doc.rows, null, id) : null;
   const state = composerState(text, r, { calm, update: intent?.kind === 'update' });
+  const was = shownState;
+  shownState = state;
   composerBox.dataset.state = state;
   composerBox.classList.toggle('lit', composerGlows(state));
   // An error only once typing pauses, short and whole on the row (composerError).
@@ -151,7 +170,7 @@ export function syncComposer(): void {
   // A figure line's table (the unit circle's, the tangent's) takes no room at all: it would wrap the line.
   composerBox.classList.toggle('quiet-figure', composerQuietFigure(text, r));
   composerBox.classList.toggle('editing', !!editingId);
-  enterWord(editingId ? 'Update' : intent?.kind === 'update' ? `Update ${intent.name}` : 'enter');
+  enterWord(editingId ? 'Update' : intent?.kind === 'update' ? `Update ${intent.name}` : 'ENTER');
   enterBtn.title = editingId ? kb('Keep the change (Enter)') : intent?.kind === 'update' ? `Change the line that defines ${intent.name} (Enter)` : kb('Send the line (Enter)');
   cancelBtn.hidden = !editingId;
   // A line that draws shows a sparkline of its curve in its color, where a value shows its answer.
@@ -175,6 +194,29 @@ export function syncComposer(): void {
   }
   if (v?.input) v.input.placeholder = editingId ? '' : composerPlaceholder(doc.rows.filter((x) => x.id !== draftRow));
   mirrorField(v?.input);
+  settleMotion(v?.el, was, state);
+}
+
+/**
+ * The composer's small moments, all on a change and never per keystroke: the live answer rises in when the line first
+ * works out (DURATIONS.answerAppear), the line cleared by a send breathes in (DURATIONS.clearBreath), and the
+ * atmosphere stirs when the state changes. Reduced motion keeps the fades and drops the travel.
+ */
+function settleMotion(el: HTMLElement | undefined, was: ComposerState, state: ComposerState): void {
+  const m = motionNow();
+  const fresh = breathe;
+  breathe = false;
+  if (was !== state) stirAurora();
+  if (!el || m === 'off') return;
+  const still = m !== 'full';
+  if (fresh) {
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: DURATIONS.clearBreath, easing: CURVES.fade });
+    return;
+  }
+  const out = el.querySelector<HTMLElement>('.out');
+  if (state === 'ok' && was !== 'ok' && out && !composerBox.classList.contains('no-answer')) {
+    out.animate(still ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: DURATIONS.answerAppear, easing: CURVES.settle });
+  }
 }
 
 export function initComposer(): void {

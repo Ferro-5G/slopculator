@@ -100,6 +100,11 @@ describe('unfoldSteps', () => {
     expect(brief(unfold('a = 2', 'b = 3', 'r = 2(a + b) - 1'))).toEqual([['0.1', 'a + b', '5'], ['0', '2(a + b)', '10']]);
     expect(brief(unfold('a = 2', 'b = 3', 'r = 2 · (a · b)'))).toEqual([['1', 'a · b', '6']]);
   });
+  it('shows order-of-operations steps for chained divisions and mixed × / ÷', () => {
+    expect(brief(unfold('5 / 5 * 56'))).toEqual([['0', '5 / 5', '1']]);
+    expect(brief(unfold('5 / 5 / 5 * 66'))).toEqual([['0.0', '5 / 5', '1'], ['0', '5 / 5 / 5', '0.2']]);
+    expect(brief(unfold('5 * 5 / 5'))).toEqual([['0', '5 * 5', '25']]);
+  });
   it("leaves a binder's inputs alone: they mean nothing outside it", () => {
     expect(brief(unfold('a = 3', 's = sum(n^2, n, 1, a) + 1'))).toEqual([['0', 'sum(n^2, n, 1, a)', '14']]);
   });

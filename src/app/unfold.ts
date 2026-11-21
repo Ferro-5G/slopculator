@@ -11,6 +11,7 @@ import { motionNow } from './feedback';
 import { mathNode } from './mathdom';
 import { views } from './rowviews';
 import { doc, opts, results, saveSoon } from './sheet';
+import { STAGGER } from '../ui/motiontokens';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -80,10 +81,24 @@ function markSpan(id: string, span: readonly [number, number] | null): void {
   }
 }
 
-function stepEl(o: OpenLine, sid: string): HTMLElement {
+function stepEl(o: OpenLine, sid: string, i: number): HTMLElement {
   let el = o.steps.get(sid);
   if (el) return el;
   el = h('div', { class: 'cv-step', role: 'listitem', tabindex: '-1' }, h('div', { class: 'sm' }), h('div', { class: 'sv' }, h('span', { class: 'v' }), h('span', { class: 'd' })));
+  // A new step unfolds a beat after the one above it; the class goes once it has, so a later flash replays cleanly.
+  if (motionNow() === 'full') {
+    const step = el;
+    step.classList.add('enter');
+    step.style.setProperty('--i', String(Math.min(i, STAGGER.maxIndex)));
+    const done = (e: AnimationEvent) => {
+      if (e.animationName !== 'cv-step-in') return;
+      step.classList.remove('enter');
+      step.removeEventListener('animationend', done);
+      step.removeEventListener('animationcancel', done);
+    };
+    step.addEventListener('animationend', done);
+    step.addEventListener('animationcancel', done);
+  }
   const show = (on: boolean) => {
     el!.classList.toggle('full', on);
     const s = o.u.steps.find((x) => x.id === sid);
@@ -162,9 +177,9 @@ export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean,
     const changed = drag && o.prev ? changedSteps(o.prev, u) : new Set<string>();
     const reached = drag ? stepsReached(u, drag.names) : null;
     const moved = o.start ? stepDeltas(o.start, u) : new Map<string, string>();
-    for (const sid of ids) {
+    for (const [i, sid] of ids.entries()) {
       const s = u.steps.find((x) => x.id === sid)!;
-      const el = stepEl(o, sid);
+      const el = stepEl(o, sid, i);
       if (o.texts.get(sid) !== s.text) {
         const boxes = typeset(s.text, { stack: true, names: sheetNames });
         el.querySelector('.sm')!.replaceChildren(boxes ? mathNode(boxes) : s.text);

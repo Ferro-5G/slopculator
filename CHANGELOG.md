@@ -4,6 +4,17 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.1-alpha] - 2026-11-21
+
+- Function tabs open in place: Math, Stats, Chance, Matrix and HVAC swap the keypad for that tab's keys, with a 123 pill to come back, the tab's pages along the top, and its builder first. The canvas stays in view the whole time.
+- Builders for what's awkward to type: a guided builder for calculus, the normal curve, data lists, probability and HVAC, each with a live preview of the line and its answer, and better Shape and Vector builders. Matrices go through the Matrix builder (with 2 × 2, 3 × 3 and 4 × 4 sizes, Identity and Clear), including from a `Build matrix…` chip inside `det()`, `inv()`, `rref()` and the other matrix functions.
+- A new look: deeper dark and warmer light colors, frosted blocks and composer, Deg and Rad on one sliding switch, and lines that fade out under the top bar and the composer instead of stopping at a hard edge. A sent line glides from the composer into its block.
+- Aurora Glow, in Appearance: the canvas and the composer take the open tab's color. The light runs the whole way round the composer, so both ends of it match.
+- Pride colors on Modern are now light rather than paint: the flag in neon glows round the canvas's edges and the composer, Enter wears it, and a stripe of it runs under the tabs. The keys keep their theme's colors, and the logo stays the logo.
+- History has its own button beside File. File no longer holds Clear all (AC and Ctrl+Alt+Backspace clear every line, and Undo brings them back), and the first run's example is back under Examples as **Welcome example**.
+- On a 390 px phone screen all five tabs fit beside 123 and AC. Below 390 px, Find becomes a magnifier so the top bar fits.
+- The canvas no longer zooms out on its own when you click something outside it, a slider sits beside the curve it drives instead of across the canvas, a value block drags by its answer without copying it, and the top bar's controls are one height.
+
 ## [0.2.0-alpha] - 2026-11-18
 
 - Deg and Rad keep one size when you switch between them.
@@ -65,7 +76,8 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.0-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.1-alpha...HEAD
+[0.2.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.0-alpha...v0.2.1-alpha
 [0.2.0-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.2-alpha...v0.2.0-alpha
 [0.1.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.1-alpha...v0.1.2-alpha
 [0.1.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.0-alpha...v0.1.1-alpha

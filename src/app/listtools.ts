@@ -1,6 +1,8 @@
 import { COMBINE_OPS } from '../ui/combine';
-import { STARTERS, starterRows, type StarterId } from '../ui/starters';
+import { EXAMPLE_LINES, WELCOME_EXAMPLE } from '../ui/canvas';
+import { STARTERS, starterRows, type Starter, type StarterId } from '../ui/starters';
 import { play } from './sound';
+import { hasExample, showExample } from './example';
 import { roving, h, icon, iconLabel, ICONS } from './dom';
 import { combineAll, clearAll, addRow, addTable, addNormalCurve, appendLine } from './edits';
 import { listTools } from './layout';
@@ -22,21 +24,44 @@ export function syncListTools(empty: boolean): void {
   clearAllBtn.hidden = empty;
   refreshListTools();
 }
-const STARTER_ICONS: Partial<Record<StarterId, keyof typeof ICONS>> = { normal: 'curve', zscore: 'func', binomial: 'bars', sliders: 'sliders' };
+const STARTER_ICONS: Partial<Record<StarterId, keyof typeof ICONS>> = { normal: 'curve', zscore: 'func', binomial: 'bars', sliders: 'sliders', moistAir: 'curve', charge: 'func', coil: 'sliders' };
+/** Puts a starter's lines on the sheet, ready to edit, with a fresh line after them. */
+export function loadStarter(ex: Starter): void {
+  play('enter');
+  for (const { text, dist } of starterRows(ex)) {
+    if (dist) addRow(doc.rows[doc.rows.length - 1].id, { kind: 'expr', text, dist }, false);
+    else appendLine(text);
+  }
+  addRow(doc.rows[doc.rows.length - 1].id, { kind: 'expr', text: '' });
+}
+function starterCard(ex: Starter): HTMLButtonElement {
+  const b = h('button', { type: 'button', class: 'starter-card' },
+    h('span', { class: 'sc-title' }, icon(STARTER_ICONS[ex.id] ?? 'func'), h('span', {}, ex.title)),
+    ex.subtitle ? h('span', { class: 'sc-sub' }, ex.subtitle) : null,
+    h('span', { class: 'sc-lines' }, ex.lines.join('\n')),
+  ) as HTMLButtonElement;
+  b.addEventListener('click', () => {
+    b.closest('dialog')?.close('ok');
+    loadStarter(ex);
+  });
+  return b;
+}
+/** The first run's example, first in the list while it's off the sheet. */
+const welcomeCard = h('button', { type: 'button', class: 'starter-card' },
+  h('span', { class: 'sc-title' }, icon('sliders'), h('span', {}, WELCOME_EXAMPLE.title)),
+  h('span', { class: 'sc-sub' }, WELCOME_EXAMPLE.subtitle),
+  h('span', { class: 'sc-lines' }, EXAMPLE_LINES.map((l) => l.text).join('\n')),
+) as HTMLButtonElement;
+welcomeCard.addEventListener('click', () => {
+  welcomeCard.closest('dialog')?.close('ok');
+  play('enter');
+  showExample();
+});
 export const starter = h('div', { class: 'starter', role: 'group', 'aria-label': 'Start with an example' },
-  h('div', { class: 'starter-grid' }, ...STARTERS.filter((ex) => !ex.hvac).map((ex) => {
-    const b = h('button', { type: 'button', class: 'starter-card' }, h('span', { class: 'sc-title' }, icon(STARTER_ICONS[ex.id]!), h('span', {}, ex.title)), h('span', { class: 'sc-lines' }, ex.lines.join(String.fromCharCode(10))));
-    b.addEventListener('click', () => {
-      b.closest('dialog')?.close('ok');
-      play('enter');
-      for (const { text, dist } of starterRows(ex)) {
-        if (dist) addRow(doc.rows[doc.rows.length - 1].id, { kind: 'expr', text, dist }, false);
-        else appendLine(text);
-      }
-      addRow(doc.rows[doc.rows.length - 1].id, { kind: 'expr', text: '' });
-    });
-    return b;
-  })),
+  h('div', { class: 'starter-section' }, 'Math & Statistics'),
+  h('div', { class: 'starter-grid' }, welcomeCard, ...STARTERS.filter((ex) => !ex.hvac).map(starterCard)),
+  h('div', { class: 'starter-section' }, 'HVAC Engineering'),
+  h('div', { class: 'starter-grid' }, ...STARTERS.filter((ex) => ex.hvac).map(starterCard)),
 );
 
 export function initListtools(): void {
@@ -56,8 +81,9 @@ export function initListtools(): void {
 
 /** The starters, from File: each puts its lines on the canvas, ready to edit. */
 export function openExamples(): void {
+  welcomeCard.hidden = hasExample();
   const dialog = dialogShell('Start with an example', starter, h('div', { class: 'mx-actions' }, cancelButton()));
   dialog.classList.add('examples-dialog');
   dialog.showModal();
-  dialog.querySelector<HTMLButtonElement>('.starter-card')?.focus();
+  dialog.querySelector<HTMLButtonElement>('.starter-card:not([hidden])')?.focus();
 }

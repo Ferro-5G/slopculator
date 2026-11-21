@@ -138,7 +138,7 @@ await check('Esc closes a tab page opened with the mouse, and the matrix editor 
   await page.waitForFunction(() => !document.querySelector('.ti-tab.lit'));
   expect(await page.evaluate(() => document.activeElement?.classList.contains('expr')), 'Esc took the caret out of the line');
   await page.keyboard.press('Control+Alt+4');
-  await page.locator('.ti-tile', { hasText: 'Any size' }).click();
+  await page.locator('.ti-tile', { hasText: 'Matrix builder' }).click();
   await page.waitForSelector('dialog.mx[open]');
   const named = await page.evaluate(() => ({ dialog: document.querySelector('dialog.mx').getAttribute('aria-label'), title: document.querySelector('dialog.mx h2')?.textContent, buttons: [...document.querySelectorAll('dialog.mx .mx-size button')].map((b) => b.getAttribute('aria-label')) }));
   expect(named.dialog === 'New matrix' && named.title === 'New matrix', `the editor has no name: ${JSON.stringify(named)}`);
@@ -230,7 +230,7 @@ await check('motion states: pointer down takes ownership from a graph zoom immed
 await check('starter example loads a shaded curve', async (page) => {
   await page.click('.menu-btn');
   await page.locator('.menu [role=menuitem]', { hasText: 'Start with an example' }).click();
-  await page.click('.examples-dialog .starter-card');
+  await page.locator('.examples-dialog .starter-card', { hasText: 'Shaded normal curve' }).click();
   await page.waitForTimeout(400);
   const l = await lines(page);
   expect(l.some((x) => x.probability && Math.abs(x.probability - 0.8186) < 1e-3), JSON.stringify(l));
@@ -815,9 +815,14 @@ await check('canvas: the first run shows an editable example; Clear example take
   expect((await lines(page)).length === 2, 'Undo did not bring the example back');
   await page.click('.example-clear');
   await page.click('.menu-btn');
-  await page.locator('.menu [role=menuitem]', { hasText: 'Show the example again' }).click();
+  await page.locator('.menu [role=menuitem]', { hasText: 'Start with an example' }).click();
+  await page.locator('.examples-dialog .starter-card', { hasText: 'Welcome example' }).click();
   await page.waitForTimeout(150);
-  expect((await lines(page)).some((x) => x.text === 'k = 45'), 'File did not bring the example back');
+  expect((await lines(page)).some((x) => x.text === 'k = 45'), 'Examples did not bring the example back');
+  await page.click('.menu-btn');
+  await page.locator('.menu [role=menuitem]', { hasText: 'Start with an example' }).click();
+  expect(await page.locator('.examples-dialog .starter-card', { hasText: 'Welcome example' }).isHidden(), 'Examples offers the welcome example while it is on the sheet');
+  await page.keyboard.press('Escape');
   await page.reload();
   await page.waitForFunction(() => !!window.slopculator);
   await page.click('.example-clear');
@@ -1100,7 +1105,9 @@ await check('Shift+drag zooms into the box', async (page) => {
 });
 
 await check('table Fit line adds y = ax + b', async (page) => {
-  await fileItem(page, 'Add a table');
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.locator('dialog.palette .pal-input').fill('Add a table');
+  await page.locator('dialog.palette .pal-item', { hasText: 'Add a table' }).first().click();
   const data = [['1', '3'], ['2', '5'], ['3', '7'], ['4', '9']];
   await page.fill('.tbl thead th:nth-child(2) input', 'y_1');
   for (let r = 0; r < data.length; r++) for (let c = 0; c < 2; c++) await page.fill(`.tbl input[data-r="${r}"][data-c="${c}"]`, data[r][c]);
@@ -1114,7 +1121,9 @@ await check('table Fit line adds y = ax + b', async (page) => {
 });
 
 await check('a regression line reads the table, shows its fit and defines m and b; Desmos and LaTeX forms are read and drawn as math', async (page) => {
-  await fileItem(page, 'Add a table');
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.locator('dialog.palette .pal-input').fill('Add a table');
+  await page.locator('dialog.palette .pal-item', { hasText: 'Add a table' }).first().click();
   const data = [['1', '3'], ['2', '5'], ['3', '7'], ['4', '9']];
   await page.fill('.tbl thead th:nth-child(2) input', 'y');
   for (let r = 0; r < data.length; r++) for (let c = 0; c < 2; c++) await page.fill(`.tbl input[data-r="${r}"][data-c="${c}"]`, data[r][c]);
@@ -1147,7 +1156,7 @@ await check('keys play their recorded sounds: a digit, an operator and Enter eac
   const key = (label) => page.evaluate((label) => [...document.querySelectorAll('.keypad .key, .composer .key')].find((k) => k.querySelector('.kl')?.textContent.replace(/\s/g, '') === label && k.offsetParent).click(), label);
   const digit = await press('7', key);
   const operator = await press('+', key);
-  const enter = await press('enter', key);
+  const enter = await press('ENTER', key);
   for (const [name, clip] of Object.entries({ digit, operator, enter })) {
     expect(clip.rate === 44100 && clip.ms > 5 && clip.ms < 200 && clip.peak > 0.15 && clip.peak <= 0.75, `the ${name} clip: ${JSON.stringify(clip)}`);
   }
@@ -1400,19 +1409,17 @@ await check('desktop: the keypad is the everyday row over a 6 × 4 pad with keys
   expect(g.tabs.join() === 'Math,Stats,Chance,Matrix,HVAC', `tabs: ${g.tabs}`);
   expect(g.acAbove, 'AC is not on the composer\'s edge');
 });
-await check('desktop: a tab\'s page rises from the composer\'s edge over the canvas, one size on every tab, and never covers the keys', async (page) => {
+await check('desktop: a tab\'s page swaps inside the keypad under the deck bar, one size on every tab, and never covers the composer', async (page) => {
   const sizes = [];
   for (let i = 0; i < 5; i++) {
     await page.locator('.composer-tabs .ti-tab').nth(i).click();
     await page.waitForTimeout(250);
     const g = await page.evaluate(() => {
-      const p = document.querySelector('.ti-page').getBoundingClientRect(), c = document.querySelector('.composer').getBoundingClientRect(), k = document.querySelector('#keypad').getBoundingClientRect();
-      const tiles = [...document.querySelectorAll('.ti-page .ti-tile')].map((t) => t.getBoundingClientRect());
-      return { p: { t: p.top, b: p.bottom, l: p.left, r: p.right, h: p.height }, compTop: c.top, keysLeft: k.left, whole: tiles.every((t) => t.bottom <= p.bottom + 1 && t.top >= p.top - 1) };
+      const p = document.querySelector('.ti-page').getBoundingClientRect(), c = document.querySelector('.composer').getBoundingClientRect(), k = document.querySelector('#keypad').getBoundingClientRect(), bar = document.querySelector('.deck-bar').getBoundingClientRect();
+      return { p: { t: p.top, b: p.bottom, l: p.left, r: p.right, h: p.height }, compRight: c.right, keys: { t: k.top, b: k.bottom, l: k.left, r: k.right }, barBottom: bar.bottom };
     });
-    expect(g.p.b <= g.compTop + 1, `tab ${i}: the page runs onto the composer: ${JSON.stringify(g)}`);
-    expect(g.p.r <= g.keysLeft + 1, `tab ${i}: the page covers the keys: ${JSON.stringify(g)}`);
-    expect(g.whole, `tab ${i}: a tile is cut`);
+    expect(g.p.l >= g.compRight - 1, `tab ${i}: the page runs onto the composer: ${JSON.stringify(g)}`);
+    expect(g.p.t >= g.barBottom - 1 && g.p.b <= g.keys.b + 1 && g.p.l >= g.keys.l - 1 && g.p.r <= g.keys.r + 1, `tab ${i}: the page left the keypad card: ${JSON.stringify(g)}`);
     sizes.push(Math.round(g.p.h));
     await page.keyboard.press('Escape');
   }
@@ -1449,7 +1456,7 @@ await check('desktop: Ctrl+Alt+1–5 open the tabs on their first tile; arrows w
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowDown');
   s = await at();
-  expect(s.tile === 'acos', `→ then ↓: ${JSON.stringify(s)}`);
+  expect(s.tile === 'asin', `→ then ↓: ${JSON.stringify(s)}`);
   await page.keyboard.press('Control+Alt+ArrowRight');
   await page.waitForTimeout(150);
   s = await at();
@@ -1488,7 +1495,8 @@ await check('the number pad sits on the right, and can switch sides', async (pag
   expect((await firstRow()) === '÷ 7 8 9 ← →', `left: ${await firstRow()}`);
   const after = await page.evaluate(() => document.querySelector('.pad').getBoundingClientRect().height);
   expect(after === box, `pad height ${box} became ${after}`);
-  await page.waitForTimeout(350);
+  // The side is saved a moment later (saveSoon); reload only once it's in storage, which a fixed wait didn't always cover on CI.
+  await page.waitForFunction(() => Object.keys(localStorage).some((k) => (localStorage.getItem(k) ?? '').includes('"padLeft":true')), null, { timeout: 5000 });
   await page.reload();
   await page.waitForTimeout(150);
   expect((await firstRow()) === '÷ 7 8 9 ← →', `after reload: ${await firstRow()}`);
@@ -1577,8 +1585,9 @@ await check('All + combines lines, leaving empty ones out with a note', async (p
   // The composer never sends an empty line, so the sheet with one in the middle comes from the page API.
   await page.evaluate(() => window.slopculator.setLines(['10', '', '5', '']));
   await page.waitForTimeout(100);
-  await page.click('.menu-btn');
-  await page.click(".combine-row button[aria-label='Add all lines']");
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.locator('dialog.palette .pal-input').fill('Add all lines');
+  await page.locator('dialog.palette .pal-item', { hasText: 'Add all lines' }).first().click();
   await page.waitForTimeout(200);
   const got = await lines(page);
   const last = got[got.length - 1];
@@ -1649,9 +1658,9 @@ await check('Ctrl+Alt+C copies the answer on the line', async (page) => {
 
 const openMatrixGrid = async (page) => {
   await page.keyboard.press('ControlOrMeta+k');
-  await page.keyboard.type('new matrix');
+  await page.keyboard.type('matrix builder');
   await page.waitForTimeout(150);
-  await page.locator('.pal-item', { hasText: 'New matrix…' }).first().click();
+  await page.locator('.pal-item', { hasText: 'Matrix builder…' }).first().click();
   await page.waitForSelector('dialog.mx[open]');
 };
 const activeLine = (page) => page.inputValue('.row.active .expr');
@@ -2115,7 +2124,7 @@ await check('phone: a tile inserts what its key did and closes the page; binompd
     await page.waitForTimeout(250);
     l = await lineNow(page);
     expect(!l.calm && l.out.startsWith('0.2001') && l.slots === null, `${look}: binompdf(10, 0.3, 4): ${JSON.stringify(l)}`);
-    await tapKey(page, 'enter');
+    await tapKey(page, 'ENTER');
     await tapTab(page, 'Stats');
     await tapTile(page, 'invNorm');
     await tapKeys(page, '0.95');
@@ -2151,46 +2160,46 @@ await check('phone: the Refrig chips fill in the fluid, and tapping the end of a
   expect((await lineNow(page)).text === 'poissoncdf(2,3)', `typed on: ${(await lineNow(page)).text}`);
 }, true);
 
-await check('phone: det offers a 2 × 2 or 3 × 3, the comma and Next step through its cells, and det of [[1, 2], [3, 4]] is −2', async (page) => {
+await check('phone: det offers Build matrix…, opens inline Matrix Builder, and det of [[1, 2], [3, 4]] is −2', async (page) => {
   await page.locator('.rows .row .expr').first().tap();
   await tapTab(page, 'Matrix');
   await tapTile(page, 'det');
   let l = await lineNow(page);
-  expect(l.text === 'det()' && l.calm && !l.red && /2 × 2/.test(l.hint) && /3 × 3/.test(l.hint), `det(): ${JSON.stringify(l)}`);
-  await page.locator('.hint-line .grid-chip', { hasText: '2 × 2' }).tap();
-  await page.waitForTimeout(150);
-  l = await lineNow(page);
-  expect(l.text === 'det([[, ], [, ]])' && l.slots === 'det([[a, b], [c, d]])' && /Row 1, column 1 of 2 × 2/.test(l.hint), `the grid: ${JSON.stringify(l)}`);
-  await tapKeys(page, '1,2,3');
-  l = await lineNow(page);
-  expect(l.text === 'det([[1, 2], [3, ]])' && /Row 2, column 1/.test(l.hint) && l.calm, `the comma steps cells: ${JSON.stringify(l)}`);
-  await page.locator('.hint-line .next-slot').tap();
-  await page.waitForTimeout(100);
-  await tapKey(page, '4');
+  expect(l.text === 'det()' && l.calm && !l.red && /Build matrix/.test(l.hint), `det(): ${JSON.stringify(l)}`);
+  await page.locator('.hint-line .grid-chip', { hasText: 'Build matrix' }).tap();
+  await page.waitForSelector('dialog.mx.mx-matrix[open]');
+  expect(!(await page.locator('dialog.mx .mx-name').count()), 'inline matrix builder omits the Name field');
+  await page.locator('dialog.mx [data-r="0"][data-c="0"]').fill('1');
+  await page.locator('dialog.mx [data-r="0"][data-c="1"]').fill('2');
+  await page.locator('dialog.mx [data-r="1"][data-c="0"]').fill('3');
+  await page.locator('dialog.mx [data-r="1"][data-c="1"]').fill('4');
+  await page.locator('dialog.mx button.primary').tap();
   await page.waitForTimeout(250);
   l = await lineNow(page);
   expect(l.text === 'det([[1, 2], [3, 4]])' && l.out === '−2', `det: ${JSON.stringify(l)}`);
 }, true);
 
-await check('phone: a digit closes the page and still types; so does any key', async (page) => {
+await check('phone: 123 swaps back from any tab to the number pad, and its keys type immediately', async (page) => {
   await page.locator('.rows .row .expr').first().tap();
   await tapTab(page, 'Math');
+  await page.locator('.ti-close').tap();
   await tapKey(page, '7');
   expect(!(await pageOpen(page)) && (await lineNow(page)).text === '7', `a digit: ${await pageOpen(page)} ${(await lineNow(page)).text}`);
   await tapTab(page, 'Stats');
+  await page.locator('.ti-close').tap();
   await tapKey(page, '×');
   expect(!(await pageOpen(page)) && (await lineNow(page)).text === '7*', `× : ${(await lineNow(page)).text}`);
   await tapTab(page, 'HVAC');
+  await page.locator('.ti-close').tap();
   await tapKey(page, 'π');
   expect(!(await pageOpen(page)) && (await lineNow(page)).text === '7*π', `π: ${(await lineNow(page)).text}`);
 }, true);
 
-await check('phone: Clear all is in File, its Undo pill says so for 10 s, and Undo brings every line back', async (page) => {
+await check('phone: AC clears every line, its Undo pill says so for 10 s, and Undo brings every line back', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['6*7', '2+2', '']));
   await page.waitForTimeout(200);
-  await page.locator('.menu-btn').tap();
   await freezeClock(page);
-  await page.locator('.menu [role=menuitem]', { hasText: 'Clear all' }).tap();
+  await page.locator('.deck-ac').tap();
   await page.clock.runFor(200);
   expect((await lines(page)).every((r) => !r.text), 'Clear all left lines');
   expect(/Cleared every line/.test(await page.textContent('.toast.show')), `the pill: ${await page.textContent('.toast')}`);
@@ -2267,10 +2276,11 @@ await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down
     const g = await page.evaluate(() => {
       const r = (e) => { const x = e.getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom, h: x.height, w: x.width }; };
       const kp = document.querySelector('.keypad');
+      const bar = kp.querySelector('.deck-bar');
       const pad = [...document.querySelectorAll('.numpad .krow')].map((row) => [...row.querySelectorAll('.key')].map((k) => ({ ...r(k), label: k.getAttribute('aria-label').split(':')[0] })));
       const index = [...document.querySelectorAll('.ti-row .key')].map(r);
       return {
-        keypadTop: kp.getBoundingClientRect().top + parseFloat(getComputedStyle(kp).borderTopWidth), firstTop: Math.min(...index.map((k) => k.t)),
+        keypadTop: bar ? bar.getBoundingClientRect().bottom : kp.getBoundingClientRect().top + parseFloat(getComputedStyle(kp).borderTopWidth), firstTop: Math.min(...index.map((k) => k.t)),
         index: index.map((k) => k.h), pad,
         filled: [...document.querySelectorAll('.keys .key, .composer .key')].filter((k) => k.offsetParent && k.classList.contains('hero')).map((k) => k.textContent.trim()),
         enterOnComposer: !!document.querySelector('.composer .key[data-action=enter]')?.offsetParent,
@@ -2283,7 +2293,7 @@ await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down
     expect(g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ') === '← → 7 8 9 ÷ / xʸ √ 4 5 6 × / ( ) 1 2 3 − / , = 0 . ⌫ +', `${look}: pad ${g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ')}`);
     const col = g.pad.map((r) => r[5]);
     expect(col.every((k) => Math.abs(k.r - g.pad[0][5].r) < 0.6) && col.every((k, i) => i === 0 || k.t > col[i - 1].t), `${look}: the right column`);
-    expect(g.filled.join() === 'enter' && g.enterOnComposer, `${look}: filled keys ${g.filled}`);
+    expect(g.filled.join() === 'ENTER' && g.enterOnComposer, `${look}: filled keys ${g.filled}`);
   }
 }, true);
 
@@ -2420,8 +2430,8 @@ for (const look of ['modern', 'retro']) {
     const tiles = await tileProblems(page, 24);
     expect(!tiles.length, `${look}: ${tiles.join(', ')}`);
     await tapTab(page, 'HVAC');
-    const o = await page.evaluate(() => [document.querySelector('.ti-page').getBoundingClientRect().bottom, document.querySelector('.keypad').getBoundingClientRect().top]);
-    expect(o[0] <= o[1] + 0.5, `${look}: the page covers the keys: ${o}`);
+    const o = await page.evaluate(() => [document.querySelector('.ti-page').getBoundingClientRect().top, document.querySelector('.composer-dock').getBoundingClientRect().bottom]);
+    expect(o[0] >= o[1] - 1, `${look}: the keypad-swap deck covers the composer/canvas: ${o}`);
   }, { width: 375, height: 667 });
 }
 
@@ -2509,18 +2519,20 @@ await check('phone: typing a name never moves the keys', async (page) => {
 }, true);
 
 const paneShown = (page) => page.evaluate(() => !!document.querySelector('.tape .graph-pane')?.offsetParent);
-await check('Hide graph in File wins over a plottable line, and Show graph keeps it on an empty sheet', async (page) => {
+await check('Hide graph in Modes wins over a plottable line, and Show graph keeps it on an empty sheet', async (page) => {
   await page.keyboard.type('y = x^2');
   await page.waitForTimeout(500);
-  await page.click('.menu-btn');
-  await page.locator('.menu [role=menuitem]', { hasText: 'Hide graph' }).click();
+  await page.click('.modebar .desk-more');
+  await page.locator('.mode-menu button', { hasText: 'Graph' }).click();
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   expect(!(await paneShown(page)), 'Hide graph left it up');
   await page.reload();
   await page.waitForTimeout(400);
   expect(!(await paneShown(page)), 'the choice did not survive a reload');
-  await page.click('.menu-btn');
-  await page.locator('.menu [role=menuitem]', { hasText: 'Show graph' }).click();
+  await page.click('.modebar .desk-more');
+  await page.locator('.mode-menu button', { hasText: 'Graph' }).click();
+  await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   expect(await paneShown(page), 'Show graph did not show it');
   await page.keyboard.press('Control+Alt+Backspace');
@@ -2580,7 +2592,9 @@ await check('desktop: the keypad is as tall as its keys; a hint over it says wha
 await check('File keeps files; look, mode, color and motion are in Appearance', async (page) => {
   await page.click('.menu-btn');
   const file = await page.locator('.menu-wrap:not(.appear-wrap) > .menu').textContent();
-  for (const word of ['New sheet', 'Open', 'Save', 'Duplicate', 'Rename', 'History', 'Export', 'Import', 'PNG', 'SVG']) expect(file.includes(word), `File lost ${word}`);
+  for (const word of ['New sheet', 'Open', 'Save', 'Duplicate', 'Rename', 'Export', 'Import', 'PNG', 'SVG']) expect(file.includes(word), `File lost ${word}`);
+  for (const word of ['History', 'Clear all', 'Show the example again']) expect(!file.includes(word), `File still has ${word}`);
+  expect(await page.isVisible('.head-pill .head-history'), 'History is not beside File');
   for (const word of ['Look', 'Theme', 'Color', 'Motion']) expect(!file.includes(word), `File still has ${word}`);
   expect((await page.locator('.menu-wrap:not(.appear-wrap) > .menu :is(select, .swatch)').count()) === 0, 'File still has pickers');
   await page.click('.appear-btn');
@@ -3131,15 +3145,22 @@ await check('UX2 3-4: percentile means the normal percentile first, and Stats �
   expect((await page.locator('.rows .row .fix').first().textContent()) === 'Use invNorm(0.95)', 'no invNorm fix for percentile(0.95)');
 });
 
-await check('UX2 5-6: the phone File menu is short, and Reorder lines moves lines, undoably', async (page) => {
+await check('UX2 5-6: the phone File menu is short and pure, and Reorder lines lives in the line menu and moves lines undoably', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['1', '2', '3']));
   await page.waitForTimeout(200);
   await page.locator('.menu-btn').tap();
   await page.waitForTimeout(150);
   const items = await page.$$eval('.menu [role=menuitem]', (els) => els.map((e) => e.textContent.trim()));
-  expect(['New sheet', 'Open…', 'Duplicate', 'Rename…', 'Copy as text', 'History…', 'Reorder lines', 'Clear all'].every((w) => items.includes(w)), `menu: ${items}`);
-  expect(!items.some((t) => /palette|shortcuts|key sounds|Number pad|Hide keypad|Hide graph/i.test(t)), `extras on a phone: ${items}`);
-  await page.locator('.menu [role=menuitem]', { hasText: 'Reorder lines' }).tap();
+  expect(['New sheet', 'Open…', 'Duplicate', 'Rename…', 'Copy as text', 'Start with an example…'].every((w) => items.includes(w)), `menu: ${items}`);
+  expect(!items.some((t) => /History|Clear all/.test(t)), `History and Clear all left File: ${items}`);
+  expect(await page.locator('.head-pill .head-history').isVisible(), 'History is not beside File on a phone');
+  expect(!items.some((t) => /palette|shortcuts|key sounds|Number pad|Hide keypad|Hide graph|Combine|Reorder|system keyboard|Add a table/i.test(t)), `extras on a phone: ${items}`);
+  await page.locator('.menu-btn').tap();
+  await page.waitForTimeout(100);
+  // Open Reorder lines from a line's context menu.
+  await page.locator('.tape .rows > .row.blk').first().click({ button: 'right' });
+  await page.waitForTimeout(150);
+  await page.locator('.line-menu [role=menuitem]', { hasText: 'Reorder lines' }).tap();
   await page.waitForTimeout(150);
   expect(await page.isVisible('.reorder-done') && (await page.locator('.row > .reorder').count()) === 3, 'reorder mode');
   await page.locator('.rows .row').nth(2).locator('.reorder-btn[aria-label="Move up"]').tap();
@@ -3393,7 +3414,7 @@ await check('A heading line draws no grey slots, and a call on an ordinary line 
 
 await check('The line menu\'s Copy result copies what Ctrl+Alt+C copies: a shaded curve\'s probability, nothing from an unshaded one', async (page) => {
   await fileItem(page, 'Start with an example');
-  await page.click('.examples-dialog .starter-card');
+  await page.locator('.examples-dialog .starter-card', { hasText: 'Shaded normal curve' }).click();
   await page.waitForTimeout(400);
   const k = await page.evaluate(() => [...document.querySelectorAll('.rows .row')].findIndex((r) => r.querySelector('.dist-prob:not([hidden])')));
   expect(k >= 0, 'no shaded curve');
@@ -3813,16 +3834,20 @@ await check('D2 desktop: a new curve that doesn\'t show is fitted; a slider movi
   expect(Math.abs(slid.ymin - after.ymin) < 1e-6 && Math.abs(slid.ymax - after.ymax) < 1e-6, `a slider refitted the view: ${JSON.stringify({ after, slid })}`);
 });
 
-await check('D2 desktop: det of a 2 × 2 from the keyboard: Ctrl+Alt+4, Enter, the 2 × 2 chip, cells by comma, then −2', async (page) => {
+await check('D2 desktop: det of a 2 × 2 via Build matrix… chip and inline Matrix Builder gives −2', async (page) => {
   await page.locator('.rows .expr').first().click();
   await page.keyboard.press('Control+Alt+4');
   await page.waitForTimeout(250);
   await page.keyboard.press('Enter');
   await page.waitForTimeout(250);
   expect((await lineNow(page)).text === 'det()', `det: ${JSON.stringify(await lineNow(page))}`);
-  await page.locator('.row.active .hint-line .grid-chip', { hasText: '2 × 2' }).click();
-  await page.waitForTimeout(150);
-  for (const c of ['1', ',', '2', ',', '3', ',', '4']) await page.keyboard.type(c);
+  await page.locator('.row.active .hint-line .grid-chip', { hasText: 'Build matrix' }).click();
+  await page.waitForSelector('dialog.mx.mx-matrix[open]');
+  await page.locator('dialog.mx [data-r="0"][data-c="0"]').fill('1');
+  await page.locator('dialog.mx [data-r="0"][data-c="1"]').fill('2');
+  await page.locator('dialog.mx [data-r="1"][data-c="0"]').fill('3');
+  await page.locator('dialog.mx [data-r="1"][data-c="1"]').fill('4');
+  await page.locator('dialog.mx button.primary').click();
   await page.keyboard.press('Enter');
   await page.waitForTimeout(300);
   const l = await lines(page);
@@ -3910,7 +3935,7 @@ await check('H2 phone: a narrow window has the Shape, Vector and matrix tiles th
   expect((await names()).includes('Shape…'), `Graph page: ${await names()}`);
   await tapTab(page, 'Matrix');
   await page.waitForTimeout(200);
-  expect((await names()).includes('Any size…'), `Matrix page: ${await names()}`);
+  expect((await names()).includes('Matrix builder…'), `Matrix page: ${await names()}`);
   await page.locator('.ti-seg', { hasText: 'Vectors' }).tap();
   await page.waitForTimeout(200);
   expect((await names()).includes('Vector…'), `Vectors page: ${await names()}`);
@@ -3922,7 +3947,7 @@ await check('H2 phone: a narrow window has the Shape, Vector and matrix tiles th
 await check('H2 phone: a 6 × 6 matrix grid scrolls inside its dialog on a narrow window, and inserts', async (page) => {
   await tapTab(page, 'Matrix');
   await page.waitForTimeout(200);
-  await page.locator('.ti-tile:has(.ti-face:text-is("Any size…"))').tap();
+  await page.locator('.ti-tile:has(.ti-face:text-is("Matrix builder…"))').tap();
   await page.waitForSelector('dialog.mx[open]');
   const grow = page.locator('dialog.mx .mx-size button', { hasText: '+' });
   for (const axis of [0, 1]) for (let i = 0; i < 4; i++) await grow.nth(axis).tap();

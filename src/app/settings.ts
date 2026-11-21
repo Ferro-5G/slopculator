@@ -5,7 +5,7 @@ import { play } from './sound';
 import { syncers, seg, toggle, MODES, setMode, bindRound } from './controls';
 import { h, iconLabel, roving } from './dom';
 import { motionNow } from './feedback';
-import { setMenu, menuWrap } from './file';
+import { setMenu, menuWrap, historyBtn } from './file';
 import { modeBar, leftPane, app, main } from './layout';
 import { openPalette } from './palette';
 import { kb, narrow, isMac } from './platform';
@@ -45,6 +45,8 @@ function percentSeg(): HTMLElement {
   for (const b of el.querySelectorAll('button')) b.removeAttribute('title');
   return el;
 }
+const graphModeBtn = h('button', { type: 'button', class: 'tog', 'aria-pressed': 'true', title: kb('Show or hide the graph (Ctrl+Alt+Shift+G)'), onclick: () => { play('toggle'); setGraph(!graphOn()); } }, 'Graph');
+syncers.push(() => graphModeBtn.setAttribute('aria-pressed', String(graphOn())));
 const modeMenu = h('div', { class: 'menu mode-menu', role: 'group', 'aria-label': 'Modes', hidden: true },
   h('div', { class: 'mode-row', 'data-bar': 'angle' }, h('span', {}, 'Angle'), modeSeg('angle')),
   h('div', { class: 'mode-row', 'data-bar': 'answers' }, h('span', {}, 'Answers'), modeSeg('answers')),
@@ -56,6 +58,7 @@ const modeMenu = h('div', { class: 'menu mode-menu', role: 'group', 'aria-label'
     modeToggle('percent', '%', 'Show probabilities as percents (Ctrl+Alt+P)'),
     modeToggle('letters', 'A=line', 'Line letters: line 1 is A, line 2 is B, … (Ctrl+Alt+L)'),
     modeToggle('complex', 'a+bi', 'Complex numbers: √(−1) = i'),
+    graphModeBtn,
   )),
   h('div', { class: 'mode-row' }, h('span', {}, 'Rounding'), h('label', { class: 'round-wrap' }, roundSlider, roundOut)),
 );
@@ -273,7 +276,7 @@ function openModeSheet(): void {
 function closeModeSheet(): void {
   if (modeSheetMotion.open) modeSheetMotion.set(false, motionNow() === 'full');
 }
-export const refreshModeBar = roving(modeBar, '.brand-home, .sheet-title,.desk-modes .seg button, .desk-modes .tog, .bar-round-slider, .pill, .bar-tog, .appear-btn, .head-find, .menu-btn, .help-btn');
+export const refreshModeBar = roving(modeBar, '.brand-home, .sheet-title,.desk-modes .seg button, .desk-modes .tog, .bar-round-slider, .pill, .bar-tog, .appear-btn, .head-find, .menu-btn, .head-history, .help-btn');
 
 export function initSettings(): void {
   addPopover({ close: closeModeMenu, exclusive: true, outside: true });
@@ -320,7 +323,7 @@ export function initSettings(): void {
   narrow.addEventListener('change', placeBar);
   placeBar();
   modeBar.insertBefore(headPill, menuWrap);
-  headPill.append(headFind, menuWrap);
+  headPill.append(headFind, menuWrap, historyBtn);
   // A phone's bar says Modes in words, as the phone apps do; the icon is for narrow windows outside the canvas.
   modesMore.innerHTML = `${SLIDERS_ICON}<span class="more-word">Modes</span>`;
   modesMore.addEventListener('click', (e) => {

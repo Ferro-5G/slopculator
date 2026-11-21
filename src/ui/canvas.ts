@@ -346,13 +346,20 @@ export function flowLayout(blocks: readonly FlowBlock[], wires: readonly Wire[],
   const free = blocks.filter((b) => !b.pinned);
   const byId = new Map(free.map((b) => [b.id, b]));
   const order = new Map(free.map((b, k) => [b.id, k]));
-  // Each slider's first consumer among the blocks that flow, in sheet order.
+  // Each slider's first consumer among the blocks that flow, in sheet order. A slider that feeds any curve or figure
+  // stays in the left column (above its first curve/figure consumer) so data flows left to right instead of wiring
+  // backwards across the graph from the values column.
   const firstUse = new Map<string, string>();
   for (const b of free) {
     if (b.kind !== 'slider') continue;
     const uses = wires.filter((w) => w.from === b.id && byId.has(w.to) && byId.get(w.to)!.kind !== 'example' && byId.get(w.to)!.kind !== 'slider').map((w) => w.to);
-    uses.sort((p, q) => order.get(p)! - order.get(q)!);
-    if (uses.length) firstUse.set(b.id, uses[0]);
+    const leftUses = uses.filter((id) => {
+      const k = byId.get(id)!.kind;
+      return k === 'line' || k === 'figure';
+    });
+    const pick = leftUses.length ? leftUses : uses;
+    pick.sort((p, q) => order.get(p)! - order.get(q)!);
+    if (pick.length) firstUse.set(b.id, pick[0]);
   }
   const example: FlowBlock[] = [], lines: FlowBlock[] = [], values: FlowBlock[] = [];
   for (const b of free) {
@@ -671,7 +678,8 @@ export const EXAMPLE_LINES: readonly { text: string; slider?: { min: number; max
 /** The example frame's name for screen readers; the frame shows no title. */
 export const EXAMPLE_TITLE = 'Example';
 export const CLEAR_EXAMPLE = 'Clear example';
-export const SHOW_EXAMPLE = 'Show the example again';
+/** The first run's example, listed first under Examples while it's off the sheet so it can come back. */
+export const WELCOME_EXAMPLE = { title: 'Welcome example', subtitle: 'A slider wired to a curve and the graph' } as const;
 export const EXAMPLE_CLEARED = 'Example cleared';
 export const isExampleRow = (r: { example?: boolean }): boolean => r.example === true;
 

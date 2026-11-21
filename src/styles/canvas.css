@@ -8,6 +8,18 @@
   inherits: true;
   initial-value: 0deg;
 }
+/* Aurora Glow's two light sources: --au-a follows the open deck's color, --au-b the line's state. Registered as
+   colors so a change glides instead of jumping. */
+@property --au-a {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+@property --au-b {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
 
 :root[data-look='modern'] {
   --sans: 'Superscripts', 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -32,6 +44,9 @@
   --cv-radius: 22px;
   --cv-ac: var(--key-ac-ink, var(--err));
   position: relative;
+}
+:root[data-look='retro'] .canvas-ui {
+  --cv-radius: 10px;
 }
 
 /* ---------- the stage ---------- */
@@ -101,7 +116,8 @@
   padding-left: 12px;
   border-left: 1px solid var(--cv-edge-2);
 }
-/* The bar's groups are the mockup's segmented controls: a surface, a fine edge, the chosen one raised. */
+/* The bar's groups are the mockup's segmented controls: a surface, a fine edge, the chosen one raised. One 34 px
+   height across every group and button so the top bar sits on a single baseline. */
 #app.canvas-ui > .modebar .desk-modes .seg,
 #app.canvas-ui > .modebar .cv-tools,
 #app.canvas-ui > .modebar .head-pill,
@@ -109,23 +125,31 @@
 #app.canvas-ui > .modebar .desk-more,
 #app.canvas-ui > .modebar .appear-btn,
 #app.canvas-ui > .modebar .help-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--cv-block);
   border: 1px solid var(--cv-edge);
   border-radius: 10px;
   padding: 3px;
   min-height: 0;
-  height: auto;
+  height: 34px;
   box-shadow: none;
 }
 #app.canvas-ui > .modebar .desk-modes .seg button,
 #app.canvas-ui > .modebar .cv-tools .cv-btn,
 #app.canvas-ui > .modebar .head-pill > button,
 #app.canvas-ui > .modebar .head-pill .menu-btn {
-  padding: 6px 11px;
-  height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  height: 26px;
   min-height: 0;
   border-radius: 7px;
   font-size: 14px;
+  line-height: 1;
   color: var(--ink-2);
   background: none;
   border: 0;
@@ -140,7 +164,7 @@
 #app.canvas-ui > .modebar .desk-more,
 #app.canvas-ui > .modebar .help-btn,
 #app.canvas-ui > .modebar .appear-btn {
-  padding: 6px 11px;
+  padding: 0 11px;
   font-size: 14px;
   color: var(--ink-2);
 }
@@ -181,7 +205,8 @@
 }
 .canvas-ui .cv-zoom {
   min-width: 46px;
-  padding: 6px;
+  padding: 0 6px;
+  line-height: 26px;
   text-align: center;
   font-size: 14px;
   color: var(--ink-3);
@@ -226,12 +251,18 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: none;
-  transition: border-color 0.15s;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 5%, transparent), 0 1px 2px rgb(0 0 0 / 0.08);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .canvas-ui .rows > .row.blk::before,
 .canvas-ui .rows > .row.blk + .row::before {
   display: none;
+}
+/* A pressed block gives a little under the finger (PRESS_DEPTH.block in src/ui/motiontokens.ts) instead of washing
+   out. Not a block with a slider or a figure: their tracks and handles must stay put under a drag. */
+.canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
+  transform: scale(0.985);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.06s cubic-bezier(0.3, 0.7, 0.4, 1);
 }
 .canvas-ui .cv-wide > .rows > .row.blk .reorder {
   display: none;
@@ -353,12 +384,34 @@
 .canvas-ui .rows > .row.blk-value .out,
 .canvas-ui .rows > .row.blk-value .out .result {
   font: 600 31px/1.15 var(--sans);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--ink);
   justify-content: flex-start;
   text-align: left;
   max-width: none;
-  font-variant-numeric: lining-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.canvas-ui .rows > .row.blk-value .out .result {
+  cursor: copy;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.canvas-ui .rows > .row.blk-value .out .result:hover {
+  color: var(--cv-accent);
+}
+.canvas-ui .rows > .row.blk-value:not(.blk-figure) {
+  display: block;
+}
+/* Place Steps in the top-right corner of value blocks so the large answer below spans the whole card without clipping. */
+.canvas-ui .rows > .row.blk-value:not(.blk-figure) > .cv-steps {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  margin: 0;
+  z-index: 2;
+}
+.canvas-ui .rows > .row.blk-value:not(.blk-figure):has(> .cv-steps:not([hidden])) .line > .src {
+  margin-right: 92px;
 }
 .canvas-ui .rows > .row.blk-value .out .result::before {
   content: '=';
@@ -886,7 +939,7 @@
 .canvas-ui .rows > .cv-tray {
   position: absolute;
   margin: 0;
-  border: 1.5px dashed color-mix(in srgb, var(--ink-3) 30%, var(--bg));
+  border: 1px solid var(--rule);
   border-radius: var(--cv-radius);
   background: color-mix(in srgb, var(--cv-block) 34%, transparent);
   z-index: 1;
@@ -923,6 +976,7 @@
 }
 .canvas-ui .cv-step .v {
   font: 600 17px var(--sans);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 .canvas-ui .cv-step .v.eq::before {
@@ -957,6 +1011,20 @@
   color: var(--ink-3);
   font-weight: 500;
 }
+/* Steps unfold one after another, each a beat behind the one above (STAGGER in src/ui/motiontokens.ts). */
+.canvas-ui .cv-step.enter {
+  animation: cv-step-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i, 0) * 28ms) both;
+}
+@keyframes cv-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .canvas-ui .cv-step.hit {
   animation: cv-hit 0.55s ease-out;
 }
@@ -978,6 +1046,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .canvas-ui .cv-step.hit,
+  .canvas-ui .cv-step.enter,
   .canvas-ui .cv-tray.settle {
     animation: none;
   }
@@ -985,8 +1054,8 @@
     transition: none;
   }
 }
-[data-motion='off'] .canvas-ui :is(.cv-step.hit, .cv-tray.settle),
-[data-motion='reduced'] .canvas-ui :is(.cv-step.hit, .cv-tray.settle) {
+[data-motion='off'] .canvas-ui :is(.cv-step.hit, .cv-step.enter, .cv-tray.settle),
+[data-motion='reduced'] .canvas-ui :is(.cv-step.hit, .cv-step.enter, .cv-tray.settle) {
   animation: none;
 }
 
@@ -1005,7 +1074,7 @@
   justify-content: space-between;
   gap: 4px;
   height: 34px;
-  padding: 0 16px;
+  padding: 0 16px 0 var(--cv-radius);
 }
 .canvas-ui .composer-head > .spacer {
   flex: 1;
@@ -1013,46 +1082,143 @@
 .canvas-ui .composer-head > .list-tools {
   display: none;
 }
-.canvas-ui .composer-tabs {
+/* ---------- unified deck bar across the top edge of #keypad ---------- */
+.canvas-ui .deck-bar {
+  position: relative;
   display: flex;
-  gap: 4px;
-  align-self: flex-end;
+  align-items: center;
+  gap: 5px;
+  padding: 0 0 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--cv-edge);
+}
+/* The bar catches light along its top edge, a plane above the key bed. */
+:root[data-look='modern']:is([data-theme='ink'], [data-theme='oled']) .canvas-ui .deck-bar {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .deck-bar {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+/* The liquid ink: one pill that slides from the deck you left to the one you chose, its leading edge first. The
+   chosen pill's own solid fill waits under it (.has-ink) and locks in as it lands. Drawn under the labels. */
+.canvas-ui .deck-ink {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1;
+}
+.canvas-ui .deck-bar.has-ink .deck-ink {
+  opacity: 1;
+}
+.canvas-ui .deck-bar .ti-tab .kl,
+.canvas-ui .deck-bar .deck-pad {
+  position: relative;
+  z-index: 2;
+}
+.canvas-ui .deck-bar.has-ink .ti-tab.lit,
+.canvas-ui .deck-bar.has-ink .deck-pad.lit {
+  transition: background-color 0.08s linear 0.22s, color 0.08s linear 0.22s, border-color 0.08s linear 0.22s;
+}
+[data-look='retro'] .canvas-ui .deck-ink,
+[data-theme^='contrast'] .canvas-ui .deck-ink {
+  display: none;
+}
+.canvas-ui .deck-pad {
+  flex: none;
+  width: auto;
+  height: 26px;
+  min-height: 0;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--cv-edge);
+  background: transparent;
+  color: var(--ink-2);
+  font: 600 12px/1 var(--sans);
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.canvas-ui .deck-pad:hover:not(.lit) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.canvas-ui .deck-pad.lit {
+  background: var(--cv-accent);
+  border-color: var(--cv-accent);
+  color: var(--hero-ink);
+}
+.canvas-ui .deck-sep {
+  flex: none;
+  width: 1px;
+  height: 15px;
+  background: var(--cv-edge);
+}
+.canvas-ui .deck-ac-sep,
+.canvas-ui .deck-kb,
+.canvas-ui .deck-ac {
+  display: none;
+}
+.canvas-ui .composer-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.canvas-ui .composer-tabs::-webkit-scrollbar {
+  display: none;
 }
 .canvas-ui .composer-tabs .key.ti-tab {
   flex: none;
   position: relative;
-  top: 1px;
-  height: auto;
+  top: 0;
+  height: 26px;
   min-height: 0;
   width: auto;
-  padding: 7px 13px 8px;
-  border-radius: 11px 11px 0 0;
+  padding: 0 7px;
+  border-radius: 999px;
   background: var(--cv-block);
-  border: 1px solid var(--cv-edge);
-  border-bottom: 0;
+  border: 1px solid transparent;
   box-shadow: none;
   color: var(--ink-2);
   flex-direction: row;
   gap: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .canvas-ui .composer-tabs .ti-tab .ti-glyph,
-.canvas-ui .composer-tabs .ti-tab::before,
-.canvas-ui .composer-tabs .ti-tab::after {
+.canvas-ui .composer-tabs .ti-tab::after,
+.canvas-ui .composer-tabs .ti-tab::before {
   display: none;
 }
 .canvas-ui .composer-tabs .key.ti-tab .kl {
-  font: 500 14px/1.2 var(--sans);
+  font: 500 12.5px/1 var(--sans);
   max-width: none;
   overflow: visible;
   color: inherit;
 }
-.canvas-ui .composer-tabs .key.ti-tab:hover {
+.canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
   color: var(--ink);
+  background: var(--cv-raised);
 }
 .canvas-ui .composer-tabs .key.ti-tab.lit {
-  background: var(--cv-raised);
-  color: var(--ink);
-  border-color: var(--cv-edge-2);
+  background: var(--tab);
+  color: var(--tab-on);
+  border-color: var(--tab);
+}
+.canvas-ui .composer-tabs .key.ti-tab.lit .kl {
+  color: var(--tab-on);
+  font-weight: 600;
+}
+.canvas-ui .pad-stage {
+  position: relative;
+  width: 100%;
 }
 .canvas-ui .composer-head .composer-ac {
   flex: none;
@@ -1085,6 +1251,11 @@
   padding: 12px 12px 12px 22px;
   background: var(--cv-raised);
   border-radius: var(--cv-radius);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
+}
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer {
+  background: var(--cv-block);
+  box-shadow: 0 2px 12px rgb(23 23 26 / 0.08);
 }
 /* The edge: a fine rim, and once the line works out, a light that runs round it with a soft halo. */
 .canvas-ui .composer::before,
@@ -1131,8 +1302,21 @@
 .canvas-ui .composer[data-state='ok'] .composer-halo {
   opacity: 0.3;
 }
+/* Reaching an answer: a quick sheen sweeps the rim (DURATIONS.auroraSheen), then the light makes one slow lap and
+   rests (DURATIONS.auroraDrift, CURVES.auroraDrift in src/ui/motiontokens.ts). It never spins on its own. */
 .canvas-ui .composer[data-state='ok'] {
-  animation: cv-orbit 2.6s linear infinite;
+  animation: cv-orbit 9s cubic-bezier(0.45, 0, 0.55, 1) 0.7s 1 both;
+}
+.canvas-ui .composer[data-state='ok']::after {
+  animation: cv-sheen 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+@keyframes cv-sheen {
+  from {
+    --cv-ang: 0deg;
+  }
+  to {
+    --cv-ang: 360deg;
+  }
 }
 .canvas-ui .composer[data-state='err']::before {
   background: color-mix(in srgb, var(--err) 45%, var(--cv-edge-2));
@@ -1146,13 +1330,16 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .canvas-ui .composer[data-state='ok'] {
+  .canvas-ui .composer[data-state='ok'],
+  .canvas-ui .composer[data-state='ok']::after {
     animation: none;
     --cv-ang: 20deg;
   }
 }
 [data-motion='off'] .canvas-ui .composer[data-state='ok'],
-[data-motion='reduced'] .canvas-ui .composer[data-state='ok'] {
+[data-motion='reduced'] .canvas-ui .composer[data-state='ok'],
+[data-motion='off'] .canvas-ui .composer[data-state='ok']::after,
+[data-motion='reduced'] .canvas-ui .composer[data-state='ok']::after {
   animation: none;
   --cv-ang: 20deg;
 }
@@ -1210,6 +1397,8 @@
 .canvas-ui .composer-slot > .row .out,
 .canvas-ui .composer-slot > .row .out .result {
   font: 600 22px var(--sans);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
   color: var(--accent);
   white-space: nowrap;
 }
@@ -1271,7 +1460,8 @@
   border-radius: 14px;
   background: var(--cv-accent);
   color: var(--hero-ink);
-  font: 650 17px var(--sans);
+  font: 700 14.5px var(--sans);
+  letter-spacing: 0.04em;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1358,7 +1548,7 @@
   top: 50%;
   width: 1.5px;
   height: 1.05em;
-  margin-top: -0.55em;
+  margin-top: -0.525em;
   background: var(--cv-accent);
 }
 .canvas-ui .cv-mirror .cv-caret.raised {
@@ -1436,11 +1626,11 @@
   flex: none;
 }
 
-/* A tab's page rises over the canvas from the composer's edge. */
+/* A tab's page swaps cleanly inside #keypad's .pad-stage, directly under .deck-bar. */
 .canvas-ui .ti-page {
-  background: var(--cv-raised);
-  border: 1px solid var(--cv-edge-2);
-  border-radius: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
 }
 
@@ -1449,9 +1639,9 @@
   position: absolute;
   right: 22px;
   bottom: 22px;
-  width: 330px;
+  width: 342px;
   z-index: 20;
-  padding: 10px;
+  padding: 9px 10px 10px;
   background: var(--cv-block);
   border: 1px solid var(--cv-edge);
   border-radius: 18px;
@@ -1459,6 +1649,16 @@
 }
 .canvas-ui .main > .left > .keypad[hidden] {
   display: none;
+}
+.canvas-ui .main > .left > .keypad .pad {
+  transition: opacity 0.12s ease-out, visibility 0s;
+}
+/* The pad fades out under an opening deck rather than cutting away; it keeps its room, so nothing shifts. */
+.canvas-ui .main > .left > .keypad.deck-open .pad {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out, visibility 0s 0.12s;
 }
 /* The panel is as tall as its keys. What a pointed-at key or tile does shows in a strip that rises over the panel,
    and only while there is something to say. */
@@ -1556,11 +1756,20 @@
     align-items: flex-start;
     /* Cascade sets each block's gap above it, its step right and its width (src/app/canvas.ts). */
     gap: 0;
-    padding: 46px 12px 16px var(--cv-gutter);
+    padding: 46px 12px 24px var(--cv-gutter);
     transform: none !important;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.32) 12px, #000 36px, #000 calc(100% - 38px), rgb(0 0 0 / 0.32) calc(100% - 12px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.32) 12px, #000 36px, #000 calc(100% - 38px), rgb(0 0 0 / 0.32) calc(100% - 12px), transparent 100%);
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value .out,
+  .canvas-ui .cv-narrow > .rows > .row.blk-value .out .result {
+    font-size: 25px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-curve .gutter {
+    left: 11px;
   }
   .canvas-ui .cv-narrow > .rows:not(.has-example) {
-    padding-top: 12px;
+    padding-top: 20px;
   }
   /* A pill as wide as its line, no wider than the column. */
   .canvas-ui .cv-narrow > .rows > .row.blk {
@@ -1602,20 +1811,80 @@
     bottom: auto;
     transform: none;
     width: auto;
-    padding: 0 10px 8px;
+    padding: 4px 10px 5px;
+  }
+  .canvas-ui .composer-head:not(:has(.reorder-done:not([hidden]))) {
+    display: none;
   }
   .canvas-ui .composer-head {
-    padding: 0 8px;
-    height: 32px;
+    padding: 0 8px 4px;
+    height: auto;
   }
+  .canvas-ui .composer-slot > .row .hint-line {
+    bottom: calc(100% + 10px);
+  }
+  .canvas-ui .deck-bar {
+    padding: 5px 0 6px;
+    margin-bottom: 6px;
+    gap: 4px;
+  }
+  .canvas-ui .deck-pad {
+    height: 27px;
+    padding: 0 7px;
+    font-size: 12px;
+  }
+  .canvas-ui .deck-ac-sep {
+    display: block;
+  }
+  .canvas-ui .deck-kb:not([hidden]) {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    height: 27px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-2);
+    font: 600 12px/1 var(--sans);
+    cursor: pointer;
+  }
+  .canvas-ui .deck-kb:hover {
+    color: var(--ink);
+    background: var(--cv-raised);
+  }
+  .canvas-ui .keypad .deck-ac {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    height: 27px;
+    min-height: 0;
+    width: auto;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
+  }
+  .canvas-ui .keypad .deck-ac .kl {
+    font: 600 13px/1 var(--sans);
+    color: var(--cv-ac);
+  }
+  .canvas-ui .keypad .deck-ac:hover {
+    background: color-mix(in srgb, var(--cv-ac) 12%, transparent);
+  }
+  /* Tight enough that all five categories fit beside 123 and AC on a 390 px phone, as on iOS. */
   .canvas-ui .composer-tabs {
-    gap: 3px;
+    gap: 1px;
   }
   .canvas-ui .composer-tabs .key.ti-tab {
-    padding: 6px 9px 7px;
+    height: 27px;
+    padding: 0 5.5px;
   }
   .canvas-ui .composer-tabs .key.ti-tab .kl {
-    font-size: 13.5px;
+    font-size: 12.5px;
   }
   .canvas-ui .composer {
     min-height: 58px;
@@ -1639,11 +1908,31 @@
     right: auto;
     bottom: auto;
     width: auto;
-    padding: 8px 8px 12px;
+    padding: 0 8px 12px;
     border: 0;
     border-top: 1px solid var(--cv-edge);
     border-radius: 0;
     background: var(--bg);
+  }
+  .canvas-ui .main > .left > .keypad.bar-only {
+    padding: 0 8px 4px;
+  }
+  .canvas-ui .main > .left > .keypad.bar-only .deck-bar {
+    margin-bottom: 0;
+    border-bottom: 0;
+  }
+  .canvas-ui .main > .left > .keypad.bar-only.deck-open .deck-bar {
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--cv-edge);
+  }
+  .canvas-ui .main > .left > .keypad.bar-only .pad {
+    display: none;
+  }
+  .canvas-ui .main > .left > .keypad.bar-only .ti-page:not([hidden]) {
+    position: relative;
+    inset: auto;
+    max-height: 276px;
+    padding-bottom: 6px;
   }
   .canvas-ui .keypad .key .kl {
     font-size: 19px;
@@ -1761,7 +2050,7 @@
 
 .canvas-ui .main > .left > .ti-page {
   position: absolute;
-  z-index: 25;
+  z-index: 32;
 }
 
 /* A line with an error shows it whole, under what was typed: in the composer (which grows upward) and in its block. */
@@ -1828,9 +2117,22 @@
 
 #app.canvas-ui > .modebar .head-pill .head-find,
 #app.canvas-ui > .modebar .head-pill .menu-btn {
-  height: 31px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
+}
+/* History sits beside File as a round icon button, the way the phone apps draw it. */
+#app.canvas-ui > .modebar .head-pill .head-history {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+}
+#app.canvas-ui > .modebar .head-history svg {
+  width: 15px;
+  height: 15px;
 }
 
 .canvas-ui .modes .more .more-word {
@@ -1913,13 +2215,15 @@
   /* 33 px pills, 45 px to a thumb. */
   #app.canvas-ui .left > .modebar .modes .more::after,
   #app.canvas-ui .left > .modebar .head-pill .head-find::after,
-  #app.canvas-ui .left > .modebar .head-pill .menu-btn::after {
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn::after,
+  #app.canvas-ui .left > .modebar .head-pill .head-history::after {
     content: '';
     position: absolute;
     inset: -6px 0;
   }
   #app.canvas-ui .left > .modebar .head-pill .head-find,
-  #app.canvas-ui .left > .modebar .head-pill .menu-btn {
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn,
+  #app.canvas-ui .left > .modebar .head-pill .head-history {
     position: relative;
   }
   #app.canvas-ui .left > .modebar .more-word {
@@ -1942,11 +2246,49 @@
     border: 1px solid var(--cv-edge);
     border-radius: 10px;
   }
+  #app.canvas-ui .left > .modebar .head-pill .head-history {
+    width: 33px;
+    min-width: 33px;
+    height: 33px;
+    padding: 0;
+    color: var(--ink-2);
+    background: var(--cv-block);
+    border: 1px solid var(--cv-edge);
+  }
+  /* 33 px drawn, 44 px to a thumb. */
+  #app.canvas-ui .left > .modebar .head-pill .head-history::after {
+    inset: -6px -5.5px;
+  }
   #app.canvas-ui .left > .modebar .head-find .gi {
     display: none !important;
   }
   #app.canvas-ui .left > .modebar .head-find .gl {
     display: inline !important;
+  }
+}
+
+/* Below 390 px the bar can't hold Find's word beside History, so Find turns into a magnifier the size of History's
+   clock, and the gaps tighten. */
+@media (max-width: 389px) {
+  #app.canvas-ui .left > .modebar,
+  #app.canvas-ui .left > .modebar .head-pill {
+    gap: 4px;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-find {
+    width: 33px;
+    min-width: 33px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-find::after {
+    inset: -6px -5.5px;
+  }
+  #app.canvas-ui .left > .modebar .head-find .gi {
+    display: inline-flex !important;
+  }
+  #app.canvas-ui .left > .modebar .head-find :is(.gl, .find-key) {
+    display: none !important;
   }
 }
 
@@ -2603,4 +2945,1060 @@
   visibility: hidden;
   user-select: none;
   pointer-events: none;
+}
+
+/* ---------- overhauled insert dialogs: matrix, shape & vector builders, examples, and palette ---------- */
+dialog.mx,
+dialog.examples-dialog,
+dialog.palette {
+  background: var(--panel);
+  border: 1px solid var(--rule-2);
+  border-radius: 18px;
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+}
+dialog.mx {
+  width: min(500px, 94vw);
+  padding: 20px 22px 18px;
+}
+dialog.mx > form > h2:first-child {
+  margin: 0 0 4px;
+  font: 600 19px/1.25 var(--sans);
+  letter-spacing: -0.015em;
+}
+.mx-sub {
+  margin: 0 0 16px;
+  font: 400 13.5px/1.35 var(--sans);
+  color: var(--ink-2);
+}
+dialog.mx .mx-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+dialog.mx .mx-head label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 13px var(--sans);
+  color: var(--ink-2);
+}
+dialog.mx .mx-name {
+  width: 7rem;
+  padding: 6px 10px;
+  font: 500 14px var(--mono);
+}
+.mx-hint {
+  font: 400 12.5px/1.35 var(--sans);
+  color: var(--ink-3);
+}
+.mx-hint.bad {
+  color: var(--err);
+  font-weight: 500;
+}
+.mx-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+}
+dialog.mx .mx-size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+dialog.mx .mx-size span:not(:first-child) {
+  margin-left: 0;
+}
+.mx-axis-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mx-axis-lbl {
+  font: 500 12.5px var(--sans);
+  color: var(--ink-2);
+}
+.mx-stepper {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--rule-2);
+  overflow: hidden;
+}
+dialog.mx .mx-stepper button {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink);
+  font: 500 15px/1 var(--sans);
+  cursor: pointer;
+}
+dialog.mx .mx-stepper button:hover:not(:disabled) {
+  background: var(--hover);
+}
+dialog.mx .mx-stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mx-count {
+  min-width: 24px;
+  text-align: center;
+  font: 600 13px/1 var(--mono);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+dialog.mx .mx-dims {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font: 500 12px/1.2 var(--sans);
+}
+.mx-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mx-preset {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--rule-2);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink-2);
+  font: 500 12px/1 var(--sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.mx-preset:hover {
+  background: var(--hover);
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule-2));
+}
+.mx-preset.on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  font-weight: 600;
+}
+.mx-frame {
+  display: flex;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--well) 55%, transparent);
+  border: 1px solid var(--rule);
+}
+.mx-frame.has-visual {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.mx-frame .mx-grid {
+  margin: 0 auto;
+  max-width: 100%;
+  overflow-x: auto;
+  gap: 6px;
+}
+.mx-frame.has-visual .mx-grid {
+  margin: 0;
+}
+.mx-poly-wrap {
+  flex: none;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+}
+.mx-poly-svg {
+  display: block;
+  width: 152px;
+  height: 122px;
+}
+.mx-poly-axis {
+  stroke: var(--rule-2);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.mx-poly-shape {
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.mx-poly-dot {
+  fill: var(--accent);
+  stroke: var(--panel);
+  stroke-width: 1.5;
+}
+.mx-poly-lbl {
+  font: 600 9.5px/1 var(--mono);
+  fill: var(--ink-2);
+}
+.mx-poly-empty {
+  font: 400 11px/1 var(--sans);
+  fill: var(--ink-3);
+}
+/* Visual matrix brackets and vector angle framing around the entry cells. */
+.mx-kind-matrix .mx-grid {
+  position: relative;
+  padding: 6px 14px;
+}
+.mx-kind-matrix .mx-grid::before,
+.mx-kind-matrix .mx-grid::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  border: 2px solid color-mix(in srgb, var(--ink-2) 65%, transparent);
+  pointer-events: none;
+}
+.mx-kind-matrix .mx-grid::before {
+  left: 0;
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+}
+.mx-kind-matrix .mx-grid::after {
+  right: 0;
+  border-left: 0;
+  border-radius: 0 3px 3px 0;
+}
+.mx-kind-vector .mx-grid {
+  position: relative;
+  padding: 4px 18px;
+}
+.mx-kind-vector .mx-grid::before,
+.mx-kind-vector .mx-grid::after {
+  position: absolute;
+  bottom: 4px;
+  font: 300 28px/1 var(--sans);
+  color: color-mix(in srgb, var(--ink-2) 65%, transparent);
+  pointer-events: none;
+}
+.mx-kind-vector .mx-grid::before {
+  content: '⟨';
+  left: 0;
+}
+.mx-kind-vector .mx-grid::after {
+  content: '⟩';
+  right: 0;
+}
+.mx-grid.mx-points {
+  grid-template-columns: 2rem 6.2rem 6.2rem;
+}
+.mx-point {
+  font: 600 12px/1 var(--mono);
+  color: var(--ink-3);
+}
+.mx-preview-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  overflow-x: auto;
+}
+.mx-preview-lbl {
+  flex: none;
+  font: 600 11px/1 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mx-preview {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  font: 500 13.5px/1.35 var(--mono);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.mx-preview.dim {
+  color: var(--ink-3);
+}
+.mx-meta {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font: 600 12.5px/1.3 var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mx-meta.bad {
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  color: var(--err);
+  font-family: var(--sans);
+  font-weight: 500;
+}
+.mx-issue {
+  display: block;
+  margin: -6px 0 12px;
+  font: 500 12.5px/1.35 var(--sans);
+  color: var(--err);
+}
+dialog.mx .mx-actions {
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+dialog.mx .mx-actions button {
+  padding: 8px 16px;
+  border-radius: 10px;
+  font: 500 13.5px/1.1 var(--sans);
+}
+
+/* Declarative GUI builders (Calculus, Normal, Data list, Probability, HVAC). */
+dialog.fb-dialog {
+  width: min(520px, 94vw);
+}
+.fb-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 10px;
+  border-radius: 11px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+}
+.fb-mode {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 500 12.5px/1 var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.fb-mode:hover {
+  color: var(--ink);
+}
+.fb-mode[aria-selected='true'] {
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 0 0 1px var(--rule-2);
+}
+.fb-note {
+  margin: 0 0 12px;
+  font: 400 12.5px/1.4 var(--sans);
+  color: var(--ink-3);
+}
+.fb-presets {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.fb-fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+.fb-full {
+  grid-column: 1 / -1;
+}
+.fb-half {
+  grid-column: span 3;
+}
+.fb-third {
+  grid-column: span 2;
+}
+.fb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.fb-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font: 500 12.5px/1.2 var(--sans);
+  color: var(--ink-2);
+}
+.fb-unit {
+  font: 500 11.5px/1 var(--mono);
+  color: var(--ink-3);
+}
+.fb-input,
+.fb-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--rule-2);
+  background: var(--well);
+  color: var(--ink);
+  font: 500 14.5px/1.35 var(--mono);
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+}
+.fb-textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.fb-input:focus,
+.fb-textarea:focus {
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.fb-input::placeholder,
+.fb-textarea::placeholder {
+  color: var(--ink-3);
+  font-weight: 400;
+}
+.fb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fb-chip {
+  flex: 1 1 auto;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--rule-2);
+  background: var(--well);
+  color: var(--ink-2);
+  font: 500 12.5px/1 var(--mono);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.fb-chip:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule-2));
+}
+.fb-chip[aria-checked='true'] {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  font-weight: 600;
+}
+.fb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font: 500 13px/1.3 var(--sans);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.fb-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+@media (max-width: 440px) {
+  .fb-half,
+  .fb-third {
+    grid-column: 1 / -1;
+  }
+  .mx-frame.has-visual {
+    justify-content: center;
+  }
+}
+
+/* Examples dialog: categorized cards with descriptions and sunken formula previews. */
+dialog.examples-dialog {
+  width: min(620px, 94vw);
+  max-height: 82vh;
+  padding: 20px 22px 16px;
+}
+dialog.examples-dialog .starter {
+  padding: 0 0 12px;
+  max-height: 58vh;
+  overflow-y: auto;
+}
+dialog.examples-dialog .mx-actions {
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.starter-section {
+  font: 600 11.5px/1.2 var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 14px 0 8px;
+}
+.starter-section:first-child {
+  margin-top: 0;
+}
+dialog.examples-dialog .starter-card {
+  gap: 5px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: var(--well);
+  border: 1px solid var(--rule);
+}
+dialog.examples-dialog .starter-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--rule-2));
+  background: color-mix(in srgb, var(--well) 90%, var(--accent) 10%);
+}
+dialog.examples-dialog .sc-title {
+  min-height: 0;
+  font: 600 14px/1.25 var(--sans);
+}
+.sc-sub {
+  font: 400 12.5px/1.35 var(--sans);
+  color: var(--ink-2);
+}
+dialog.examples-dialog .sc-lines {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  font: 12px/1.45 var(--mono);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+@media (max-width: 560px) {
+  dialog.examples-dialog .starter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- frosted glass chrome (Modern look, non-high-contrast) ---------- */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  & #app.canvas-ui > .modebar {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 86%, transparent) 0%, color-mix(in srgb, var(--bg) 42%, transparent) 64%, transparent 100%);
+  }
+  & #app.canvas-ui > .modebar :is(.desk-modes .seg, .cv-tools, .head-pill, .bar-tog, .desk-more, .appear-btn, .help-btn) {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--cv-block) 72%, transparent);
+    backdrop-filter: blur(22px) saturate(185%);
+    -webkit-backdrop-filter: blur(22px) saturate(185%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+  }
+  /* A sliding-lens segmented control for Deg | Rad, at every width. */
+  & #app.canvas-ui .modebar .desk-modes .seg {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 2px;
+  }
+  & #app.canvas-ui .modebar .desk-modes .seg::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 18%, var(--cv-raised));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 1px 4px rgb(0 0 0 / 0.28);
+    transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+    pointer-events: none;
+  }
+  & #app.canvas-ui .modebar .desk-modes .seg:has(button:last-child[aria-pressed='true'])::before {
+    transform: translateX(100%);
+  }
+  & #app.canvas-ui .modebar .desk-modes .seg button {
+    position: relative;
+    z-index: 1;
+    border-radius: 999px;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  & .canvas-ui .composer-head {
+    align-items: center;
+    padding: 0 10px 0 6px;
+    height: 30px;
+  }
+  /* The composer floats as a frosted island: matching --cv-radius, a specular top
+     hairline and a lifted shadow. */
+  & .canvas-ui .composer {
+    background: color-mix(in srgb, var(--cv-raised) 82%, transparent);
+    backdrop-filter: blur(26px) saturate(185%);
+    -webkit-backdrop-filter: blur(26px) saturate(185%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.28);
+  }
+  & .canvas-ui .main > .left > .keypad {
+    background: color-mix(in srgb, var(--cv-block) 78%, transparent);
+    backdrop-filter: blur(24px) saturate(185%);
+    -webkit-backdrop-filter: blur(24px) saturate(185%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 10px 30px rgb(0 0 0 / 0.24);
+  }
+  & dialog.mx,
+  & dialog.examples-dialog,
+  & dialog.palette {
+    background: color-mix(in srgb, var(--panel) 84%, transparent);
+    backdrop-filter: blur(28px) saturate(185%);
+    -webkit-backdrop-filter: blur(28px) saturate(185%);
+  }
+  @media (--phone) {
+    & #app.canvas-ui .left > .modebar {
+      background: color-mix(in srgb, var(--bg) 76%, transparent);
+      backdrop-filter: blur(22px) saturate(180%);
+      -webkit-backdrop-filter: blur(22px) saturate(180%);
+      border-bottom-color: color-mix(in srgb, var(--rule) 55%, transparent);
+    }
+    & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--cv-block) 72%, transparent);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+    }
+    & #app.canvas-ui .left > .modebar .brand-home .mark {
+      width: 33px;
+      height: 33px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--cv-block) 72%, transparent);
+      border: 1px solid var(--cv-edge);
+      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+    }
+    & .canvas-ui .main > .left > .keypad {
+      background: var(--bg);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+    }
+  }
+}
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) {
+  & #app.canvas-ui .modebar .desk-modes .seg::before {
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(23 23 26 / 0.14), 0 0 0 0.5px rgb(23 23 26 / 0.08);
+  }
+  & .canvas-ui .composer {
+    background: color-mix(in srgb, var(--cv-block) 86%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 6px 18px rgba(30, 45, 90, 0.08);
+  }
+  & #app.canvas-ui > .modebar :is(.desk-modes .seg, .cv-tools, .head-pill, .bar-tog, .desk-more, .appear-btn, .help-btn) {
+    background: color-mix(in srgb, var(--cv-block) 80%, transparent);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 1px 3px rgb(23 23 26 / 0.06);
+  }
+}
+
+/* ---------- glass blocks (Modern look, non-high-contrast) ----------
+   Blocks are frosted cards over the canvas: a mostly opaque fill that blurs what passes under it, a specular top
+   edge and a soft drop. The fill stays opaque enough that text keeps 4.5:1 over the Aurora backdrop on every theme.
+   The rail down a drawing line's left edge keeps its curve's color, and Aurora Glow's tinted edge (below) still wins
+   over the resting edge set here. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  & .canvas-ui .rows > .row.blk {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
+:root[data-look='modern'][data-theme='ink'] {
+  & .canvas-ui .rows > .row.blk {
+    background: rgba(26, 30, 42, 0.74);
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 4px 14px rgba(0, 0, 0, 0.26);
+  }
+  & .canvas-ui .rows > .row.blk:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.24);
+  }
+}
+:root[data-look='modern'][data-theme='oled'] {
+  & .canvas-ui .rows > .row.blk {
+    background: rgba(20, 20, 24, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
+  }
+  & .canvas-ui .rows > .row.blk:hover {
+    border-color: rgba(255, 255, 255, 0.17);
+  }
+  & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.34);
+  }
+}
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) {
+  & .canvas-ui .rows > .row.blk {
+    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 4px 14px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.05);
+  }
+  & .canvas-ui .rows > .row.blk:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 5px 16px rgba(32, 48, 96, 0.1), 0 0 0 0.5px rgba(23, 23, 26, 0.1);
+  }
+  & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.08);
+  }
+}
+/* Held and keyboard-focused blocks take the accent edge over any resting or hover edge. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk:is(.dragging, :has(:focus-visible)) {
+  border-color: var(--cv-accent);
+}
+
+/* ---------- Aurora Glow: an atmosphere that answers the line ----------
+   Two soft orbs of light behind the composer: --au-a in the open deck's color (set from the deck bar), --au-b in the
+   line's state. They brighten as the line types and works out, drift once when something changes (the composer's
+   .stir, restarted from script), and then rest. Timings mirror src/ui/motiontokens.ts. */
+:root[data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  & .canvas-ui .composer-dock {
+    --au-a: var(--cv-accent);
+    --au-b: var(--cv-iris);
+    --au-k: 1;
+    transition: --au-a 0.36s ease-out, --au-b 0.36s ease-out;
+  }
+  &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer-dock {
+    --au-k: 0.6;
+  }
+  & .canvas-ui .composer[data-state='err'] {
+    --au-b: var(--err);
+  }
+  & .canvas-ui .composer.stir {
+    animation: cv-orbit 9s cubic-bezier(0.45, 0, 0.55, 1) 1 both;
+  }
+  & .canvas-ui .composer::after {
+    /* The light runs the whole way round, the two colors meeting on each side, so both ends of the bar match. */
+    background: conic-gradient(from var(--cv-ang), var(--au-a), var(--au-b) 25%, var(--au-a) 50%, var(--au-b) 75%, var(--au-a));
+    opacity: 0.5;
+  }
+  & .canvas-ui .composer[data-state='ok']::after {
+    opacity: 1;
+  }
+  & .canvas-ui .composer .composer-halo {
+    inset: -22px;
+    border-radius: calc(var(--cv-radius) + 22px);
+    background:
+      radial-gradient(closest-side at 30% 50%, var(--au-a), transparent),
+      radial-gradient(closest-side at 70% 50%, var(--au-b), transparent);
+    filter: blur(28px);
+    opacity: calc(0.18 * var(--au-k));
+    transition: opacity 0.36s ease-out;
+  }
+  & .canvas-ui .composer[data-state='typing'] .composer-halo {
+    opacity: calc(0.26 * var(--au-k));
+  }
+  & .canvas-ui .composer[data-state='ok'] .composer-halo {
+    opacity: calc(0.42 * var(--au-k));
+  }
+  & .canvas-ui .composer[data-state='err'] .composer-halo {
+    opacity: calc(0.22 * var(--au-k));
+  }
+  & .canvas-ui .composer.stir .composer-halo {
+    animation: au-drift 9s cubic-bezier(0.45, 0, 0.55, 1) 1 both;
+  }
+  & .canvas-ui .composer-enter {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--cv-accent) 60%, transparent);
+  }
+  & .canvas-ui .rows > .row.blk {
+    border-color: color-mix(in srgb, var(--c, var(--cv-accent)) 48%, var(--cv-edge));
+  }
+  /* Only a block that just landed glows, and only for a moment. */
+  & .canvas-ui .rows > .row.blk.landed {
+    animation: au-land 1.2s ease-out 1;
+  }
+  & .canvas-ui .deck-pad.lit {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--cv-accent) 62%, transparent);
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab.lit {
+    box-shadow: 0 0 14px -2px var(--tab);
+  }
+  & .canvas-ui .keypad .key.op .kl {
+    text-shadow: 0 0 10px color-mix(in srgb, var(--cv-accent) 55%, transparent);
+  }
+}
+@keyframes au-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  35% {
+    transform: translate(3%, -4%) scale(1.04);
+  }
+  70% {
+    transform: translate(-3%, 3%) scale(0.98);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+@keyframes au-land {
+  from {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--c, var(--cv-accent)) 30%, transparent);
+  }
+  to {
+    box-shadow: 0 0 18px transparent;
+  }
+}
+:root[data-glow][data-motion='off'] .canvas-ui .composer,
+:root[data-glow][data-motion='reduced'] .canvas-ui .composer,
+:root[data-glow][data-motion='off'] .canvas-ui .composer::after,
+:root[data-glow][data-motion='reduced'] .canvas-ui .composer::after {
+  animation: none;
+  --cv-ang: 35deg;
+}
+:root[data-glow][data-motion='off'] .canvas-ui :is(.composer-halo, .rows > .row.blk.landed),
+:root[data-glow][data-motion='reduced'] .canvas-ui :is(.composer-halo, .rows > .row.blk.landed) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-glow] .canvas-ui :is(.composer, .composer-halo, .rows > .row.blk.landed),
+  :root[data-glow] .canvas-ui .composer::after {
+    animation: none;
+  }
+}
+/* The canvas behind the blocks takes the open deck's color too: a faint orb of it at the top left (--au-deck, set
+   beside the composer's --au-a from the deck bar) and a violet one at the right. The layer sits under the blocks and
+   takes no pointer; its tint glides once when the deck changes and then rests. Each orb's color is scaled against
+   the layer's opacity, so the violet lands at 0.14 on dark themes and 0.11 on light ones. */
+:root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .tape.cv-viewport::before {
+  --au-a: var(--au-deck, var(--cv-accent));
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
+    radial-gradient(46% 52% at 90% 54%, rgba(167, 139, 250, 0.7), transparent 72%);
+  opacity: 0.2;
+  transition: --au-a 0.42s ease-out;
+}
+:root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .tape.cv-viewport::before {
+  background:
+    radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
+    radial-gradient(46% 52% at 90% 54%, rgba(124, 92, 240, 0.786), transparent 72%);
+  opacity: 0.14;
+}
+
+/* ---------- Pride colors (Modern): the flag in neon, lit the way Aurora Glow is ----------
+   The theme stays as it is. Six neon clouds sit round the canvas's edges, the composer's rim and the light behind it
+   run through the flag, Enter wears it, and a stripe of it lies along the deck bar. The same colors as NEON_DARK and
+   NEON_LIGHT in src/ui/palettes.ts, which the phones draw. */
+:root[data-look='modern'][data-pride]:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  --pr-1: #ff2e63;
+  --pr-2: #ff8a00;
+  --pr-3: #ffe600;
+  --pr-4: #00f58a;
+  --pr-5: #1fb6ff;
+  --pr-6: #b44dff;
+  --pr-flag: var(--pr-1), var(--pr-2), var(--pr-3), var(--pr-4), var(--pr-5), var(--pr-6);
+  --pr-glow: 0.36;
+  /* The accent turns neon violet, as palettes.ts makes it on the phones. */
+  --led: #c77dff;
+  &:is(:not([data-theme]), [data-theme='paper']) {
+    --led: #9b30f5;
+    --pr-1: #f0124d;
+    --pr-2: #ff7a00;
+    --pr-3: #f5c800;
+    --pr-4: #00d977;
+    --pr-5: #0a9cf5;
+    --pr-6: #9b30f5;
+    --pr-glow: 0.3;
+  }
+  &[data-theme='oled'] {
+    --pr-glow: 0.3;
+  }
+  & .canvas-ui .tape.cv-viewport::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(42% 42% at 8% 6%, var(--pr-1), transparent 72%),
+      radial-gradient(42% 42% at 92% 10%, var(--pr-2), transparent 72%),
+      radial-gradient(42% 42% at 102% 50%, var(--pr-3), transparent 72%),
+      radial-gradient(42% 42% at 86% 94%, var(--pr-4), transparent 72%),
+      radial-gradient(42% 42% at 12% 90%, var(--pr-5), transparent 72%),
+      radial-gradient(42% 42% at -2% 46%, var(--pr-6), transparent 72%);
+    opacity: var(--pr-glow);
+  }
+  & .canvas-ui .composer::after {
+    background: conic-gradient(from var(--cv-ang), var(--pr-flag), var(--pr-1));
+    opacity: 0.9;
+  }
+  & .canvas-ui .composer .composer-halo {
+    inset: -22px;
+    border-radius: calc(var(--cv-radius) + 22px);
+    background: linear-gradient(90deg, var(--pr-flag));
+    filter: blur(28px);
+    opacity: 0.4;
+  }
+  & .canvas-ui .composer-enter {
+    background: linear-gradient(100deg, var(--pr-flag));
+    border-color: transparent;
+  }
+  & .canvas-ui .composer-enter .kl {
+    color: #1a1024;
+  }
+  & .canvas-ui .deck-bar {
+    border-bottom: 2px solid transparent;
+    border-image: linear-gradient(90deg, var(--pr-1) 0 16.67%, var(--pr-2) 0 33.33%, var(--pr-3) 0 50%, var(--pr-4) 0 66.67%, var(--pr-5) 0 83.33%, var(--pr-6) 0) 1;
+  }
+}
+
+/* ---------- the empty canvas: a first impression ----------
+   Beside the list of lines, never in it: a bell curve that draws itself once and a few starters. Timings mirror
+   DURATIONS.emptyDraw, emptyFillDelay, emptyFadeOut and STAGGER.starterMs in src/ui/motiontokens.ts. */
+.canvas-ui .tape > .cv-empty {
+  position: absolute;
+  left: calc((100% - var(--cv-keys-w, 0px)) / 2);
+  top: calc((100% - 150px) / 2);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+  transition: opacity 0.16s ease-out, visibility 0s;
+}
+.canvas-ui .tape > .cv-empty[hidden] {
+  display: none;
+}
+.canvas-ui .tape > .cv-empty.gone {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s ease-out, visibility 0s 0.16s;
+}
+.canvas-ui .tape > .cv-empty.gone * {
+  pointer-events: none;
+}
+.canvas-ui .cv-empty-mark {
+  overflow: visible;
+}
+.canvas-ui .cv-empty-mark .curve,
+.canvas-ui .cv-empty-mark .base {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.canvas-ui .cv-empty-mark .curve {
+  stroke: var(--cv-accent);
+  stroke-width: 2.25;
+  animation: cv-empty-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.canvas-ui .cv-empty-mark .base {
+  stroke: var(--cv-edge-2);
+  stroke-width: 1.5;
+  animation: cv-empty-draw 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.canvas-ui .cv-empty-mark .area {
+  fill: var(--cv-accent);
+  opacity: 0.18;
+  animation: cv-empty-fill 0.3s ease-out 0.6s both;
+}
+@keyframes cv-empty-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cv-empty-fill {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.18;
+  }
+}
+.canvas-ui .cv-empty-starters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.canvas-ui .cv-empty-chip {
+  pointer-events: auto;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--cv-edge);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cv-block) 72%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent), 0 1px 2px rgb(0 0 0 / 0.08);
+  color: var(--ink-2);
+  font: 500 14px/1 var(--sans);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background-color 0.12s, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: cv-empty-chip-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) calc(0.45s + var(--i, 0) * var(--stagger, 40ms)) both;
+}
+.canvas-ui .cv-empty-chip:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--cv-accent) 45%, var(--cv-edge));
+}
+.canvas-ui .cv-empty-chip:active {
+  transform: scale(0.96);
+  transition-duration: 0.06s;
+  transition-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+.canvas-ui .cv-empty-chip:focus-visible {
+  outline: 2px solid var(--cv-accent);
+  outline-offset: 2px;
+}
+@keyframes cv-empty-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+:root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .cv-empty-chip {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 1px 3px rgb(23 23 26 / 0.08);
+}
+[data-theme^='contrast'] .canvas-ui .cv-empty-chip {
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+}
+[data-look='retro'] .canvas-ui .cv-empty-chip {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-ui .cv-empty-mark :is(.curve, .base, .area),
+  .canvas-ui .cv-empty-chip {
+    animation: none;
+  }
+}
+@media (--phone) {
+  .canvas-ui .tape > .cv-empty {
+    left: 50%;
+    top: 50%;
+  }
 }

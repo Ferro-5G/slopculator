@@ -53,10 +53,12 @@ class Parser {
   private rows = 0;
   /** Tokens from here on read as the end of the line: an integral's body stops at its dx. */
   private limit: number;
+  private spans?: Map<Node, [number, number]>;
   /** For each integral sign, by its token, the dx that closes it. Worked out once, the first time one is met. */
   private closers: Map<number, { at: number; head?: string; d: string }> | undefined;
   constructor(private toks: Token[], spans?: Map<Node, [number, number]>) {
     this.limit = toks.length - 1;
+    this.spans = spans;
     if (!spans) return;
     // Each part's place in the text: the tokens its rule took, from the first one's start to where the next one starts.
     for (const rule of SPANNED) {
@@ -68,6 +70,10 @@ class Parser {
         return n;
       };
     }
+  }
+  private mark(n: Node, from: number): Node {
+    if (this.spans && !this.spans.has(n) && this.i > from) this.spans.set(n, [this.toks[from].pos, this.peek().pos]);
+    return n;
   }
 
   private peek(o = 0): Token {
@@ -200,14 +206,15 @@ class Parser {
   }
 
   parseAdditive(): Node {
+    const from = this.i;
     let a = this.parseMul();
     for (;;) {
       if (this.isOp('+')) {
         this.i++;
-        a = { k: 'bin', op: '+', a, b: this.parseMul() };
+        a = this.mark({ k: 'bin', op: '+', a, b: this.parseMul() }, from);
       } else if (this.isOp('-')) {
         this.i++;
-        a = { k: 'bin', op: '-', a, b: this.parseMul() };
+        a = this.mark({ k: 'bin', op: '-', a, b: this.parseMul() }, from);
       } else return a;
     }
   }
@@ -222,29 +229,30 @@ class Parser {
   }
 
   parseMul(): Node {
+    const from = this.i;
     let a = this.parseUnary();
     for (;;) {
       const t = this.peek();
       if (t.type === 'op' && t.value === '*') {
         this.i++;
-        a = { k: 'bin', op: '*', a, b: this.parseUnary() };
+        a = this.mark({ k: 'bin', op: '*', a, b: this.parseUnary() }, from);
       } else if (t.type === 'op' && t.value === '/') {
         this.i++;
-        a = { k: 'bin', op: '/', a, b: this.parseBelow() };
+        a = this.mark({ k: 'bin', op: '/', a, b: this.parseBelow() }, from);
       } else if (t.type === 'ident' && INFIX_WORDS.has(t.value)) {
         this.i++;
         const b = this.parseUnary();
-        if (t.value === 'mod') a = { k: 'call', name: 'mod', args: [a, b], pos: t.pos };
-        else a = { k: 'bin', op: t.value === 'choose' ? 'nCr' : (t.value as 'nCr' | 'nPr'), a, b };
+        if (t.value === 'mod') a = this.mark({ k: 'call', name: 'mod', args: [a, b], pos: t.pos }, from);
+        else a = this.mark({ k: 'bin', op: t.value === 'choose' ? 'nCr' : (t.value as 'nCr' | 'nPr'), a, b }, from);
       } else if (t.type === 'ident' && t.value === 'of' && endsInPercent(a)) {
         // 10% of 50 is 10% × 50, and so are 2 × 10% of 50 and −10% of 50 with their factor.
         this.i++;
-        a = { k: 'bin', op: '*', a, b: this.parseUnary() };
+        a = this.mark({ k: 'bin', op: '*', a, b: this.parseUnary() }, from);
       } else if (this.startsImplicit()) {
         // [[1, 2][3, 4]] is a matrix as a TI writes it: inside a bracket, a row follows a row. Rows of numbers never
         // multiply, while [[1, 2], [3, 4]][[5, 6], [7, 8]] is still a product of matrices.
         if (this.rows > 0 && a.k === 'bracket' && a.items.every((r) => r.k !== 'bracket') && this.isOp('[') && !(this.peek(1).type === 'op' && this.peek(1).value === '[')) return a;
-        a = { k: 'bin', op: '*', a, b: this.parsePower() };
+        a = this.mark({ k: 'bin', op: '*', a, b: this.parsePower() }, from);
       } else return a;
     }
   }
@@ -254,10 +262,11 @@ class Parser {
    * (−b + √d)/2a is over 2a. A written * or another / ends it: 1/2*x is x/2.
    */
   private parseBelow(): Node {
+    const from = this.i;
     let b = this.parseUnary();
     while (this.startsImplicit()) {
       if (this.rows > 0 && b.k === 'bracket' && b.items.every((r) => r.k !== 'bracket') && this.isOp('[') && !(this.peek(1).type === 'op' && this.peek(1).value === '[')) break;
-      b = { k: 'bin', op: '*', a: b, b: this.parsePower() };
+      b = this.mark({ k: 'bin', op: '*', a: b, b: this.parsePower() }, from);
     }
     return b;
   }

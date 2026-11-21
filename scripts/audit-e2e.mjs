@@ -85,8 +85,9 @@ for (const trailing of [[], ['']]) {
   await check(`Combine has its own undo with ${trailing.length ? 'an empty' : 'a new'} result line`, async (p) => {
     await seed(p, ['1', '2', ...trailing]);
     await dropToast(p);
-    await p.click('.menu-btn');
-    await p.locator('.combine-row button[aria-label="Add all lines"]').click();
+    await p.click('.head-find');
+    await p.locator('dialog.palette .pal-input').fill('Add all lines');
+    await p.locator('dialog.palette .pal-item', { hasText: 'Add all lines' }).first().click();
     assert.deepEqual(await texts(p), ['1', '2', '1 + 2']);
     await undo(p);
     // The composer's empty new line isn't one of the sheet's lines.
@@ -105,8 +106,9 @@ for (const trailing of [[], ['']]) {
 await check('Combine toast undo preserves newer source edits', async (p) => {
   await seed(p, ['1', '2']);
   await dropToast(p);
-  await p.click('.menu-btn');
-  await p.locator('.combine-row button[aria-label="Add all lines"]').click();
+  await p.click('.head-find');
+  await p.locator('dialog.palette .pal-input').fill('Add all lines');
+  await p.locator('dialog.palette .pal-item', { hasText: 'Add all lines' }).first().click();
   await p.evaluate(() => {
     const input = document.querySelector('.rows .row .expr');
     input.value = '10'; input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -359,7 +361,7 @@ for (const look of ['modern', 'retro']) {
       const range = document.createRange(); range.selectNodeContents(e);
       return { text: e.textContent, width: range.getBoundingClientRect().width, room: e.clientWidth };
     }));
-    assert.deepEqual(legends.map((l) => l.text), ['7', '8', '9', '×', 'enter']);
+    assert.deepEqual(legends.map((l) => l.text), ['7', '8', '9', '×', 'ENTER']);
     for (const label of legends) assert.ok(label.width <= label.room + 1, `${look}: ${label.text} needs ${label.width}px but has ${label.room}px`);
   });
 }
@@ -407,7 +409,7 @@ for (const look of ['modern', 'retro']) {
       const box = await p.locator(panel).boundingBox();
       assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 762 && box.y + box.height <= 560, `${look}: reopened ${name} escapes the window`);
       if (name === 'File') {
-        const last = p.locator(panel).getByRole('menuitem', { name: /Keyboard shortcuts/ });
+        const last = p.locator(panel).getByRole('menuitem', { name: /Privacy/ });
         await last.focus();
         const item = await last.boundingBox();
         assert.ok(item.y >= box.y && item.y + item.height <= box.y + box.height, `${look}: File's final action cannot scroll into view`);
@@ -434,18 +436,90 @@ for (const look of ['modern', 'retro']) {
         assert.ok(tile.height >= 28, `${look} ${viewport.height}: ${tile.name} shrank to ${tile.height}px`);
         assert.ok(tile.ink <= tile.height + 1, `${look}: formula is taller than its tile`);
       }
-      const close = await p.locator('.ti-close').boundingBox(), page = await p.locator('.ti-page').boundingBox();
+      const close = await p.locator('.ti-close').boundingBox(), keypad = await p.locator('#keypad').boundingBox();
       const last = p.locator('.ti-tile').last();
       await last.focus();
-      const tile = await last.boundingBox(), grid = await p.locator('.ti-grid').boundingBox();
-      assert.ok(tile.y >= grid.y - 1 && tile.y + tile.height <= grid.y + grid.height + 1, `${look}: final Math tile cannot scroll into view`);
+      const tile = await last.boundingBox(), scroll = await p.locator('.ti-scroll').boundingBox();
+      assert.ok(tile.y >= scroll.y - 1 && tile.y + tile.height <= scroll.y + scroll.height + 1, `${look}: final Math tile cannot scroll into view`);
       const after = await p.locator('.ti-close').boundingBox();
-      assert.ok(after.y === close.y && after.y >= page.y && after.y + after.height <= page.y + page.height, `${look}: scrolling hid the page header`);
+      assert.ok(after.y === close.y && after.y >= keypad.y && after.y + after.height <= keypad.y + keypad.height, `${look}: scrolling hid the deck bar`);
       await p.locator('.ti-close').click();
       assert.ok(await p.locator('.ti-page').isHidden());
     }
   });
 }
+
+await check('desktop toolbar controls share one uniform height, and dragging a value block by its answer moves it without copying', async (p) => {
+  await p.setViewportSize({ width: 1280, height: 800 });
+  await seed(p, ['r = 4', 'A = pi * r^2', 'y = r * sin(x)']);
+  await dropToast(p);
+  await p.evaluate(() => document.fonts.ready);
+  const heights = await p.evaluate(() => [...document.querySelectorAll('#app.canvas-ui > .modebar .desk-modes .seg, #app.canvas-ui > .modebar .cv-tools, #app.canvas-ui > .modebar .head-pill, #app.canvas-ui > .modebar .bar-tog, #app.canvas-ui > .modebar .desk-more, #app.canvas-ui > .modebar .appear-btn, #app.canvas-ui > .modebar .help-btn')]
+    .filter((el) => el.offsetParent)
+    .map((el) => Math.round(el.getBoundingClientRect().height)));
+  assert.ok(heights.length >= 6 && new Set(heights).size === 1, `ragged toolbar heights: ${JSON.stringify(heights)}`);
+  // Dragging starting on the value block's .result button moves the block instead of copying.
+  const val = p.locator('.tape .rows > .row.blk-value').first();
+  const res = val.locator('.out .result');
+  const before = await val.boundingBox(), rb = await res.boundingBox();
+  assert.ok(before && rb);
+  await p.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(rb.x + rb.width / 2 + 48, rb.y + rb.height / 2 + 32, { steps: 6 });
+  await p.mouse.up();
+  const after = await val.boundingBox();
+  assert.ok(Math.hypot(after.x - before.x, after.y - before.y) > 20, `value block did not drag from its answer: ${JSON.stringify({ before, after })}`);
+  assert.equal(await p.locator('.toast.show').count(), 0, 'dragging from the answer triggered copy toast');
+  // A plain click on the answer still copies it.
+  await res.click();
+  await p.locator('.toast.show').waitFor();
+  await dropToast(p);
+  // Opening Steps and then clicking Math never jolts canvas zoom.
+  const zoomBefore = await p.locator('.cv-zoom').innerText();
+  await val.locator('.cv-steps').click();
+  await p.locator('.ti-tab[aria-label="Math"]').click();
+  const zoomAfter = await p.locator('.cv-zoom').innerText();
+  assert.equal(zoomAfter, zoomBefore, `zoom jolted after Steps + Math click: ${zoomBefore} -> ${zoomAfter}`);
+  await p.keyboard.press('Escape');
+});
+
+await check('wide to narrow resize resets psychrometric chart position, keeps value answers whole under Steps, and hugs narrow Math page to its grid', async (p) => {
+  await p.setViewportSize({ width: 1280, height: 800 });
+  await seed(p, ['r = 4', 'A = pi * r^2', 'y = r * sin(x)', 'S1 = psych(25, 0.5)']);
+  await p.locator('.tape .rows > .row.blk-value .cv-steps').click();
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const state = await p.evaluate(() => {
+    const val = document.querySelector('.tape .rows > .row.blk-value');
+    const out = val.querySelector('.out'), res = val.querySelector('.out .result');
+    const psych = document.querySelector('.tape .blk-psych');
+    const prev = psych.previousElementSibling;
+    const pr = psych.getBoundingClientRect(), vr = prev.getBoundingClientRect();
+    return {
+      ansWhole: res.scrollWidth <= out.clientWidth + 1,
+      psychLeft: psych.style.left,
+      psychTop: psych.style.top,
+      psychRight: Math.round(pr.right),
+      psychGap: Math.round(pr.top - vr.bottom),
+    };
+  });
+  assert.ok(state.ansWhole, `mobile value answer clipped under Steps: ${JSON.stringify(state)}`);
+  assert.equal(state.psychLeft, '', `psychBlock kept stale wide left: ${JSON.stringify(state)}`);
+  assert.equal(state.psychTop, '', `psychBlock kept stale wide top: ${JSON.stringify(state)}`);
+  assert.ok(state.psychRight <= 390, `psychBlock overflowed phone width: ${JSON.stringify(state)}`);
+  assert.ok(state.psychGap < 80, `psychBlock left huge vertical void: ${JSON.stringify(state)}`);
+  await p.locator('.ti-tab[aria-label="Math"]').click();
+  await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const deckCheck = await p.evaluate(() => {
+    const pg = document.querySelector('.ti-page').getBoundingClientRect();
+    const dock = document.querySelector('.composer-dock').getBoundingClientRect();
+    const lastTile = [...document.querySelectorAll('.ti-page .ti-tile')].at(-1).getBoundingClientRect();
+    return { coversComposer: pg.top < dock.bottom - 1 && pg.bottom > dock.top + 1, slack: Math.round(pg.bottom - lastTile.bottom) };
+  });
+  assert.ok(!deckCheck.coversComposer, `narrow Math deck covered composer/canvas: ${JSON.stringify(deckCheck)}`);
+  assert.ok(deckCheck.slack <= 24, `narrow Math deck left ${deckCheck.slack}px of empty void under its tiles`);
+  await p.locator('.ti-close').click();
+});
 
 await browser.close();
 process.exitCode = failures ? 1 : 0;

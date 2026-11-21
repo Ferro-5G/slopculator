@@ -99,13 +99,17 @@ export function applyUI({ glide = false } = {}): void {
   const show = graphOn();
   const onGraph = false;
   const sysKeyboard = !!doc.ui.sysKeyboard;
-  foldKeypad(keypadOn() && !(coarse.matches && sysKeyboard), glide);
+  const showPad = keypadOn() && !(coarse.matches && sysKeyboard);
+  // On a narrow window with a hardware keyboard (keypad off), keep the compact deck bar docked so categories remain one tap away.
+  const barOnly = narrow.matches && !showPad && !(coarse.matches && sysKeyboard);
+  keypadEl.classList.toggle('bar-only', barOnly);
+  foldKeypad(showPad || barOnly, glide);
   keysToggle.setAttribute('aria-expanded', String(keypadOn()));
   barKeypad.setAttribute('aria-pressed', String(keypadOn()));
   barGraph.setAttribute('aria-pressed', String(show));
   for (const v of views.values()) if (v.input) v.input.inputMode = lineInputMode();
   syncers.forEach((s) => s());
-  if (onGraph || !keypadOn() || (coarse.matches && sysKeyboard)) closeThumb();
+  if (onGraph || (!showPad && !barOnly)) closeThumb();
   refreshModeBar();
   syncMobileNav();
   buildMenu();

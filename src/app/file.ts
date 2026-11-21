@@ -5,24 +5,20 @@ import { setSound, play } from './sound';
 import { showHelp, COMMANDS } from './commands';
 import { syncers } from './controls';
 import { type Doc, normalizeDoc, type Row, blankRow } from './docmodel';
-import { SHOW_EXAMPLE } from '../ui/canvas';
-import { hasExample, showExample } from './example';
 import { openExamples } from './listtools';
-import { h } from './dom';
-import { undos, runUndo, runRedo, clearAll, dragEnds, pushStep, leaveSheet, addTable, addNormalCurve, combineAll } from './edits';
-import { COMBINE_OPS } from '../ui/combine';
+import { h, icon } from './dom';
+import { undos, runUndo, runRedo, dragEnds, pushStep, leaveSheet } from './edits';
 import { copy } from './feedback';
 import { exportSVG, copyGraphImage } from './graphpane';
 import { openHistoryDialog } from './historydialog';
-import { switchPadSide } from './keypad';
 import { graph, modeBar } from './layout';
 import { placePopover, dialogShell, cancelButton, closePopovers, arrowsMove, addPopover } from './overlay';
 import { type SavedSheet, loadSessions, store, sheetExists, writeSheet, removeSession, KEYS } from './persistence';
 import { coarse, kb } from './platform';
-import { setReorder, rebuildRows } from './rows';
+import { rebuildRows } from './rows';
 import { focusRow, focusLine } from './rowviews';
 import { currentSheet, doc, saveSoon, autosaveSheet, setDoc, setCurrentSheetName, opts, results, sheetChanged, sheetFromAnotherTab, storedNameIsOurs, recompute } from './sheet';
-import { keypadOn, graphOn, applyUI, toggleSysKeyboard } from './shell';
+import { applyUI } from './shell';
 import { applyTheme, syncAppearanceSlots } from './theme';
 import { hideToast, showToast } from './toast';
 
@@ -59,18 +55,11 @@ export function buildMenu(): void {
       h('hr'),
       ...(typeof navigator.share === 'function' ? [item('Share as text…', '', shareSheetText)] : []),
       item('Copy as text', '', () => copy(sheetAsText())),
-      item('History…', '', openHistoryDialog),
-      item('Reorder lines', '', () => setReorder(true)),
-      item('Add a table', '', addTable),
-      item('Add a normal curve', '', addNormalCurve),
-      item(doc.ui.sysKeyboard ? 'Use the keypad' : 'Use the system keyboard', '', toggleSysKeyboard),
-      item('Clear all', '', clearAll),
-      item('Start with an example…', '', openExamples),
-      ...(hasExample() ? [] : [item(SHOW_EXAMPLE, '', showExample)]),
-      item('Privacy', '', showPrivacy),
-      h('hr'),
       h('div', { class: 'menu-row file-row', role: 'group', 'aria-label': 'Sheet file' }, h('span', { 'aria-hidden': 'true' }, 'Sheet file'),
         h('div', { class: 'menu-btns' }, small('Export', 'Export the sheet', '.json', exportJSON), small('Import', 'Import a sheet', '.json', importJSON))),
+      h('hr'),
+      item('Start with an example…', '', openExamples),
+      item('Privacy', '', showPrivacy),
     );
     syncAppearanceSlots();
     return;
@@ -82,34 +71,18 @@ export function buildMenu(): void {
     item(currentSheet ? 'Save' : 'Save…', COMMANDS.saveSheet.keys, COMMANDS.saveSheet.run),
     item('Duplicate', '', duplicateSheet),
     item('Rename…', '', renameSheet),
-    item('History…', COMMANDS.history.keys, COMMANDS.history.run),
-    item('Clear all', COMMANDS.clearAll.keys, COMMANDS.clearAll.run),
     ...recentSheetItems(item),
-    h('hr'),
-    item('Add a table', '', addTable),
-    item('Add a normal curve', '', addNormalCurve),
-    h('div', { class: 'menu-row combine-row', role: 'group', 'aria-label': 'Combine every line with a number into a new line' }, h('span', { 'aria-hidden': 'true' }, 'Combine all lines'),
-      h('div', { class: 'menu-btns' }, ...COMBINE_OPS.map(([op, label, word]) => small(label, `${word} all lines`, 'in a new line', () => combineAll(op))))),
     h('hr'),
     item('Copy sheet as text', '', () => copy(sheetAsText())),
     item('Export…', '', exportJSON, '.json'),
     item('Import…', '', importJSON, '.json'),
-    h('hr'),
     h('div', { class: 'menu-row graph-row', role: 'group', 'aria-label': 'Graph' }, h('span', { 'aria-hidden': 'true' }, 'Graph'),
       h('div', { class: 'menu-btns' },
         small('PNG', 'Save graph as PNG', 'P on the graph', () => graph.exportPNG()),
         small('SVG', 'Save graph as SVG', 'vector', () => exportSVG()),
         small('Copy', 'Copy graph as image', 'C on the graph', () => copyGraphImage()))),
     h('hr'),
-    item(keypadOn() ? 'Hide keypad' : 'Show keypad', COMMANDS.toggleKeypad.keys, COMMANDS.toggleKeypad.run),
-    item(graphOn() ? 'Hide graph' : 'Show graph', COMMANDS.toggleGraph.keys, COMMANDS.toggleGraph.run),
-    item(`Move number pad to the ${doc.ui.padLeft ? 'right' : 'left'}`, '', switchPadSide),
-    item(doc.ui.sound === false ? 'Turn key sounds on' : 'Turn key sounds off', '', () => toggleKeySound(true)),
-    h('hr'),
-    item('Find a function or command', COMMANDS.palette.keys, COMMANDS.palette.run),
-    item('Keyboard shortcuts', COMMANDS.help.keys, COMMANDS.help.run),
     item('Start with an example…', '', openExamples),
-    ...(hasExample() ? [] : [item(SHOW_EXAMPLE, '', showExample)]),
     item('Privacy', '', showPrivacy),
   );
   syncAppearanceSlots();
@@ -321,6 +294,8 @@ function appMark(): HTMLElement {
   return m;
 }
 export const menuWrap = h('div', { class: 'menu-wrap' }, menuBtn, menu);
+/** History, beside File: everything worked out, kept for good. */
+export const historyBtn = h('button', { type: 'button', class: 'head-history', 'aria-label': 'History', title: kb(`History (${COMMANDS.history.keys})`), onclick: () => openHistoryDialog() }, icon('history'));
 function shareSheetText(): void {
   const text = sheetAsText();
   navigator.share({ title: currentSheet ?? 'Slopculator sheet', text }).catch((e: unknown) => {

@@ -47,3 +47,7 @@ export function showToast(msg: string, undo?: () => void, actionOnly = false): v
   toast.classList.add('show');
   toastTimer = window.setTimeout(hideToast, undo ? TOAST_MS.action : TOAST_MS.note);
 }
+// Keep an open toast centred over the composer if the window resizes or crosses the phone breakpoint.
+const replaceToast = () => { if (toast.classList.contains('show')) placeToast(); };
+window.addEventListener('resize', replaceToast);
+narrow.addEventListener('change', replaceToast);

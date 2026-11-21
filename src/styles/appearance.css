@@ -147,3 +147,12 @@
   border-top: 1px solid var(--rule);
   background: var(--key-bed, var(--well));
 }
+
+.as-keys .key.hero {
+  flex: 1.45;
+}
+
+.as-keys .key.hero .kl {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}

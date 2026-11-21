@@ -147,6 +147,14 @@ describe('flowLayout: the mockup\'s columns', () => {
     expect(at.get('r4')!.x).toBe(at.get('r3')!.x + FLOW.step!);
     expect(at.get('r3')!.y).toBeLessThan(at.get('r4')!.y);
   });
+  it('keeps a slider feeding both a value and a curve in the left column so wires flow left to right', () => {
+    const at = flow(['r = 4', 'A = πr^2', 'y = r * sin(x)']);
+    const r = at.get('r1')!, area = at.get('r2')!, curve = at.get('r3')!, g = at.get(GRAPH_BLOCK)!;
+    expect(r.x).toBe(FLOW.origin.x);
+    expect(r.y).toBeLessThan(curve.y);
+    expect(g.x).toBeGreaterThan(r.x + r.w);
+    expect(area.x).toBeGreaterThan(g.x + g.w);
+  });
   it('keeps a dragged block where it is, and flows the rest around it', () => {
     const at = flow(['y = x', 'y = 2x', 'y = 3x'], {}, { r2: { x: 600, y: 600 }, r1: { x: 56, y: 170 } });
     expect(at.get('r1')).toMatchObject({ x: 56, y: 170 });

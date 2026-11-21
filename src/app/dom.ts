@@ -28,6 +28,7 @@ export const ICONS: Record<string, string> = {
   bars: '<rect x="2.75" y="8.75" width="2.5" height="4.5" rx=".5"/><rect x="6.75" y="2.75" width="2.5" height="10.5" rx=".5"/><rect x="10.75" y="5.75" width="2.5" height="7.5" rx=".5"/>',
   sliders: '<path d="M2.25 3.75h6.5M12.25 3.75h1.5M2.25 8h1.5M7.25 8h6.5M2.25 12.25h4.5M10.25 12.25h3.5"/><circle cx="10.5" cy="3.75" r="1.75"/><circle cx="5.5" cy="8" r="1.75"/><circle cx="8.5" cy="12.25" r="1.75"/>',
   sigma: '<path d="M12 3.25H4l4 4.75-4 4.75h8"/>',
+  history: '<path d="M2.75 8a5.25 5.25 0 1 0 1.55-3.7"/><path d="M2.6 2.6v2.6h2.6"/><path d="M8 5.25V8l2 1.25"/>',
   search: '<circle cx="7" cy="7" r="4.25"/><path d="M10.25 10.25 13.5 13.5"/>',
   clear: '<path d="M3 4.5h10M6.25 4.5V3h3.5v1.5M4.5 4.5l.6 8.1a.75.75 0 0 0 .75.65h4.3a.75.75 0 0 0 .75-.65l.6-8.1"/>',
 };

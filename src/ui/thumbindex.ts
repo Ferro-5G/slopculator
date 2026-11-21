@@ -13,6 +13,7 @@ export interface Tile {
 
 export interface Page {
   name: string;
+  note?: string;
   tiles: Tile[];
   editor?: EditorTile;
 }
@@ -80,205 +81,229 @@ export function tileKey(tile: Tile, fluid: string = FLUIDS[0].key.ins!): Key {
   return { ...tile.key, ins: tile.key.ins.replace('(¦)', `(${fluid}, ¦)`) };
 }
 
-const si = (bank: string) => t(bank, 'SI', 'IP → SI', 'switch this function to metric, as its last input');
+const si = (bank: string) => t(bank, 'SI', 'IP → SI', 'use metric (SI) units for the last argument');
 
 export const TABS: Tab[] = [
   {
     name: 'Math',
-    subtitle: 'functions, trig, numbers, calculus, graphing, units and money',
+    subtitle: 'Trig, logs, algebra, calculus, graphing & units',
     glyph: 'ƒ',
     symbol: 'function',
     pages: [
       {
         name: 'Basic',
+        note: 'Core trig, logs, powers, roots & equation solver',
         tiles: [
           t('Trig', 'sin', 'sin', 'sine'), t('Trig', 'cos', 'cos', 'cosine'), t('Trig', 'tan', 'tan', 'tangent'), t('Algebra', 'ln', 'ln x', 'natural log'),
-          t('Trig', 'sin⁻¹', 'sin⁻¹', 'inverse sine, the angle'), t('Trig', 'cos⁻¹', 'cos⁻¹', 'inverse cosine, the angle'), t('Trig', 'tan⁻¹', 'tan⁻¹', 'inverse tangent, the angle'), t('Algebra', 'log', 'log x', 'log base 10'),
-          t('Basic', 'x²', 'x²', 'square'), t('Basic', 'x⁻¹', '1/x', 'reciprocal'), t('Algebra', 'eˣ', 'eˣ', 'e to a power'), t('Algebra', '10ˣ', '10ˣ', '10 to a power'),
+          t('Trig', 'sin⁻¹', 'sin⁻¹', 'inverse sine (angle)'), t('Trig', 'cos⁻¹', 'cos⁻¹', 'inverse cosine (angle)'), t('Trig', 'tan⁻¹', 'tan⁻¹', 'inverse tangent (angle)'), t('Algebra', 'log', 'log x', 'base-10 logarithm'),
+          t('Basic', 'x²', 'x²', 'square'), t('Basic', 'x⁻¹', '1/x', 'reciprocal'), t('Algebra', 'eˣ', 'eˣ', 'exponential e^x'), t('Algebra', '10ˣ', '10ˣ', 'power of 10'),
           t('Algebra', '∛', '∛x', 'cube root'), t('Algebra', 'ⁿ√', 'ⁿ√x', 'nth root'), t('Basic', '|x|', '|x|', 'absolute value'), t('Basic', 'n!', 'n!', 'factorial'),
-          t('Algebra', 'log_b', 'log base b', 'log in any base'), t('Algebra', 'E', '× 10ⁿ', 'scientific notation'), t('Algebra', 'solve', 'f(x) = 0', 'solve an equation for x'), t('Trig', '°', 'θ°', 'degrees'),
+          t('Algebra', 'log_b', 'log base b', 'logarithm in any base'), t('Algebra', 'E', '× 10ⁿ', 'scientific notation'), t('Algebra', 'solve', 'f(x) = 0', 'solve an equation for x'), t('Trig', '°', 'θ°', 'degrees'),
         ],
       },
       {
         name: 'Trig',
+        note: 'Reciprocal trig, angle conversion, unit circle & wave form',
         tiles: [
-          t('Trig', 'csc', '1/sin', 'cosecant'), t('Trig', 'sec', '1/cos', 'secant'), t('Trig', 'cot', '1/tan', 'cotangent'), t('Trig', 'θ', 'θ', 'theta'),
-          t('Trig', 'torad', '° → rad', 'degrees to radians'), t('Trig', 'todeg', 'rad → °', 'radians to degrees'), t('Trig', 'atan2', '(x, y) → θ', 'angle of a point'), t('Trig', 'sin²', 'sin² x', 'sine squared'),
-          t('Trig', 'arclen', 's = rθ', 'arc length'), t('Trig', 'sector', '½ r²θ', 'sector area'), t('Trig', 'unitcircle', '(cos, sin)', 'exact point on the unit circle'), t('Trig', 'period', '2π / b', 'period of a sine wave'),
-          t('Trig', 'trigform', 'a·sin(bx)+d', 'amplitude, period, shift and midline'), t('Trig', 'tanform', 'a·tan(bx)+d', 'period and asymptotes of a tangent'),
+          t('Trig', 'csc', '1/sin', 'cosecant'), t('Trig', 'sec', '1/cos', 'secant'), t('Trig', 'cot', '1/tan', 'cotangent'), t('Trig', 'θ', 'θ', 'angle variable theta'),
+          t('Trig', 'torad', '° → rad', 'convert degrees to radians'), t('Trig', 'todeg', 'rad → °', 'convert radians to degrees'), t('Trig', 'atan2', '(x, y) → θ', 'angle of a point (x, y)'), t('Trig', 'sin²', 'sin² x', 'sine squared'),
+          t('Trig', 'arclen', 's = rθ', 'circle arc length'), t('Trig', 'sector', '½ r²θ', 'circle sector area'), t('Trig', 'unitcircle', '(cos, sin)', 'exact point on the unit circle'), t('Trig', 'period', '2π / b', 'period of a sine wave'),
+          t('Trig', 'trigform', 'a·sin(bx)+d', 'amplitude, period, phase shift & midline'), t('Trig', 'tanform', 'a·tan(bx)+d', 'period & asymptotes of a tangent wave'),
         ],
       },
       {
         // A segment a sixth of a phone wide fits seven narrow letters at most: Number and Calculus didn't.
         name: 'Integer',
+        note: 'Rounding, remainders, primes, complex numbers & variables',
         tiles: [
-          t('Algebra', 'round', 'round x', 'round to places'), t('Algebra', 'floor', '⌊x⌋', 'round down'), t('Algebra', 'ceil', '⌈x⌉', 'round up'), t('Algebra', 'abs', 'abs(x)', 'absolute value, as a function'),
-          t('Algebra', 'mod', 'a mod b', 'remainder'), t('Algebra', 'rem', 'rem(a, b)', 'remainder with the sign of a'), t('Algebra', 'quot', 'whole a ÷ b', 'whole-number quotient'), t('Algebra', 'gcd', 'gcd(a, b)', 'greatest common divisor'),
-          t('Algebra', 'lcm', 'lcm(a, b)', 'least common multiple'), t('Algebra', 'factor', '2³·3²·5', 'prime factors'), t('Algebra', 'isprime', 'prime?', 'is it prime'), t('Algebra', 'divisors', 'd | n', 'every divisor'),
-          t('Algebra', 're', 'Re z', 'real part'), t('Algebra', 'im', 'Im z', 'imaginary part'), t('Algebra', 'arg', 'arg z', 'angle of a complex number'), t('Algebra', 'conj', 'z̄', 'complex conjugate'),
-          t('Algebra', 'a', 'a', 'the letter a'), t('Algebra', 'b', 'b', 'the letter b'), t('Algebra', 'c', 'c', 'the letter c'), t('Algebra', 'n', 'n', 'the letter n'),
+          t('Algebra', 'round', 'round x', 'round to decimal places'), t('Algebra', 'floor', '⌊x⌋', 'round down (floor)'), t('Algebra', 'ceil', '⌈x⌉', 'round up (ceiling)'), t('Algebra', 'abs', 'abs(x)', 'absolute value function'),
+          t('Algebra', 'mod', 'a mod b', 'non-negative remainder'), t('Algebra', 'rem', 'rem(a, b)', 'signed remainder'), t('Algebra', 'quot', 'whole a ÷ b', 'integer quotient'), t('Algebra', 'gcd', 'gcd(a, b)', 'greatest common divisor'),
+          t('Algebra', 'lcm', 'lcm(a, b)', 'least common multiple'), t('Algebra', 'factor', '2³·3²·5', 'prime factorization'), t('Algebra', 'isprime', 'prime?', 'test if a number is prime'), t('Algebra', 'divisors', 'd | n', 'all divisors of an integer'),
+          t('Algebra', 're', 'Re z', 'real part of z'), t('Algebra', 'im', 'Im z', 'imaginary part of z'), t('Algebra', 'arg', 'arg z', 'angle of complex number z'), t('Algebra', 'conj', 'z̄', 'complex conjugate'),
+          t('Algebra', 'a', 'a', 'variable a'), t('Algebra', 'b', 'b', 'variable b'), t('Algebra', 'c', 'c', 'variable c'), t('Algebra', 'n', 'n', 'variable n'),
         ],
       },
       {
         name: '∫ d/dx',
+        note: 'Derivatives, integrals, polynomials, series & tangents',
+        editor: EDITOR_TILES.calc,
         tiles: [
-          t('Calculus', 'deriv', 'f′(a)', 'derivative at a point', { insert: 'deriv(¦, x, )' }), t('Calculus', 'deriv2', 'f″(a)', 'second derivative', { insert: 'deriv2(¦, x, )' }), t('Calculus', '∫', '∫ₐᵇ f dx', 'integral, the area', { insert: 'integral(¦, x, , )' }), t('Calculus', 't', 't', 'the variable t'),
-          t('Calculus', 'roots', 'p(x) = 0', 'every root of a polynomial'), t('Calculus', 'polyval', 'p(x)', 'value of a polynomial'), t('Algebra', 'quad', 'ax²+bx+c = 0', 'roots of a quadratic'), t('Calculus', 'sum', 'Σ', 'sum of a list or a series'),
-          t('Calculus', 'seq', '{f(n)}', 'a list from a rule'), t('Calculus', 'gamma', 'Γ(x)', 'gamma function'),
-          t('Calculus', 'tangent', 'tangent(f, p)', 'the line touching f at p'), t('Calculus', 'riemann', 'Σ f·Δx', 'Riemann sum in n strips'),
+          t('Calculus', 'deriv', 'f′(a)', 'derivative at a point', { insert: 'deriv(¦, x, )' }), t('Calculus', 'deriv2', 'f″(a)', 'second derivative at a point', { insert: 'deriv2(¦, x, )' }), t('Calculus', '∫', '∫ₐᵇ f dx', 'definite integral (area under curve)', { insert: 'integral(¦, x, , )' }), t('Calculus', 't', 't', 'variable t'),
+          t('Calculus', 'roots', 'p(x) = 0', 'all roots of a polynomial'), t('Calculus', 'polyval', 'p(x)', 'evaluate a polynomial'), t('Algebra', 'quad', 'ax²+bx+c = 0', 'quadratic formula roots'), t('Calculus', 'sum', 'Σ', 'sum of a list or series'),
+          t('Calculus', 'seq', '{f(n)}', 'generate a list from a rule'), t('Calculus', 'gamma', 'Γ(x)', 'gamma function'),
+          t('Calculus', 'tangent', 'tangent(f, p)', 'tangent line to f at x = p'), t('Calculus', 'riemann', 'Σ f·Δx', 'Riemann sum in n strips'),
         ],
       },
       {
         name: 'Graph',
+        note: 'Curves, inequalities, domains, sliders & 2D geometry',
         editor: EDITOR_TILES.shape,
         tiles: [
-          t('Graph', 'y =', 'y =', 'graph y as a function of x'), t('Graph', 'x =', 'x =', 'a vertical line, or x as a function of y'), t('Graph', 'f(x)=', 'f(x) =', 'define a function'), t('Graph', '( , )', '(x, y)', 'a point'),
-          t('Graph', '<', '<', 'shade below, dashed edge'), t('Graph', '>', '>', 'shade above, dashed edge'), t('Graph', '≤', '≤', 'shade below, solid edge'), t('Graph', '≥', '≥', 'shade above, solid edge'),
-          t('Graph', '{x>0}', '{x > 0}', 'domain restriction'), t('Graph', '{ : }', '{x<0: a, b}', 'piecewise'), t('Graph', 'a =', 'a =', 'define a, with a slider'), t('Graph', 'b =', 'b =', 'define b, with a slider'),
-          t('Graph', 'c =', 'c =', 'define c, with a slider'), t('Graph', 'd =', 'd =', 'define d, with a slider'), t('Graph', 'distance', '|PQ|', 'distance between two points'), t('Graph', 'slope', 'Δy / Δx', 'slope between two points'),
-          t('Graph', 'midpoint', 'mid PQ', 'midpoint'), t('Graph', 'area', 'area △', 'area of a polygon'), t('Graph', 'polygon', 'draw △', 'draw a shape'),
+          t('Graph', 'y =', 'y =', 'plot y as a function of x'), t('Graph', 'x =', 'x =', 'vertical line or x as a function of y'), t('Graph', 'f(x)=', 'f(x) =', 'define a reusable function'), t('Graph', '( , )', '(x, y)', 'plot a point'),
+          t('Graph', '<', '<', 'shade below (dashed edge)'), t('Graph', '>', '>', 'shade above (dashed edge)'), t('Graph', '≤', '≤', 'shade below (solid edge)'), t('Graph', '≥', '≥', 'shade above (solid edge)'),
+          t('Graph', '{x>0}', '{x > 0}', 'restrict curve domain'), t('Graph', '{ : }', '{x<0: a, b}', 'piecewise expression'), t('Graph', 'a =', 'a =', 'parameter a with slider'), t('Graph', 'b =', 'b =', 'parameter b with slider'),
+          t('Graph', 'c =', 'c =', 'parameter c with slider'), t('Graph', 'd =', 'd =', 'parameter d with slider'), t('Graph', 'distance', '|PQ|', 'distance between two points'), t('Graph', 'slope', 'Δy / Δx', 'slope between two points'),
+          t('Graph', 'midpoint', 'mid PQ', 'midpoint of two points'), t('Graph', 'area', 'area △', 'area of a polygon'), t('Graph', 'polygon', 'draw △', 'plot a polygon from points'),
         ],
       },
       {
         name: 'Units $',
+        note: 'Unit conversions, loans, interest & number bases',
         tiles: [
-          t('Units & $', 'convert', 'mi → km', 'convert units'), t('Units & $', 'pmt', 'payment', 'monthly loan payment'), t('Units & $', 'compound', 'P(1+r/n)ⁿᵗ', 'compound interest'), t('Units & $', 'simple', 'P(1 + rt)', 'simple interest'),
-          t('Units & $', 'continuous', 'Peʳᵗ', 'continuous growth'), t('Units & $', 'pctchange', 'old → new %', 'percent change'), t('Units & $', '" "', '"text"', 'text in quotes, for units'), t('Units & $', 'hex', '→ base 16', 'to hexadecimal'),
-          t('Units & $', 'bin', '→ base 2', 'to binary'), t('Units & $', 'dec', 'base b → 10', 'to base 10'),
+          t('Units & $', 'convert', 'mi → km', 'convert between units'), t('Units & $', 'pmt', 'payment', 'monthly loan payment'), t('Units & $', 'compound', 'P(1+r/n)ⁿᵗ', 'compound interest'), t('Units & $', 'simple', 'P(1 + rt)', 'simple interest'),
+          t('Units & $', 'continuous', 'Peʳᵗ', 'continuous compounding'), t('Units & $', 'pctchange', 'old → new %', 'percent change'), t('Units & $', '" "', '"text"', 'quoted string for units'), t('Units & $', 'hex', '→ base 16', 'convert to hexadecimal'),
+          t('Units & $', 'bin', '→ base 2', 'convert to binary'), t('Units & $', 'dec', 'base b → 10', 'convert base b to decimal'),
         ],
       },
     ],
   },
   {
     name: 'Stats',
-    subtitle: 'the normal curve, data and inference',
+    subtitle: 'Normal curve, data summary, regression & inference',
     glyph: 'x̄',
     symbol: 'chart.bar',
     pages: [
       {
         name: 'Normal',
+        note: 'Normal curve areas, z-scores, percentiles & bell plots',
+        editor: EDITOR_TILES.normal,
         tiles: [
-          t('Normal', 'normalcdf', 'z → area', 'area under the normal curve'), t('Normal', 'invNorm', 'area → z', 'z from an area, the normal percentile'), t('Normal', 'zscore', 'x → z', 'z-score'), t('Normal', 'x_from_z', 'z → x', 'value from a z-score'),
-          t('Normal', 'left tail', 'P(X < x)', 'left tail'), t('Normal', 'right tail', 'P(X > x)', 'right tail'), t('Normal', 'between', 'P(a < X < b)', 'between a and b'), t('Normal', 'outside', 'P(X ∉ [a, b])', 'both tails, outside a and b'),
-          t('Normal', 'normaldist', 'bell curve', 'draw the normal curve'), t('Normal', 'normalpdf', 'f(x) height', 'height of the curve'), t('Normal', 'empirical', '68·95·99.7', 'empirical rule'), t('Normal', '−∞', '−∞', 'negative infinity'),
-          t('Normal', 'μ', 'μ', 'mu, the mean'), t('Normal', 'σ', 'σ', 'sigma, the standard deviation'), t('Normal', 'μ =', 'μ =', 'define mu, with a slider'), t('Normal', '∞', '∞', 'infinity'),
-          t('Normal', 'σ =', 'σ =', 'define sigma, with a slider'),
+          t('Normal', 'normalcdf', 'z → area', 'area under the normal curve'), t('Normal', 'invNorm', 'area → z', 'z from an area, the normal percentile'), t('Normal', 'zscore', 'x → z', 'standardize to z-score'), t('Normal', 'x_from_z', 'z → x', 'raw value from z-score'),
+          t('Normal', 'left tail', 'P(X < x)', 'left-tail probability'), t('Normal', 'right tail', 'P(X > x)', 'right-tail probability'), t('Normal', 'between', 'P(a < X < b)', 'probability between a and b'), t('Normal', 'outside', 'P(X ∉ [a, b])', 'two-tail area outside [a, b]'),
+          t('Normal', 'normaldist', 'bell curve', 'plot an interactive normal curve'), t('Normal', 'normalpdf', 'f(x) height', 'normal density height'), t('Normal', 'empirical', '68·95·99.7', 'empirical rule estimate'), t('Normal', '−∞', '−∞', 'negative infinity'),
+          t('Normal', 'μ', 'μ', 'mean mu'), t('Normal', 'σ', 'σ', 'standard deviation sigma'), t('Normal', 'μ =', 'μ =', 'mean mu with slider'), t('Normal', '∞', '∞', 'infinity'),
+          t('Normal', 'σ =', 'σ =', 'standard deviation sigma with slider'),
         ],
       },
       {
         name: 'Data',
+        note: 'Averages, spread, quartiles, box plots & regressions',
+        editor: EDITOR_TILES.data,
         tiles: [
-          t('Data', 'mean', 'x̄', 'mean'), t('Data', 'median', 'x̃', 'median'), t('Data', 'sdp', 'σ population', 'population standard deviation'), t('Data', 'sds', 's sample', 'sample standard deviation'),
-          t('Data', '{ }', '{ , , }', 'a list'), t('Data', 'mode', 'mode', 'most common value'), t('Data', 'range', 'max − min', 'range'), t('Data', 'quartiles', 'Q1, Q3', 'quartiles'),
-          t('Data', 'fivenum', 'box plot', 'five-number summary'), t('Data', 'stats', 'n, x̄, σ, s', 'summary statistics'), t('Data', 'percentile', 'p% → x', 'data percentile'), t('Data', 'sd', 'σ or s', 'standard deviation, by the switch'),
-          t('Data', 'linreg', 'y = ax + b', 'linear fit'), t('Data', 'quadreg', 'ax²+bx+c', 'quadratic fit'), t('Data', 'expreg', 'a·bˣ fit', 'exponential fit'), t('Data', 'corr', 'r', 'correlation'),
-          t('Data', 'varp', 'σ²', 'population variance'), t('Data', 'sort', 'low → high', 'sort a list'), t('Data', 'max', 'max', 'largest value'), t('Data', 'min', 'min', 'smallest value'),
+          t('Data', 'mean', 'x̄', 'arithmetic mean'), t('Data', 'median', 'x̃', 'median value'), t('Data', 'sdp', 'σ population', 'population standard deviation'), t('Data', 'sds', 's sample', 'sample standard deviation'),
+          t('Data', 'mode', 'mode', 'most frequent value'), t('Data', 'range', 'max − min', 'data range'), t('Data', 'quartiles', 'Q1, Q3', 'first and third quartiles'), t('Data', 'fivenum', 'box plot', 'five-number summary & box plot'),
+          t('Data', 'stats', 'n, x̄, σ, s', 'full summary statistics'), t('Data', 'percentile', 'p% → x', 'data percentile'), t('Data', 'sd', 'σ or s', 'standard deviation (follows SD mode)'), t('Data', 'linreg', 'y = ax + b', 'linear regression fit'),
+          t('Data', 'quadreg', 'ax²+bx+c', 'quadratic regression fit'), t('Data', 'expreg', 'a·bˣ fit', 'exponential regression fit'), t('Data', 'corr', 'r', 'Pearson correlation r'), t('Data', 'varp', 'σ²', 'population variance'),
+          t('Data', 'sort', 'low → high', 'sort list ascending'), t('Data', 'max', 'max', 'maximum value'), t('Data', 'min', 'min', 'minimum value'),
         ],
       },
       {
         name: 'Inference',
+        note: 'Confidence intervals, t / χ² areas & standard error',
         tiles: [
-          t('Inference', 'zcrit', 'C% → z*', 'critical z for a confidence level'), t('Inference', 'invT', 'area → t', 't from an area'), t('Inference', 'tcdf', 't → area', 'area under the t curve'), t('Inference', 'chi2cdf', 'χ² → area', 'chi-square area'),
-          t('Inference', 'phat', 'p̂ = x/n', 'sample proportion'), t('Inference', 'sep', '√(p̂q̂/n)', 'standard error of a proportion'), t('Inference', 'moep', 'z*·SE', 'margin of error for a proportion'), t('Inference', 'moe', '1/√n', 'quick margin of error'),
+          t('Inference', 'zcrit', 'C% → z*', 'critical z* for a confidence level'), t('Inference', 'invT', 'area → t', 'inverse t critical value'), t('Inference', 'tcdf', 't → area', 'area under Student’s t curve'), t('Inference', 'chi2cdf', 'χ² → area', 'chi-square tail area'),
+          t('Inference', 'phat', 'p̂ = x/n', 'sample proportion'), t('Inference', 'sep', '√(p̂q̂/n)', 'standard error of a proportion'), t('Inference', 'moep', 'z*·SE', 'margin of error for a proportion'), t('Inference', 'moe', '1/√n', 'quick 95% margin of error'),
         ],
       },
     ],
   },
   {
     name: 'Chance',
-    subtitle: 'binomial, Poisson, counting',
+    subtitle: 'Binomial, Poisson, permutations & expected value',
     glyph: '⚄',
     symbol: 'dice',
     pages: [
       {
         name: 'Chance',
+        note: 'Binomial & Poisson probabilities, counting & expected value',
+        editor: EDITOR_TILES.chance,
         tiles: [
           t('Chance', 'binompdf', 'P(X = k)', 'probability of exactly k'), t('Chance', 'binomcdf', 'P(X ≤ k)', 'probability of at most k'), t('Chance', 'binomge', 'P(X ≥ k)', 'probability of at least k'), t('Chance', 'between', 'P(a ≤ X ≤ b)', 'probability between a and b'),
-          t('Chance', 'binomlt', 'P(X < k)', 'probability of fewer than k'), t('Chance', 'binomgt', 'P(X > k)', 'probability of more than k'), t('Chance', 'binomstats', 'np, σ', 'binomial mean and standard deviation'), t('Chance', 'binomdist', 'bar graph', 'binomial bars on the graph'),
-          t('Chance', 'poissonpdf', 'λ: P(= k)', 'Poisson, exactly k'), t('Chance', 'poissoncdf', 'λ: P(≤ k)', 'Poisson, at most k'), t('Chance', 'geompdf', '1st on k', 'first success on trial k'), t('Chance', 'EV', 'Σ x·p', 'expected value'),
-          t('Chance', 'nCr', 'ₙCᵣ', 'combinations'), t('Chance', 'nPr', 'ₙPᵣ', 'permutations'), t('Chance', 'count', 'a·b·c', 'counting principle'), t('Chance', 'netgain', 'EV − cost', 'net gain'),
-          t('Chance', 'p', 'p', 'the letter p'), t('Data', '+ table', 'x, P table', 'add a table of outcomes and probabilities'),
+          t('Chance', 'binomlt', 'P(X < k)', 'probability of fewer than k'), t('Chance', 'binomgt', 'P(X > k)', 'probability of more than k'), t('Chance', 'binomstats', 'np, σ', 'binomial mean and standard deviation'), t('Chance', 'binomdist', 'bar graph', 'plot binomial distribution bars'),
+          t('Chance', 'poissonpdf', 'λ: P(= k)', 'Poisson probability of exactly k'), t('Chance', 'poissoncdf', 'λ: P(≤ k)', 'Poisson probability of at most k'), t('Chance', 'geompdf', '1st on k', 'geometric — first success on trial k'), t('Chance', 'EV', 'Σ x·p', 'expected value'),
+          t('Chance', 'nCr', 'ₙCᵣ', 'combinations (order doesn’t matter)'), t('Chance', 'nPr', 'ₙPᵣ', 'permutations (order matters)'), t('Chance', 'count', 'a·b·c', 'fundamental counting principle'), t('Chance', 'netgain', 'EV − cost', 'expected net gain'),
+          t('Chance', 'p', 'p', 'probability parameter p'), t('Data', '+ table', 'x, P table', 'insert an outcomes & probabilities table'),
         ],
       },
     ],
   },
   {
     name: 'Matrix',
-    subtitle: 'matrices and vectors',
+    subtitle: 'Matrices, linear systems, vectors & transforms',
     glyph: '[ ]',
     symbol: 'square.grid.3x3',
     pages: [
       {
         name: 'Matrix',
+        note: 'Build matrices below — plus det, inv, rref & eigen',
         editor: EDITOR_TILES.matrix,
         tiles: [
-          t('Matrix', 'det', '|A|', 'determinant'), t('Matrix', 'inv', 'A⁻¹', 'inverse'), t('Matrix', 'new matrix', '3 × 3', 'a 3 by 3 matrix, cell by cell', { name: 'matrix', insert: '[[¦, , ], [, , ], [, , ]]' }), t('Matrix', '[[ ]]', '2 × 2', 'a 2 by 2 matrix, cell by cell', { name: 'matrix', insert: '[[¦, ], [, ]]' }),
-          t('Matrix', 'transpose', 'Aᵀ', 'transpose'), t('Matrix', 'identity', 'Iₙ', 'identity matrix'), t('Matrix', 'rref', 'rref', 'reduced row echelon form'), t('Matrix', '[ ]', '+ row', 'a row: in a matrix, a new row at its foot', { matrixRow: true }),
-          t('Matrix', 'linsolve', 'AX = B', 'solve a system'), t('Matrix', 'trace', 'tr A', 'trace'), t('Matrix', 'rank', 'rank A', 'rank'), t('Matrix', 'eigen', 'λ of A', 'eigenvalues'),
+          t('Matrix', 'det', '|A|', 'matrix determinant'), t('Matrix', 'inv', 'A⁻¹', 'matrix inverse'), t('Matrix', 'transpose', 'Aᵀ', 'matrix transpose'), t('Matrix', 'identity', 'Iₙ', 'n × n identity matrix'),
+          t('Matrix', 'rref', 'rref', 'reduced row echelon form'), t('Matrix', 'linsolve', 'AX = B', 'solve linear system AX = B'), t('Matrix', 'trace', 'tr A', 'matrix trace (diagonal sum)'), t('Matrix', 'rank', 'rank A', 'matrix rank'),
+          t('Matrix', 'eigen', 'λ of A', 'matrix eigenvalues'), t('Matrix', '[ ]', '+ row', 'add a new row at the bottom of a matrix', { matrixRow: true }),
         ],
       },
       {
         name: 'Vectors',
+        note: 'Dot & cross products, norms, angles & 2D transforms',
         editor: EDITOR_TILES.vector,
         tiles: [
-          t('Matrix', '⟨ ⟩', '⟨x, y⟩', 'a vector'), t('Matrix', 'dot', 'u · v', 'dot product'), t('Matrix', 'cross', 'u × v', 'cross product'), t('Matrix', 'mag', '‖v‖', 'magnitude'),
-          t('Matrix', 'unit', 'v / ‖v‖', 'unit vector'), t('Matrix', 'vec', 'vec(x, y)', 'vector from parts'), t('Matrix', 'angle', '∠(u, v)', 'angle between vectors'), t('Matrix', 'rotation', 'turn θ', 'rotation matrix'),
-          t('Matrix', 'dilation', 'scale k', 'dilation matrix'), t('Matrix', 'reflectx', 'over x-axis', 'reflect over the x-axis'), t('Matrix', 'reflecty', 'over y-axis', 'reflect over the y-axis'), t('Matrix', 'reflectyx', 'over y = x', 'reflect over y equals x'),
-          t('Matrix', 'apply', 'M · points', 'apply a matrix to points'),
+          t('Matrix', '⟨ ⟩', '⟨x, y⟩', 'vector literal'), t('Matrix', 'dot', 'u · v', 'dot product'), t('Matrix', 'cross', 'u × v', '3D cross product'), t('Matrix', 'mag', '‖v‖', 'vector magnitude (length)'),
+          t('Matrix', 'unit', 'v / ‖v‖', 'unit vector in same direction'), t('Matrix', 'vec', 'vec(x, y)', 'construct vector from components'), t('Matrix', 'angle', '∠(u, v)', 'angle between two vectors'), t('Matrix', 'rotation', 'turn θ', '2D rotation matrix by θ'),
+          t('Matrix', 'dilation', 'scale k', '2D scaling matrix by k'), t('Matrix', 'reflectx', 'over x-axis', 'reflect across the x-axis'), t('Matrix', 'reflecty', 'over y-axis', 'reflect across the y-axis'), t('Matrix', 'reflectyx', 'over y = x', 'reflect across the line y = x'),
+          t('Matrix', 'apply', 'M · points', 'apply transform matrix M to points'),
         ],
       },
     ],
   },
   {
     name: 'HVAC',
-    subtitle: 'refrigerant, air, psychrometrics, ducts, water',
+    subtitle: 'Refrigerants, psychrometrics, coils, ducts & hydronics',
     glyph: '❄',
     symbol: 'snowflake',
     pages: [
       {
         name: 'Refrig',
+        note: 'Pick a refrigerant above — superheat, subcool & PT tables',
+        editor: { ...EDITOR_TILES.hvac, mode: 'superheat', face: 'HVAC…', name: 'superheat builder' },
         tiles: [
-          t('Refrig', 'superheat', 'T − T_{sat}', 'superheat, suction line above the dew point', { fluid: true }), t('Refrig', 'subcool', 'T_{sat} − T', 'subcooling, liquid line below the bubble point', { fluid: true }), t('Refrig', 'ptchart', '°F → psig', 'pressure from a temperature', { fluid: true }), t('Refrig', 'sattemp', 'psig → °F', 'saturation temperature from a pressure', { fluid: true }),
-          t('Refrig', 'target SH', 'target SH', 'fixed-orifice target superheat'), t('Refrig', 'refcycle', 'COP, EER', 'the whole refrigeration cycle', { fluid: true }), t('Refrig', 'refprops', 'h, s, ρ', 'saturated properties', { fluid: true }), t('Refrig', 'list', 'fluids', 'every refrigerant with a table'),
-          t('Refrig', 'tbubble', 'bubble °F', 'bubble temperature', { fluid: true }), t('Refrig', 'tdew', 'dew °F', 'dew temperature', { fluid: true }), t('Refrig', 'pbubble', 'bubble psig', 'bubble pressure', { fluid: true }), t('Refrig', 'pdew', 'dew psig', 'dew pressure', { fluid: true }),
-          t('Refrig', 'carnot', 'T_{c}/(T_{h}−T_{c})', 'Carnot COP, the ideal limit'), si('Refrig'),
+          t('Refrig', 'superheat', 'T − T_{sat}', 'suction superheat above dew point', { fluid: true }), t('Refrig', 'subcool', 'T_{sat} − T', 'liquid subcooling below bubble point', { fluid: true }), t('Refrig', 'ptchart', '°F → psig', 'saturation pressure from temperature', { fluid: true }), t('Refrig', 'sattemp', 'psig → °F', 'saturation temperature from pressure', { fluid: true }),
+          t('Refrig', 'target SH', 'target SH', 'fixed-orifice target superheat'), t('Refrig', 'refcycle', 'COP, EER', 'full refrigeration cycle performance', { fluid: true }), t('Refrig', 'refprops', 'h, s, ρ', 'saturated enthalpy, entropy & density', { fluid: true }), t('Refrig', 'list', 'fluids', 'list all built-in refrigerants'),
+          t('Refrig', 'tbubble', 'bubble °F', 'liquid bubble temperature', { fluid: true }), t('Refrig', 'tdew', 'dew °F', 'vapor dew temperature', { fluid: true }), t('Refrig', 'pbubble', 'bubble psig', 'liquid bubble pressure', { fluid: true }), t('Refrig', 'pdew', 'dew psig', 'vapor dew pressure', { fluid: true }),
+          t('Refrig', 'carnot', 'T_{c}/(T_{h}−T_{c})', 'ideal Carnot COP limit'), si('Refrig'),
         ],
       },
       {
         name: 'Air',
+        note: 'Cooling coil loads, sensible/latent heat, airflow & EER/COP',
         tiles: [
-          t('Air', 'coil', 'tons, SHR', 'coil load from dry bulb and humidity'), t('Air', 'coilwb', 'coil from wb', 'coil load from wet bulb readings'), t('Air', 'sensible', '1.08·Q·ΔT', 'sensible heat'), t('Air', 'latent', '0.68·Q·Δgr', 'latent heat'),
-          t('Air', 'total', '4.5·Q·Δh', 'total heat'), t('Air', 'shratio', 'SHR', 'sensible heat ratio'), t('Air', 'airflow', 'Btu/h → CFM', 'airflow needed'), t('Air', 'temprise', 'Btu/h → ΔT', 'temperature rise'),
-          t('Air', 'mixair', 'mixed air', 'two airstreams mixed'), t('Air', 'mixtemp', 'T_{mix}', 'mixed temperature by flow'), t('Air', 'outdoor air %', 'OA %', 'percent outdoor air'), t('Air', 'bypass', 'BF', 'coil bypass factor'),
-          t('Air', 'air changes', 'CFM → ACH', 'air changes per hour'), t('Air', 'uaheat', 'U·A·ΔT', 'conduction heat'), t('Air', 'uvalue', '1 / ΣR', 'U-value from R-values'), si('Air'),
+          t('Air', 'coil', 'tons, SHR', 'cooling coil load from dry bulb & %RH'), t('Air', 'coilwb', 'coil from wb', 'cooling coil load from wet-bulb readings'), t('Air', 'sensible', '1.08·Q·ΔT', 'sensible heat transfer'), t('Air', 'latent', '0.68·Q·Δgr', 'latent heat transfer'),
+          t('Air', 'total', '4.5·Q·Δh', 'total air enthalpy heat'), t('Air', 'shratio', 'SHR', 'sensible heat ratio'), t('Air', 'airflow', 'Btu/h → CFM', 'required airflow in CFM'), t('Air', 'temprise', 'Btu/h → ΔT', 'air temperature rise'),
+          t('Air', 'mixair', 'mixed air', 'mixed airstream state'), t('Air', 'mixtemp', 'T_{mix}', 'mixed dry-bulb temperature'), t('Air', 'outdoor air %', 'OA %', 'outdoor air fraction'), t('Air', 'bypass', 'BF', 'coil bypass factor'),
+          t('Air', 'air changes', 'CFM → ACH', 'air changes per hour'), t('Air', 'uaheat', 'U·A·ΔT', 'envelope conduction heat'), t('Air', 'uvalue', '1 / ΣR', 'overall U-value from R-values'), si('Air'),
           // Equipment ratings, beside the loads they're for: the Refrig page keeps four rows under its fluid chips.
-          t('Refrig', 'eertocop', 'EER → COP', 'EER to COP'), t('Refrig', 'coptoeer', 'COP → EER', 'COP to EER'), t('Refrig', 'coptokw', 'COP → kW/t', 'COP to kilowatts per ton'), t('Refrig', 'kwtocop', 'kW/t → COP', 'kilowatts per ton to COP'),
+          t('Refrig', 'eertocop', 'EER → COP', 'convert EER to COP'), t('Refrig', 'coptoeer', 'COP → EER', 'convert COP to EER'), t('Refrig', 'coptokw', 'COP → kW/t', 'convert COP to kW per ton'), t('Refrig', 'kwtocop', 'kW/t → COP', 'convert kW per ton to COP'),
         ],
       },
       {
         name: 'Psych',
+        note: 'Moist-air properties, wet bulb, dew point & enthalpy',
+        editor: { ...EDITOR_TILES.hvac, mode: 'psych', face: 'HVAC…', name: 'moist-air builder' },
         tiles: [
-          t('Air', 'psych', 'db, rh → all', 'every property from dry bulb and humidity'), t('Air', 'wetbulb', 'T_{wb}', 'wet bulb', { name: 'wetbulb' }), t('Air', 'dewpoint', 'T_{dp}', 'dew point', { name: 'dewpoint' }), t('Air', 'enthalpy', 'h  Btu/lb', 'enthalpy'),
-          t('Air', 'psychwb', 'db, wb → all', 'every property from dry bulb and wet bulb'), t('Air', 'psychdp', 'db, dp → all', 'every property from dry bulb and dew point'), t('Air', 'RH from wb', 'wb → %RH', 'relative humidity from wet bulb'), t('Air', 'RH from dp', 'dp → %RH', 'relative humidity from dew point'),
-          t('Air', 'grains', 'gr/lb', 'grains of moisture'), t('Air', 'humratio', 'W  lb/lb', 'humidity ratio'), t('Air', 'specvol', 'v  ft³/lb', 'specific volume'), t('Air', 'density', 'ρ  lb/ft³', 'air density'),
-          t('Air', 'altitude', 'ft → psia', 'standard pressure at altitude'), t('Refrig', 'psat', 'water P_{sat}', 'saturation pressure of water'), si('Air'),
+          t('Air', 'psych', 'db, rh → all', 'full moist-air state from dry bulb & %RH'), t('Air', 'wetbulb', 'T_{wb}', 'wet-bulb temperature', { name: 'wetbulb' }), t('Air', 'dewpoint', 'T_{dp}', 'dew-point temperature', { name: 'dewpoint' }), t('Air', 'enthalpy', 'h  Btu/lb', 'moist-air enthalpy'),
+          t('Air', 'psychwb', 'db, wb → all', 'full moist-air state from dry & wet bulb'), t('Air', 'psychdp', 'db, dp → all', 'full moist-air state from dry bulb & dew point'), t('Air', 'RH from wb', 'wb → %RH', 'relative humidity from wet bulb'), t('Air', 'RH from dp', 'dp → %RH', 'relative humidity from dew point'),
+          t('Air', 'grains', 'gr/lb', 'moisture in grains per pound'), t('Air', 'humratio', 'W  lb/lb', 'humidity ratio'), t('Air', 'specvol', 'v  ft³/lb', 'specific volume'), t('Air', 'density', 'ρ  lb/ft³', 'air density'),
+          t('Air', 'altitude', 'ft → psia', 'standard barometric pressure at altitude'), t('Refrig', 'psat', 'water P_{sat}', 'water vapor saturation pressure'), si('Air'),
         ],
       },
       {
         name: 'Ducts',
+        note: 'Duct sizing, friction loss, velocity pressure & fan laws',
+        editor: { ...EDITOR_TILES.hvac, mode: 'duct', face: 'HVAC…', name: 'duct builder' },
         tiles: [
-          t('Flow', 'ductsize', 'CFM, loss → d', 'duct size from airflow and friction'), t('Flow', 'ductvel', 'CFM → FPM', 'duct velocity'), t('Flow', 'ductloss', 'in / 100 ft', 'duct friction loss'), t('Flow', 'ductdia', 'FPM → d', 'round duct size from velocity'),
-          t('Flow', 'eqdia', 'w × h → d', 'round equivalent of a rectangle'), t('Flow', 'rectduct', 'd → w × h', 'rectangle for a round size'), t('Flow', 'velpress', '(V / 4005)²', 'velocity pressure'), t('Flow', 'pitot', 'VP → FPM', 'velocity from a pitot reading'),
-          t('Flow', 'fanlaws', 'rpm₁ → rpm₂', 'fan laws'), t('Flow', 'fanpower', 'fan BHP', 'fan brake horsepower'), t('Flow', 'achflow', 'ACH → CFM', 'airflow for air changes'), t('Flow', 'ventair', '62.1 CFM', 'ASHRAE 62.1 ventilation air'),
+          t('Flow', 'ductsize', 'CFM, loss → d', 'round duct diameter from CFM & friction'), t('Flow', 'ductvel', 'CFM → FPM', 'duct air velocity'), t('Flow', 'ductloss', 'in / 100 ft', 'duct friction loss per 100 ft'), t('Flow', 'ductdia', 'FPM → d', 'round duct diameter from velocity'),
+          t('Flow', 'eqdia', 'w × h → d', 'equivalent round duct diameter'), t('Flow', 'rectduct', 'd → w × h', 'rectangular duct for a round size'), t('Flow', 'velpress', '(V / 4005)²', 'velocity pressure (in. w.c.)'), t('Flow', 'pitot', 'VP → FPM', 'velocity from Pitot tube reading'),
+          t('Flow', 'fanlaws', 'rpm₁ → rpm₂', 'fan affinity laws'), t('Flow', 'fanpower', 'fan BHP', 'fan brake horsepower'), t('Flow', 'achflow', 'ACH → CFM', 'CFM needed for target ACH'), t('Flow', 'ventair', '62.1 CFM', 'ASHRAE 62.1 outdoor ventilation air'),
           si('Flow'),
         ],
       },
       {
         name: 'Water',
+        note: 'Hydronic heat & flow, pump power, valves & electrical',
         tiles: [
-          t('Flow', 'water heat', '500·Q·ΔT', 'water heat'), t('Flow', 'water flow', 'Btu/h → GPM', 'water flow needed'), t('Flow', 'pump power', 'pump BHP', 'pump brake horsepower'), t('Flow', 'pipevel', 'GPM → ft/s', 'pipe velocity'),
-          t('Flow', 'pipeloss', 'ft / 100 ft', 'pipe friction loss'), t('Flow', 'valvecv', 'GPM → Cv', 'valve Cv needed'), t('Flow', 'Cv flow', 'Cv → GPM', 'flow through a valve'), t('Flow', 'gasinput', 'gas meter', 'gas input from clocking a meter'),
-          t('Flow', 'electric power', 'V·A·PF → kW', 'electric power'), t('Flow', 'V imbal', 'imbalance %', 'voltage imbalance'), si('Flow'),
+          t('Flow', 'water heat', '500·Q·ΔT', 'hydronic heat transfer'), t('Flow', 'water flow', 'Btu/h → GPM', 'required water flow in GPM'), t('Flow', 'pump power', 'pump BHP', 'pump brake horsepower'), t('Flow', 'pipevel', 'GPM → ft/s', 'water velocity in pipe'),
+          t('Flow', 'pipeloss', 'ft / 100 ft', 'pipe friction head loss'), t('Flow', 'valvecv', 'GPM → Cv', 'control valve Cv required'), t('Flow', 'Cv flow', 'Cv → GPM', 'flow rate through a valve'), t('Flow', 'gasinput', 'gas meter', 'furnace gas input by clocking meter'),
+          t('Flow', 'electric power', 'V·A·PF → kW', 'electrical power in kW'), t('Flow', 'V imbal', 'imbalance %', 'three-phase voltage imbalance'), si('Flow'),
         ],
       },
     ],

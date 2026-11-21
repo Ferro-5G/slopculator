@@ -7,7 +7,8 @@ import { lineCopy, nextColor } from '../ui/document';
 import { enterStep, isFinishedLine, planInsert, searchInsertLabel } from '../ui/lineedit';
 import { heldBack, typingState } from '../ui/linestate';
 import { play } from './sound';
-import { slotStep, wantsMatrix, MATRIX_SKELETONS, matrixCell } from '../ui/slots';
+import { slotStep, wantsMatrix, matrixCell } from '../ui/slots';
+import { openMatrixEditor } from './editors';
 import { newId, type Row } from './docmodel';
 import { h } from './dom';
 import { addRow, applyFix, asOwnStep, moveRow, deleteRow, nextLine } from './edits';
@@ -202,12 +203,21 @@ export function updateHint(input: HTMLInputElement, hint: HTMLElement): void {
   const phone = caret === input.selectionEnd;
   const next = phone ? nextButton(input) : null;
   if (phone && wantsMatrix(input.value, caret)) {
-    hint.replaceChildren(...MATRIX_SKELETONS.map((m) => {
-      const b = h('button', { type: 'button', class: 'cand grid-chip', tabindex: '-1', 'aria-label': `${m.label} matrix`, title: 'Puts in a grid of cells to fill, one at a time' }, m.label);
-      b.addEventListener('mousedown', (e) => e.preventDefault());
-      b.addEventListener('click', () => { play('fn'); insertText(m.ins); });
-      return b;
-    }), next ?? '');
+    const b = h('button', { type: 'button', class: 'cand grid-chip', tabindex: '-1', 'aria-label': 'Build matrix', title: 'Open the visual Matrix Builder and insert here' }, 'Build matrix…');
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => {
+      const from = input.selectionStart ?? caret;
+      const to = input.selectionEnd ?? from;
+      play('fn');
+      openMatrixEditor({
+        inline: true,
+        onInsert: (m) => {
+          input.focus();
+          editText(input, m, from, to);
+        },
+      });
+    });
+    hint.replaceChildren(b, next ?? '');
     hint.hidden = false;
     return;
   }

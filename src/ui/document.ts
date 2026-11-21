@@ -35,6 +35,8 @@ export interface AppearancePrefs {
   graphRate?: GraphRatePref;
   /** The accent and tint over the theme. The theme's own when unset. */
   color?: ColorPref;
+  /** Aurora Glow: the light over the canvas, the composer and the keys. */
+  glow?: boolean;
   pride?: boolean;
   padLeft?: boolean;
 }
@@ -142,6 +144,7 @@ export function cleanAppearance(raw: Record<string, unknown>): AppearancePrefs {
     ...(motion ? { motion } : {}),
     ...(graphRate ? { graphRate } : {}),
     ...(color ? { color } : {}),
+    ...(typeof raw.glow === 'boolean' ? { glow: raw.glow } : {}),
     ...(typeof raw.pride === 'boolean' ? { pride: raw.pride } : {}),
     ...(typeof raw.padLeft === 'boolean' ? { padLeft: raw.padLeft } : {}),
   };

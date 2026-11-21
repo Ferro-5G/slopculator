@@ -37,7 +37,7 @@ describe('the number pad', () => {
 
   it('draws enter as the one accent key: a bank\'s main keys are plain function keys, AC a quiet key', () => {
     const accented = [...PAD.flat(), ENTER, ANS, AC, ...PANELS.flatMap((p) => p.keys)].filter((k) => drawTone(k) === 'hero');
-    expect(accented.map((k) => k.label)).toEqual(['enter']);
+    expect(accented.map((k) => k.label)).toEqual(['ENTER']);
     for (const p of PANELS) for (const k of p.keys) if (k.tone === 'hero') expect(drawTone(k)).toBe('fn');
     expect(drawTone(AC)).toBe('fn');
   });

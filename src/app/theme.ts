@@ -15,7 +15,7 @@ import { syncSheetTitle, buildMenu, toggleKeySound } from './file';
 import { fitKeyLabels, switchPadSide } from './keypad';
 import { modeBar, graph } from './layout';
 import { placePopover, addPopover, closePopovers } from './overlay';
-import { dark, coarse } from './platform';
+import { dark } from './platform';
 import { prideUnlocked, setPride, prideOn } from './pride';
 import { SLIDERS_ICON, headPill, refitBar } from './settings';
 import { doc, saveSoon, recompute } from './sheet';
@@ -48,7 +48,7 @@ const modeButtons = MODE_NAMES.map(([m, label]) => h('button', { type: 'button',
 const modeSeg = h('div', { class: 'seg mode-seg', role: 'group', 'aria-label': 'Mode' }, ...modeButtons);
 const switchSyncs: (() => void)[] = [];
 function appearSwitch(name: string, hint: string, get: () => boolean, set: (v: boolean) => void): HTMLElement {
-  const b = h('button', { type: 'button', role: 'switch', class: 'appear-pride appear-switch', title: hint, onclick: () => { play('toggle'); set(!get()); } }, h('span', {}, name), knob());
+  const b = h('button', { type: 'button', role: 'switch', class: 'appear-pride appear-switch', ...(hint ? { title: hint } : {}), onclick: () => { play('toggle'); set(!get()); } }, h('span', {}, name), knob());
   const sync = () => b.setAttribute('aria-checked', String(get()));
   switchSyncs.push(sync);
   sync();
@@ -56,6 +56,7 @@ function appearSwitch(name: string, hint: string, get: () => boolean, set: (v: b
 }
 const pureBlackSwitch = appearSwitch('Pure black when dark', 'Dark draws on true black', () => appearanceOf(doc.ui).pureBlack, (v) => setAppearance({ pureBlack: v }));
 const contrastSwitch = appearSwitch('High contrast', 'Black and white, outlined keys, the color raised to 7:1', () => appearanceOf(doc.ui).contrast, (v) => setAppearance({ contrast: v }));
+const glowSwitch = appearSwitch('Aurora Glow', '', () => !!doc.ui.glow, (v) => { doc.ui.glow = v; appearanceChanged(); });
 /** Mode and the two switches all read one appearance, so a change to any of them redraws all three. */
 const syncAppearance = () => {
   const m = appearanceOf(doc.ui).mode;
@@ -117,12 +118,12 @@ function applyColor(look: LookName, theme: WebTheme): void {
 const prideSlot = h('div', { class: 'pride-slot' });
 const deviceSlot = h('div', { class: 'pride-slot device-slot' });
 export function syncAppearanceSlots(): void {
-  deviceSlot.replaceChildren(...(coarse.matches ? [
+  deviceSlot.replaceChildren(
     h('button', { type: 'button', role: 'switch', class: 'appear-pride', 'aria-checked': String(doc.ui.sound !== false), onclick: () => toggleKeySound() },
       h('span', {}, 'Key sounds'), knob()),
     h('button', { type: 'button', class: 'appear-pride', onclick: () => { switchPadSide(); buildMenu(); } },
       h('span', {}, 'Number pad'), h('span', { class: 'hint word' }, doc.ui.padLeft ? 'left' : 'right')),
-  ] : []));
+  );
   prideSlot.replaceChildren(...(prideUnlocked() ? [h('button', { type: 'button', role: 'switch', class: 'appear-pride', 'aria-checked': String(!!doc.ui.pride), onclick: () => setPride(!doc.ui.pride) },
     h('span', {}, 'Pride colors'), knob())] : []));
 }
@@ -139,6 +140,7 @@ export const appearBody = h('div', { class: 'appear-body' },
   colorRow,
   pureBlackSwitch,
   contrastSwitch,
+  glowSwitch,
   h('label', { class: 'menu-row' }, h('span', {}, 'Motion'), motionSel),
   motionNote,
   h('label', { class: 'menu-row' }, h('span', {}, 'Graph frame rate'), rateSel),
@@ -170,6 +172,7 @@ function resolvedTheme(): WebTheme {
 export function applyTheme(): void {
   document.documentElement.dataset.theme = resolvedTheme();
   document.documentElement.toggleAttribute('data-pride', prideOn());
+  document.documentElement.toggleAttribute('data-glow', !!doc.ui.glow && !appearanceOf(doc.ui).contrast);
   const look = doc.ui.look ?? 'modern';
   document.documentElement.dataset.look = look;
   lookSheet.textContent = (look === 'retro' ? retroCss : modernCss) + canvasCss;

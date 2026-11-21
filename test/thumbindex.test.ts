@@ -19,9 +19,13 @@ describe('the Thumb Index', () => {
     expect(does(ROW1[5])).toBe(does(ANS));
   });
 
-  it('gives every bank key a home: row 1, the pad, a tile or a refrigerant chip', () => {
+  it('gives every bank key a home: row 1, the pad, a tile, a refrigerant chip, or the Matrix Builder', () => {
     const keys = PANELS.flatMap((p) => p.keys.map((k) => ({ bank: p.name, k })));
+    // Raw 2×2 / 3×3 matrix and { } list templates were replaced by the Matrix and Data List builders.
     const home = new Set([...ROW1, ...PAD.flat(), DIV, ...tiles.map((t) => t.key), ...FLUIDS.map((f) => f.key)].map(does));
+    home.add('action:matrix');
+    home.add('[[¦]]');
+    home.add('{¦}');
     for (const { bank, k } of keys) expect(home.has(does(k)), `${bank}: ${k.label}`).toBe(true);
   });
 
@@ -65,10 +69,10 @@ describe('the Thumb Index', () => {
     expect(tileKey(eer, '"R134a"').ins).toBe('eertocop(¦)');
   });
 
-  it('inserts skeletons with slots where a key\'s own text wouldn\'t do: a 2 × 2, a 3 × 3, f′(a) in x', () => {
-    const by = (name: string, face: string) => tiles.find((t) => t.name === name && t.face === face)!;
-    expect(tileKey(by('matrix', '2 × 2')).ins).toBe('[[¦, ], [, ]]');
-    expect(tileKey(by('matrix', '3 × 3'))).toMatchObject({ ins: '[[¦, , ], [, , ], [, , ]]', action: undefined });
+  it('inserts skeletons with slots where a key\'s own text wouldn\'t do, and routes matrices through the Matrix Builder', () => {
+    const matrixPage = TABS.flatMap((t) => t.pages).find((p) => p.name === 'Matrix')!;
+    expect(matrixPage.editor).toEqual(EDITOR_TILES.matrix);
+    expect(matrixPage.tiles.some((t) => t.face === '2 × 2' || t.face === '3 × 3')).toBe(false);
     expect(tileKey(tiles.find((t) => t.name === 'deriv')!).ins).toBe('deriv(¦, x, )');
     expect(tileKey(tiles.find((t) => t.name === 'integral')!).ins).toBe('integral(¦, x, , )');
     expect(faceText(tiles.find((t) => t.name === 'sdp')!.face)).toBe('σ population');
@@ -93,9 +97,9 @@ describe('fix round 2 helpers', () => {
 
 describe('the editor tiles', () => {
   const pages = TABS.flatMap((t) => t.pages);
-  it('every editor has its words, and a tile on one page', () => {
+  it('every editor has its words, and a tile on its page(s)', () => {
     for (const k of ['matrix', 'shape', 'vector'] as const) for (const v of Object.values(EDITORS[k].text)) expect(v.trim().length).toBeGreaterThan(0);
-    expect(pages.flatMap((p) => (p.editor ? [p.editor.editor] : [])).sort()).toEqual(['matrix', 'shape', 'vector']);
+    expect(pages.flatMap((p) => (p.editor ? [p.editor.editor] : [])).sort()).toEqual(['calc', 'chance', 'data', 'hvac', 'hvac', 'hvac', 'matrix', 'normal', 'shape', 'vector']);
   });
 
   it('counts an editor tile a page shows: a wide one takes its own row, a narrow one takes a cell', () => {
@@ -129,7 +133,7 @@ describe('how tall a tile is', () => {
 describe('a tile\'s caption', () => {
   const caption = (name: string) => tileCaption(tiles.find((t) => t.name === name)!);
   it('is left out when it would repeat the face', () => {
-    for (const name of ['sin', 'θ', 'a =', 'μ', 'rref', 'max', 'gcd', 'ln', 'f', '^2', 'e^', '||', '{}', '"SI"']) expect(caption(name), name).toBeUndefined();
+    for (const name of ['sin', 'θ', 'a =', 'μ', 'rref', 'max', 'gcd', 'ln', 'f', '^2', 'e^', '||', '"SI"']) expect(caption(name), name).toBeUndefined();
   });
   it('stays when it is the word to type and the face does not spell it', () => {
     for (const name of ['normalcdf', 'invNorm', 'asin', 'nthroot', 'solve', 'x_from_z', 'nCr', 'inf', 'E', 'det']) expect(caption(name), name).toBe(name);

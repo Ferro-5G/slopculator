@@ -49,7 +49,7 @@ export function padRows(padLeft = false): Key[][] {
 }
 
 /** The composer's send key: the one accent-filled key, drawn on the composer rather than on the pad. */
-export const ENTER: Key = { label: 'enter', action: 'enter', title: 'Send the line (Enter)', tone: 'hero' };
+export const ENTER: Key = { label: 'ENTER', action: 'enter', title: 'Send the line (Enter)', tone: 'hero' };
 
 export const ANS: Key = { label: 'ans', ins: 'ans', title: 'Answer from the line above', tone: 'fn' };
 export const AC: Key = { label: 'AC', action: 'clearall', title: 'Clear every line (Ctrl+Alt+Backspace). Ctrl+Z brings them back', tone: 'red' };

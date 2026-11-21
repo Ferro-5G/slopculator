@@ -307,40 +307,40 @@ const CONTRAST_LIGHT = contrastOf(PAPER, true, HC_ACCENT.retro.light);
 const RETRO: Record<WebTheme, Palette> = { paper: PAPER, ink: INK, oled: OLED, contrast: CONTRAST, contrastLight: CONTRAST_LIGHT };
 
 // Retro's names stay meaningful here: lcd is the answer's background, tape the lines', and a cap is a key.
-/** A neutral instrument with one blue: white paper, keys on a grey bed like the system keyboard's, a lip under each. */
+/** Warm vellum canvas with crisp lifted white blocks, drafting-ink cobalt accent, and tactile key caps. */
 const M_LIGHT: Palette = {
   ...PAPER,
   look: 'modern',
   shape: { key: 12, chip: 8, field: 10, frame: 0, frameBorder: 0 },
   tractor: false,
-  bg: '#ffffff',
-  plate: '#ffffff',
-  well: '#f4f4f6',
+  bg: '#f4f3ef',
+  plate: '#f4f3ef',
+  well: '#ebe9e3',
   surface: '#ffffff',
-  surfaceHigh: '#ffffff',
-  formBg: '#f2f2f7',
+  surfaceHigh: '#eeede8',
+  formBg: '#efeee9',
   formCard: '#ffffff',
-  ink: '#18181b',
-  ink2: '#52525b',
-  ink3: '#5f6068',
-  rule: 'rgba(24,24,27,0.1)',
-  rule2: 'rgba(24,24,27,0.18)',
-  accent: '#2563eb',
-  accent2: '#2563eb',
+  ink: '#17171a',
+  ink2: '#4d4d55',
+  ink3: '#61616b',
+  rule: 'rgba(23,23,26,0.1)',
+  rule2: 'rgba(23,23,26,0.19)',
+  accent: '#2952cc',
+  accent2: '#2952cc',
   onAccent: '#ffffff',
-  accentSoft: '#eaf1fe',
-  error: '#d92d20',
-  warn: '#b54708',
-  led: '#2563eb',
+  accentSoft: '#e5ecfc',
+  error: '#cf2b1f',
+  warn: '#b04808',
+  led: '#2952cc',
   ledOff: 'transparent',
-  lcd: '#ffffff',
-  lcdInk: '#18181b',
-  lcdInk2: '#6b6b74',
+  lcd: '#f4f3ef',
+  lcdInk: '#17171a',
+  lcdInk2: '#61616b',
   lcdGhost: 'transparent',
   bezel: 'transparent',
-  tape: '#ffffff',
-  tapeBar: '#ffffff',
-  tapeActive: '#f2f3f6',
+  tape: '#f4f3ef',
+  tapeBar: '#f4f3ef',
+  tapeActive: '#eeede8',
   tapeHole: 'transparent',
   tapeEdge: 'transparent',
   // A light 1 pt lip, about 14% black over the bed: the fills carry the hierarchy, the lip only sets a key down.
@@ -352,73 +352,71 @@ const M_LIGHT: Palette = {
   capLipW: 1,
   activeBar: 3,
   caps: {
-    num: { cap: '#ffffff', top: '#ffffff', ink: '#18181b' },
-    fn: { cap: '#d1d3da', top: '#d1d3da', ink: '#18181b' },
-    op: { cap: '#d1d3da', top: '#d1d3da', ink: '#1a44c2' },
-    act: { cap: '#d1d3da', top: '#d1d3da', ink: '#4f5058' },
-    hero: { cap: '#2563eb', top: '#326bea', ink: '#ffffff', edge: '#1c48b8' },
+    num: { cap: '#ffffff', top: '#ffffff', ink: '#17171a' },
+    fn: { cap: '#d1d3da', top: '#d1d3da', ink: '#17171a' },
+    op: { cap: '#d1d3da', top: '#d1d3da', ink: '#1c42b8' },
+    act: { cap: '#d1d3da', top: '#d1d3da', ink: '#4a4b54' },
+    hero: { cap: '#2952cc', top: '#3560dc', ink: '#ffffff', edge: '#1d3c99' },
     red: { cap: '#d1d3da', top: '#d1d3da', ink: '#a61b12' },
   },
-  graphBg: '#ffffff',
-  grid: '#f4f4f5',
-  gridMajor: '#e4e4e7',
-  axis: '#71717a',
+  graphBg: '#faf9f6',
+  grid: '#efede8',
+  gridMajor: '#dcd9d0',
+  axis: '#6b6b74',
   hatch: false,
   glow: false,
-  curves: ['#2563eb', '#e11d48', '#059669', '#7c3aed', '#0891b2', '#d97706', '#db2777', '#18181b'],
+  curves: ['#d94f3d', '#0f8a72', '#c87d0e', '#6d48d6', '#1e68b8', '#c22977', '#557d14', '#26262a'],
 };
 
-/** The same keys in the dark: lighter digits than secondary keys, no outlines, and enter the same saturated blue. */
-// Dark is the design Slopculator is built for first (the canvas and composer): a deep blue-grey canvas, blocks a step
-// lighter with fine edges instead of shadows, one cobalt accent, and curves picked to read on it.
+/** Deep obsidian-ink canvas, elevated graphite blocks, warm alabaster type, and luminous ultramarine accent. */
 const M_DARK: Palette = {
   ...M_LIGHT,
   shape: { ...M_LIGHT.shape, key: 10 },
   dark: true,
-  bg: '#171a21',
-  plate: '#171a21',
-  well: '#1f232c',
-  surface: '#1f232c',
-  surfaceHigh: '#262b36',
-  formBg: '#171a21',
-  formCard: '#1f232c',
-  ink: '#e8ebf2',
-  ink2: '#c3c9d4',
-  ink3: '#9aa3b2',
-  rule: '#2e3440',
-  rule2: '#3a4252',
-  accent: '#8fb0ff',
-  accent2: '#5b8cff',
-  onAccent: '#0d1426',
-  accentSoft: '#1f2a44',
+  bg: '#111319',
+  plate: '#111319',
+  well: '#161922',
+  surface: '#191d26',
+  surfaceHigh: '#232836',
+  formBg: '#111319',
+  formCard: '#191d26',
+  ink: '#f1f0ec',
+  ink2: '#c0c5d1',
+  ink3: '#8c95a6',
+  rule: '#262c3a',
+  rule2: '#374054',
+  accent: '#8aadff',
+  accent2: '#5080ff',
+  onAccent: '#091124',
+  accentSoft: '#1b2640',
   error: '#ff7a70',
   warn: '#f2b84b',
-  led: '#5b8cff',
-  lcd: '#171a21',
-  lcdInk: '#e8ebf2',
-  lcdInk2: '#9aa3b2',
-  tape: '#171a21',
-  tapeBar: '#171a21',
-  tapeActive: '#262b36',
+  led: '#5080ff',
+  lcd: '#111319',
+  lcdInk: '#f1f0ec',
+  lcdInk2: '#8c95a6',
+  tape: '#111319',
+  tapeBar: '#111319',
+  tapeActive: '#232836',
   // No outline round the keys: caps a step lighter than their tray, a 1 px darker lip under each, and digits told
   // from the other keys by their larger legend more than by their fill.
-  capEdge: '#14171d',
-  keyBed: '#171a21',
+  capEdge: '#0c0e13',
+  keyBed: '#090b10',
   capRim: 0,
   capLipW: 1,
   caps: {
-    num: { cap: '#2b303c', top: '#2b303c', ink: '#f2f4f8' },
-    fn: { cap: '#262b36', top: '#262b36', ink: '#e8ebf2' },
-    op: { cap: '#262b36', top: '#262b36', ink: '#8fb0ff' },
-    act: { cap: '#262b36', top: '#262b36', ink: '#c3c9d4' },
-    hero: { cap: '#5b8cff', top: '#5b8cff', ink: '#0d1426', edge: '#3f6fe0' },
-    red: { cap: '#262b36', top: '#262b36', ink: '#ff8f87' },
+    num: { cap: '#282d3a', top: '#282d3a', ink: '#f4f3ef' },
+    fn: { cap: '#212530', top: '#212530', ink: '#e9e8e3' },
+    op: { cap: '#212530', top: '#212530', ink: '#8aadff' },
+    act: { cap: '#212530', top: '#212530', ink: '#c0c5d1' },
+    hero: { cap: '#5080ff', top: '#5080ff', ink: '#091124', edge: '#3662db' },
+    red: { cap: '#212530', top: '#212530', ink: '#ff8f87' },
   },
-  graphBg: '#1f232c',
-  grid: '#262b35',
-  gridMajor: '#323946',
-  axis: '#8a93a3',
-  curves: ['#ff7a70', '#2cc7a8', '#f2b84b', '#a48bff', '#58c4f5', '#ff9fcf', '#b6d96a', '#e8ebf2'],
+  graphBg: '#151820',
+  grid: '#1e2330',
+  gridMajor: '#2c3345',
+  axis: '#8690a3',
+  curves: ['#ff7a70', '#2cc7a8', '#f2b84b', '#a48bff', '#58c4f5', '#ff9fcf', '#b6d96a', '#f1f0ec'],
 };
 
 /** Dark on true black: only the page and bed go black; the keys keep dark fills, and enter stays filled. */
@@ -464,13 +462,17 @@ const FLAG_DARK = ['#ff5c5c', '#ff9f43', '#ffe14d', '#34d399', '#5b8cff', '#c084
 const TINTS = ['#ffd1e3', '#ffe0c2', '#fff5b8', '#cdf5dc', '#cfe3ff', '#e6d4ff'];
 const TINTS_DARK = ['#4a2040', '#4a3220', '#46421e', '#1f4634', '#22304f', '#3a2452'];
 const PENS = ['#e40303', '#e86f00', '#c9a000', '#008026', '#24408e', '#732982', '#e4287c', '#18181b'];
+/** Modern's Pride: the flag in neon for the atmosphere, the composer's rim, Enter and the stripe over the keys. */
+const NEON_DARK = ['#ff2e63', '#ff8a00', '#ffe600', '#00f58a', '#1fb6ff', '#b44dff'];
+const NEON_LIGHT = ['#f0124d', '#ff7a00', '#f5c800', '#00d977', '#0a9cf5', '#9b30f5'];
 const PENS_DARK = ['#ff5c5c', '#ff9f43', '#ffe14d', '#34d399', '#5b8cff', '#c084fc', '#f472b6', '#fafafa'];
 const BARS_OLED = ['#180b0c', '#18110a', '#17160a', '#0a1810', '#0a1018', '#140a18'];
 
 /**
- * Pride colors: the flag laid over a palette, the same tokens as the [data-pride] blocks in the web's stylesheets.
- * Purple (pink on Retro) is the accent, the six stripes are the pens, the enter key wears the flag
- * (p.flag), operator keys take a stripe each, and the line list's bars cycle through six tints (p.tapeBars). High contrast keeps its own rules.
+ * Pride colors, the same as the [data-pride] blocks in the web's stylesheets. Modern keeps its theme and lights it with
+ * the flag in neon (p.flag), as Aurora Glow does. Retro lays the flag over its palette: pink is the accent, the six
+ * stripes are the pens, the enter key wears the flag, operator keys take a stripe each, and the line list's bars cycle
+ * through six tints (p.tapeBars). High contrast keeps its own rules.
  */
 function prideify(p: Palette, theme: WebTheme): Palette {
   if (p.hc) return p;
@@ -478,41 +480,11 @@ function prideify(p: Palette, theme: WebTheme): Palette {
   const oled = theme === 'oled';
   const flag = dark ? FLAG_DARK : FLAG;
   if (p.look === 'modern') {
-    const accent = dark ? '#c084fc' : '#732982';
-    const soft = oled ? '#000000' : dark ? '#2a1a33' : '#f3e4ff';
-    // Candy: pink operators, lemon digits, sky functions, mint editing keys; neon on violet after dark.
-    const cap = (light: string, night: string) => (oled ? '#000000' : dark ? night : light);
-    return {
-      ...p,
-      flag,
-      accent,
-      accent2: accent,
-      accentSoft: soft,
-      onAccent: '#ffffff',
-      led: accent,
-      bg: oled ? '#000000' : dark ? '#16101f' : '#fff6fb',
-      plate: oled ? '#000000' : dark ? '#16101f' : '#fff6fb',
-      surface: oled ? '#000000' : dark ? '#16101f' : '#fff6fb',
-      surfaceHigh: oled ? '#1a0f24' : dark ? '#2a1b3a' : '#f3e4ff',
-      formBg: oled ? '#000000' : dark ? '#16101f' : '#f3e4ff',
-      formCard: oled ? '#1a0f24' : dark ? '#2a1b3a' : '#ffffff',
-      well: oled ? '#1a0f24' : dark ? '#2a1b3a' : '#f3e4ff',
-      tapeActive: oled ? '#1a0f24' : dark ? '#2a1b3a' : '#f3e4ff',
-      tapeBars: oled ? BARS_OLED : dark ? TINTS_DARK : TINTS,
-      caps: {
-        ...p.caps,
-        num: { ...p.caps.num, cap: cap('#fff3b8', '#2b2140'), top: cap('#fff3b8', '#2b2140') },
-        fn: { ...p.caps.fn, cap: cap('#cfe3ff', '#1d1428'), top: cap('#cfe3ff', '#1d1428') },
-        act: { ...p.caps.act, cap: cap('#e6d4ff', '#1f2a30'), top: cap('#e6d4ff', '#1f2a30') },
-        op: { ...p.caps.op, cap: cap('#ffd1e3', '#2a1a33'), top: cap('#ffd1e3', '#2a1a33'), ink: dark ? '#e2b6ff' : '#6b2683' },
-        hero: { ...p.caps.hero, cap: '#732982', top: '#8d3aa6', ink: '#ffffff' },
-      },
-      graphBg: oled ? '#000000' : dark ? '#140e1c' : '#fff7fb',
-      grid: oled ? '#140b1a' : dark ? '#241632' : '#fde6f2',
-      gridMajor: oled ? '#2a1830' : dark ? '#3a2450' : '#f2c7e4',
-      axis: dark ? '#c58cff' : '#9b4dca',
-      curves: dark ? PENS_DARK : PENS,
-    };
+    // Modern's Pride is light, not paint: the theme stays as it is, and the flag, in neon, lights the canvas and the
+    // composer the way Aurora Glow does. The accent turns neon violet.
+    const neon = dark ? NEON_DARK : NEON_LIGHT;
+    const accent = dark ? '#c77dff' : '#9b30f5';
+    return { ...p, flag: neon, accent, accent2: accent, led: accent, accentSoft: dark ? 'rgba(199,125,255,0.24)' : 'rgba(155,48,245,0.16)', onAccent: '#ffffff' };
   }
   const base: Palette = {
     ...p,

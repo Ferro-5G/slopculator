@@ -1,6 +1,6 @@
 // The first run's example: a slider wired to a curve, wired to the graph, on the canvas beside the composer. It's made
 // of ordinary lines (flagged `example`), so it can be edited like any other; Clear example takes it away with an
-// Undo, and Help or File brings it back.
+// Undo, and Help or Examples brings it back.
 import { EXAMPLE_CLEARED, EXAMPLE_LINES, isExampleRow } from '../ui/canvas';
 import { isBlankSheet, nextColor } from '../ui/document';
 import { type Row, newId } from './docmodel';

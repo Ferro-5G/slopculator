@@ -12,7 +12,7 @@ import { kb } from './platform';
 import { konamiStep, KONAMI_KEYS } from './pride';
 import { views, viewOfInput } from './rowviews';
 import { doc, saveSoon, rowIndex, activeId, currentResults, activeInput } from './sheet';
-import { closeThumb, tiRows, buildThumbRows } from './thumb';
+import { closeThumb, deckBar, tiPage, tiRows, buildThumbRows } from './thumb';
 
 let redrawKeys = () => {};
 export function switchPadSide(): void {
@@ -109,11 +109,24 @@ export function keyButton(k: Key): HTMLButtonElement {
   b.addEventListener('mousedown', (e) => e.preventDefault());
   if (k.action === 'left' || k.action === 'right') caretKey(b, k);
   const cleared = k.action === 'back' ? backKey(b) : null;
+  const cue = () => (k.action === 'enter' ? (activeId && currentResults()[rowIndex(activeId)]?.error ? 'error' : 'enter') : tone === 'num' ? 'tick' : 'fn');
+  // The click lands on touch-down, as a physical key's does; the key still acts on release. A keyboard or scripted
+  // click (no pointer down first) sounds as it acts.
+  let sounded = false;
+  if (k.action !== 'left' && k.action !== 'right') {
+    b.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      sounded = true;
+      play(cue());
+    });
+  }
   b.addEventListener('click', (e) => {
     if ((k.action === 'left' || k.action === 'right') && e.detail !== 0) return;
+    const early = sounded && e.detail !== 0;
+    sounded = false;
     if (cleared?.()) return;
     closeThumb();
-    play(k.action === 'enter' ? (activeId && currentResults()[rowIndex(activeId)]?.error ? 'error' : 'enter') : tone === 'num' ? 'tick' : 'fn');
+    if (!early) play(cue());
     b.classList.remove('pop');
     void b.offsetWidth; // restart the press animation
     b.classList.add('pop');
@@ -247,7 +260,7 @@ export function fitKeyLabels(): void {
   fitQueued = true;
   requestAnimationFrame(() => {
     fitQueued = false;
-    const labels = [...keypadEl.querySelectorAll<HTMLElement>('.key .kl')];
+    const labels = [...keypadEl.querySelectorAll<HTMLElement>('.pad .key .kl')];
     for (const l of labels) {
       l.style.fontSize = '';
       l.hidden = false;
@@ -280,7 +293,7 @@ export function fitKeyLabels(): void {
       shrink.push([l, Math.max(LABEL_MIN, fit)]);
     }
     for (const [l, px] of shrink) l.style.fontSize = `${px}px`;
-    const keys = [...keypadEl.querySelectorAll<HTMLElement>('.key')].filter((k) => k.offsetParent);
+    const keys = [...keypadEl.querySelectorAll<HTMLElement>('.pad .key')].filter((k) => k.offsetParent);
     const rows = new Map<string, HTMLElement[]>();
     const heights = keys.map((k) => k.getBoundingClientRect().height).sort((a, b) => a - b);
     const usual = heights[Math.floor(heights.length / 2)] ?? 0;
@@ -362,8 +375,12 @@ export function buildKeypad(): void {
     if (!t.classList.contains('key')) return;
     grid.querySelectorAll<HTMLButtonElement>('.key').forEach((k) => (k.tabIndex = k === t ? 0 : -1));
   });
-  // AC and enter are on the composer; the foot of the keys says what the key or tile you point at does.
-  keypadEl.append(h('div', { class: 'pad' }, h('div', { class: 'pad-main' }, grid, keyHelp)), h('div', { class: 'key-foot' }, keyHint));
+  // One unified deck bar sits across the top of the keypad; below it, the pad and any open category page swap in-place.
+  keypadEl.append(
+    deckBar,
+    h('div', { class: 'pad-stage' }, h('div', { class: 'pad' }, h('div', { class: 'pad-main' }, grid, keyHelp)), tiPage),
+    h('div', { class: 'key-foot' }, keyHint),
+  );
   show();
 }
 let lastKeyFocus: Element | null = null;

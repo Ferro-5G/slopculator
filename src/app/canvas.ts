@@ -35,6 +35,9 @@ import { setHostedCheck, views } from './rowviews';
 import { openLineMenu } from './rows';
 import { doc, results, rowIndex, saveSoon } from './sheet';
 import { play } from './sound';
+import { CURVES, DURATIONS, STAGGER } from '../ui/motiontokens';
+import { EMPTY_STARTERS, STARTERS } from '../ui/starters';
+import { loadStarter } from './listtools';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -207,6 +210,7 @@ export function layoutCanvas(): void {
   measurePorts();
   drawWires();
   settleLift();
+  syncEmpty();
 }
 
 /** Where the composer and the keys sit over the canvas, in its own coordinates at the default view. */
@@ -298,14 +302,22 @@ function layoutWide(cid: string): void {
   // Until the person pans or zooms, the view keeps the whole sheet in sight: at 100% while it fits, else zoomed out.
   // Never while the pointer is down (a slider held, a point dragged on the graph): the view would move what it holds.
   if (autoView && rects.size && !dragHeld() && !pointerDown && !holdView) setView(homeView());
-  else if (holdView) showTrays();
-  else applyView();
+  else if (holdView) {
+    // If opening Steps/figure would have shrunk the canvas zoom, keep the user's current zoom rather than jolting on
+    // the next unrelated click; Fit all brings auto-fit back.
+    if (autoView && rects.size && homeView().scale < view.scale - 0.01) autoView = false;
+    showTrays();
+  } else {
+    if (pointerDown) layoutDeferred = true;
+    applyView();
+  }
 }
 /** The example's frame on a wide canvas, as last laid out. */
 let frameRect: Rect | null = null;
 
 let holdView = false;
 let pointerDown = false;
+let layoutDeferred = false;
 /** Pans just enough to bring an open tray that's mostly out of sight into the free part of the screen. */
 function showTrays(): void {
   const a = freeArea();
@@ -343,6 +355,8 @@ function layoutNarrow(cid: string): void {
     if (el) el.style.left = el.style.top = '';
   }
   Object.assign(graphPane.style, { left: '', top: '', width: '', height: '' });
+  Object.assign(exampleGraphPane.style, { left: '', top: '', width: '', height: '' });
+  Object.assign(psychBlock.style, { left: '', top: '' });
   ghost.hidden = true;
   let order = columnOrder(doc.rows.filter((r) => r.id !== cid), wires).filter((id) => (id !== GRAPH_BLOCK || graphPane.isConnected) && (id !== EXAMPLE_GRAPH || exampleGraphPane.isConnected));
   // The chart where its first state goes, its states (drawn inside it) after it.
@@ -605,13 +619,83 @@ function settleLift(): void {
       setView({ ...view, dx: view.dx + Math.min(0, a.x + a.w - 40 - (sx + sw)) + Math.max(0, a.x + 40 - sx), dy: view.dy + Math.min(0, a.y + a.h - 40 - (sy + sh)) + Math.max(0, a.y + 40 - sy) });
     }
   }
-  if (!motion()) return;
+  const m = motionNow();
+  if (m === 'off') return;
+  // The live answer was the accent while it was typed; once sent it cools into the block's own ink.
+  const ans = el.querySelector<HTMLElement>('.out .result');
+  if (ans) ans.animate([{ color: 'var(--cv-accent)' }, { color: getComputedStyle(ans).color }], { duration: DURATIONS.answerCool, easing: CURVES.cool });
+  if (m !== 'full') return;
   const to = el.getBoundingClientRect();
   const s = wide() ? view.scale : 1;
   el.animate([
     { transform: `translate(${(l.from.left - to.left) / s}px, ${(l.from.top - to.top) / s}px)`, opacity: 0.55 },
     { transform: 'none', opacity: 1 },
-  ], { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  ], { duration: DURATIONS.launch, easing: CURVES.launch });
+  // Aurora Glow: only the block that just landed glows, briefly (its look's animation takes the class off).
+  if (document.documentElement.hasAttribute('data-glow')) {
+    el.classList.remove('landed');
+    void el.offsetWidth;
+    el.classList.add('landed');
+    const off = (e: AnimationEvent) => {
+      if (e.animationName !== 'au-land') return;
+      el.classList.remove('landed');
+      el.removeEventListener('animationend', off);
+    };
+    el.addEventListener('animationend', off);
+  }
+}
+
+/** A gentle bell curve over its baseline, in a 64-unit square: the empty canvas's mark. */
+function bellPath(): { line: string; fill: string } {
+  const at = (x: number) => 52 - 38 * Math.exp(-(((x - 32) / 9.5) ** 2) / 2);
+  const pts: string[] = [];
+  for (let x = 6; x <= 58; x += 2) pts.push(`${x} ${at(x).toFixed(2)}`);
+  const under: string[] = [];
+  for (let x = 24; x <= 40; x += 2) under.push(`${x} ${at(x).toFixed(2)}`);
+  return { line: `M${pts.join(' L')}`, fill: `M24 52 L${under.join(' L')} L40 52 Z` };
+}
+let emptyEl: HTMLElement | null = null;
+/**
+ * The open canvas before anything is on it: a bell curve that draws itself once, and a few starters to begin from.
+ * It sits beside the list of lines, never in it, and gives way as soon as a line exists or anything is typed.
+ */
+function emptyCanvas(): HTMLElement {
+  if (emptyEl) return emptyEl;
+  const { line, fill } = bellPath();
+  const mark = document.createElementNS(NS, 'svg');
+  mark.setAttribute('class', 'cv-empty-mark');
+  mark.setAttribute('viewBox', '0 0 64 64');
+  mark.setAttribute('width', '64');
+  mark.setAttribute('height', '64');
+  mark.setAttribute('aria-hidden', 'true');
+  for (const [cls, d] of [['area', fill], ['base', 'M4 52 H60'], ['curve', line]] as const) {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('class', cls);
+    p.setAttribute('d', d);
+    if (cls !== 'area') p.setAttribute('pathLength', '1');
+    mark.append(p);
+  }
+  const chips = EMPTY_STARTERS.flatMap((id) => STARTERS.filter((x) => x.id === id)).map((ex, i) => {
+    const b = h('button', { type: 'button', class: 'cv-empty-chip', title: ex.subtitle ?? ex.title }, ex.title);
+    b.style.setProperty('--i', String(i));
+    b.style.setProperty('--stagger', `${STAGGER.starterMs}ms`);
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => loadStarter(ex));
+    return b;
+  });
+  emptyEl = h('div', { class: 'cv-empty', hidden: true },
+    mark,
+    h('div', { class: 'cv-empty-starters', role: 'group', 'aria-label': 'Start with an example' }, ...chips));
+  return emptyEl;
+}
+/** Shows the empty canvas while the sheet has no lines and nothing is typed; fades it out otherwise. */
+function syncEmpty(): void {
+  const empty = !editingId && doc.rows.every((r) => r.kind === 'expr' && !r.text.trim());
+  if (!empty && !emptyEl) return;
+  const el = emptyCanvas();
+  if (el.parentElement !== tape) tape.append(el);
+  if (empty) el.hidden = false;
+  el.classList.toggle('gone', !empty);
 }
 
 /** A ring that comes and goes on a block: where an edit or an update landed. */
@@ -674,8 +758,9 @@ export const canvasTools = h('div', { class: 'cv-tools', role: 'group', 'aria-la
   zoomBtn('Fit all', 'Show every block (Ctrl+Alt+0)', () => fitCanvas()),
 );
 
-/** What a press on the canvas takes no notice of: controls inside blocks keep their own. */
-const ownsPointer = (t: Element) => !!t.closest('input:not(.expr), button, select, textarea, a, label, .extra, .tbl, .graph-host, .graph-dock, .blk-resize, .example-frame, .blk-example-graph, .fh:not(.fixed), .cv-seg');
+/** What a press on the canvas takes no notice of: controls inside blocks keep their own. A value block's answer button
+ * (.result) still lets a drag move the block, while a plain click on it copies as always. */
+const ownsPointer = (t: Element) => !!t.closest('input:not(.expr), button:not(.result), select, textarea, a, label, .extra, .tbl, .graph-host, .graph-dock, .blk-resize, .example-frame, .blk-example-graph, .fh:not(.fixed), .cv-seg');
 
 /** The block a drag holds, kept still on a narrow canvas while tags come and go above it. */
 let held: string | null = null;
@@ -722,8 +807,14 @@ export function initCanvas(): void {
   listEl.addEventListener('pointerdown', (e) => { const id = sliderRow(e.target); if (id) press(id); }, true);
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
-  window.addEventListener('pointerdown', () => { pointerDown = true; }, true);
-  for (const type of ['pointerup', 'pointercancel'] as const) window.addEventListener(type, () => { if (!pointerDown) return; pointerDown = false; layoutCanvas(); });
+  // Only pointers on the canvas itself defer layout (sliders, graph/figure handles); clicks on the composer, tabs or
+  // top bar never trigger an extra layout pass on release.
+  listEl.addEventListener('pointerdown', () => { pointerDown = true; layoutDeferred = false; }, true);
+  for (const type of ['pointerup', 'pointercancel'] as const) window.addEventListener(type, () => {
+    if (!pointerDown) return;
+    pointerDown = false;
+    if (layoutDeferred) { layoutDeferred = false; layoutCanvas(); }
+  });
   listEl.addEventListener('keydown', (e) => {
     const id = sliderRow(e.target);
     if (id && !dragHeld() && /^(Arrow|Page|Home|End)/.test(e.key)) press(id);
@@ -753,21 +844,33 @@ export function initCanvas(): void {
   }, { passive: false });
 
   // A press on a block: a click edits it in the composer, a drag (wide) moves it. A press on the background pans.
+  let dropClick = false;
+  listEl.addEventListener('click', (e) => {
+    if (!dropClick) return;
+    dropClick = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
   listEl.addEventListener('pointerdown', (e) => {
+    dropClick = false;
     const t = e.target as Element;
     const block = t.closest<HTMLElement>('.row.blk, .row.blk-pstate');
     if (!block || e.button !== 0 || ownsPointer(t)) return;
     const id = [...views].find(([, v]) => v.el === block)?.[0];
     if (!id) return;
-    e.preventDefault();
-    e.stopPropagation();
+    const onResult = !!t.closest('.result');
+    // On a value block's answer button, let a plain click reach the copy handler; only take over once a drag starts.
+    if (!onResult) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const start = { x: e.clientX, y: e.clientY };
     const row = doc.rows[rowIndex(id)];
     // Where it is now, laid out or dragged before: a drag pins it there.
     const laid = rects.get(id);
     const at0 = row?.at ? { ...row.at } : laid ? { x: laid.x, y: laid.y } : null;
     let moved = false;
-    try { block.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track (a synthetic one) */ }
+    if (!onResult) try { block.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track (a synthetic one) */ }
     // A long press on a touch screen opens the line's menu, as a right-click does.
     let held = false;
     const hold = e.pointerType === 'mouse' ? 0 : window.setTimeout(() => { held = true; if (row) { play('toggle'); openLineMenu(row, start.x, start.y); } }, 420); // The long-press threshold the line menu has always used.
@@ -777,6 +880,7 @@ export function initCanvas(): void {
       if (!wide() || !at0 || !row || hostedIds.has(id)) return;
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
       if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
+      if (!moved && onResult) try { block.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
       moved = true;
       block.classList.add('dragging');
       row.at = dragTo(at0, dx, dy);
@@ -794,13 +898,19 @@ export function initCanvas(): void {
     };
     const up = () => {
       clearTimeout(hold);
-      block.removeEventListener('pointermove', move);
-      block.removeEventListener('pointerup', up);
-      block.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       block.classList.remove('dragging');
       if (held) return;
-      if (moved) { dropped = id; saveSoon(); layoutCanvas(); return; }
-      if (row?.kind !== 'expr') return;
+      if (moved) {
+        if (onResult) dropClick = true;
+        dropped = id;
+        saveSoon();
+        layoutCanvas();
+        return;
+      }
+      if (onResult || row?.kind !== 'expr') return;
       // The caret goes where the line was clicked, as it did when lines were edited in place.
       const v = views.get(id);
       let caret = v?.tex && v.el.classList.contains('typeset') && v.tex.offsetParent ? caretAt(v.tex, start.x, start.y, row.text.length) : undefined;
@@ -809,9 +919,9 @@ export function initCanvas(): void {
       play('toggle');
       editLine(id, caret);
     };
-    block.addEventListener('pointermove', move);
-    block.addEventListener('pointerup', up);
-    block.addEventListener('pointercancel', up);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }, true);
 
   // A right-click on a block opens its line's menu: copy, duplicate, show or hide on the graph, move, delete.

@@ -18,8 +18,11 @@
   --graph-chip-radius: 8;
   --shadow-float: 0 1px 2px rgba(24, 24, 27, 0.06), 0 8px 24px rgba(24, 24, 27, 0.12);
   --shadow-well: 0 0 #0000;
-  --key-depth: inset 0 -1px 0 rgb(0 0 0 / 0.14), 0 0.5px 1px rgb(0 0 0 / 0.06);
-  --hero-depth: inset 0 -1.5px 0 #1c48b8, inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px color-mix(in srgb, var(--hero-glow) 30%, transparent), 0 4px 12px -4px color-mix(in srgb, var(--hero-glow) 45%, transparent);
+  /* Keycaps: a crisp top-edge hairline and a soft contact shadow. Number keys sit a touch prouder than the rest. */
+  --key-depth: inset 0 -1px 0 rgba(23, 23, 26, 0.1), 0 1px 1.5px rgba(23, 23, 26, 0.1), 0 0 0 0.5px rgba(23, 23, 26, 0.05);
+  --key-depth-fn: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(23, 23, 26, 0.08), 0 0.5px 1px rgba(23, 23, 26, 0.08);
+  --key-press-sheen: inset 0 1px 2px rgba(23, 23, 26, 0.14), inset 0 0 0 100px rgba(23, 23, 26, 0.035);
+  --hero-depth: inset 0 -1.5px 0 #1d3c99, inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px color-mix(in srgb, var(--hero-glow) 30%, transparent), 0 4px 12px -4px color-mix(in srgb, var(--hero-glow) 45%, transparent);
   --sans: 'Superscripts', 'Geist Sans', 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'Superscripts', 'Geist Mono', 'IBM Plex Sans', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --blur: blur(16px) saturate(1.5);
@@ -33,16 +36,18 @@
 
 [data-theme='ink'] {
   --edge-shade: rgb(0 0 0 / 0.6);
-  --glass: rgba(31, 35, 44, 0.86);
-  --glass-strong: rgba(31, 35, 44, 0.97);
-  --menu: #1f232c;
-  --label-2: #9aa3b2;
-  --hover: rgba(255, 255, 255, 0.05);
-  --press: rgba(255, 255, 255, 0.1);
+  --glass: rgba(25, 29, 38, 0.88);
+  --glass-strong: rgba(25, 29, 38, 0.97);
+  --menu: #191d26;
+  --label-2: #8c95a6;
+  --hover: rgba(255, 255, 255, 0.055);
+  --press: rgba(255, 255, 255, 0.11);
   --ok: #4ade80;
-  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 28px rgba(0, 0, 0, 0.55);
-  --key-depth: inset 0 -1px 0 #000000, inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 1px rgba(0, 0, 0, 0.35);
-  --hero-depth: inset 0 -1px 0 #3f6fe0, inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px -6px color-mix(in srgb, var(--hero-glow) 45%, transparent);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.58);
+  --key-depth: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.45);
+  --key-depth-fn: inset 0 1px 0 rgba(255, 255, 255, 0.045), inset 0 -1px 0 rgba(0, 0, 0, 0.3), 0 1px 1.5px rgba(0, 0, 0, 0.4);
+  --key-press-sheen: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 100px rgba(255, 255, 255, 0.04);
+  --hero-depth: inset 0 -1px 0 #3662db, inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px -6px color-mix(in srgb, var(--hero-glow) 45%, transparent);
   --blur: blur(16px);
   --active-bar-w: 3px;
   --caret: var(--accent);
@@ -60,6 +65,8 @@
   --ok: #4ade80;
   --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.2);
   --key-depth: 0 0 #0000;
+  --key-depth-fn: var(--key-depth);
+  --key-press-sheen: none;
   --hero-depth: 0 0 #0000;
   --blur: blur(16px);
   --active-bar-w: 3px;
@@ -79,6 +86,8 @@
   --ok: #5cff9a;
   --shadow-float: 0 0 #0000;
   --key-depth: inset 0 0 0 2px #ffffff;
+  --key-depth-fn: var(--key-depth);
+  --key-press-sheen: none;
   --hero-depth: inset 0 0 0 2px #ffffff;
   --blur: none;
   --active-bar-w: 3px;
@@ -97,6 +106,8 @@
   --ok: #006b2d;
   --shadow-float: 0 0 0 2px #000000;
   --key-depth: inset 0 0 0 2px #000000;
+  --key-depth-fn: var(--key-depth);
+  --key-press-sheen: none;
   --hero-depth: inset 0 0 0 2px #000000;
   --blur: none;
   --active-bar-w: 3px;
@@ -1799,6 +1810,10 @@
   --kc: var(--key-act);
 }
 
+.key:is(.fn, .op, .act) {
+  box-shadow: var(--key-depth-fn, var(--key-depth));
+}
+
 .key.act .kl {
   font: 500 13px/1 var(--sans);
   color: var(--key-act-ink);
@@ -1839,21 +1854,107 @@
   filter: brightness(1.06);
 }
 
+/* Press physics, mirrored from src/ui/motiontokens.ts: an instant press-in (PRESS_DEPTH by size, CURVES.pressIn) and
+   a crisp rebound on release (key-pop, CURVES.pressOut). The cap sinks under a faint pressed sheen; its legend stays. */
 .key:active {
-  transform: scale(0.94);
-  box-shadow: none;
-  transition-duration: 0.06s, 0.06s, 0.06s;
-  transition-timing-function: ease-out;
+  transform: scale(0.955);
+  box-shadow: var(--key-press-sheen, none);
+  transition: background 0.06s, box-shadow 0.06s, transform 0.06s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.key.hero:active,
+.key.wide:active,
+.key.composer-enter:active {
+  transform: scale(0.975);
+}
+
+.key.ti-tab:active,
+.deck-pad:active {
+  transform: scale(0.96);
 }
 
 .key.pop {
-  animation: key-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: key-pop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @keyframes key-pop {
-  0% { transform: scale(0.94); }
-  45% { transform: scale(1.018); }
+  0% { transform: scale(0.955); }
+  55% { transform: scale(1.008); }
   100% { transform: scale(1); }
+}
+
+/* ---------- sculpted keycaps (the keypad, non-high-contrast) ----------
+   Matte caps with a machined top edge and a 2 px lip under them: number keys pill-rounded, the rest squircles. A press
+   drops the cap 1.5 px onto its lip, which shrinks to match, and the release springs it back to rest at translateY(0)
+   scale(1). With motion Reduced or Off the cap only shades. Scoped to the keypad, so the Appearance preview keeps its
+   small plain caps. */
+:root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key:not(.ti-tab, .deck-ac) {
+  border-radius: 12px;
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key.num:not(.ti-tab, .deck-ac) {
+  border-radius: 16px;
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key.hero:not(.ti-tab, .deck-ac) {
+  border-radius: 13px;
+}
+
+@media (--phone) {
+  :root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key.num:not(.ti-tab, .deck-ac) {
+    border-radius: 14px;
+  }
+}
+
+:root:is([data-theme='ink'], [data-theme='oled']) .keypad .key:not(.ti-tab, .deck-ac) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #050609, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+}
+
+:root:is([data-theme='ink'], [data-theme='oled']) .keypad .key.num:not(.ti-tab, .deck-ac) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 2px 0 #050609, 0 3px 6px rgba(0, 0, 0, 0.42);
+}
+
+:root:is([data-theme='ink'], [data-theme='oled']) .keypad .key:not(.ti-tab, .deck-ac):active {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 100px rgba(255, 255, 255, 0.04), 0 0.5px 0 #050609;
+}
+
+:root:is(:not([data-theme]), [data-theme='paper']) .keypad .key:not(.ti-tab, .deck-ac) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 0 rgba(23, 23, 26, 0.11), 0 2px 3px rgba(23, 23, 26, 0.06);
+}
+
+:root:is(:not([data-theme]), [data-theme='paper']) .keypad .key.num:not(.ti-tab, .deck-ac) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), 0 2px 0 rgba(23, 23, 26, 0.14), 0 3px 5px rgba(23, 23, 26, 0.08);
+}
+
+:root:is(:not([data-theme]), [data-theme='paper']) .keypad .key:not(.ti-tab, .deck-ac):active {
+  box-shadow: inset 0 1px 2px rgba(23, 23, 26, 0.14), inset 0 0 0 100px rgba(23, 23, 26, 0.035), 0 0.5px 0 rgba(23, 23, 26, 0.14);
+}
+
+/* ENTER keeps its glow and gains the machined edge and lip. */
+:root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key.hero:not(.ti-tab, .deck-ac) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 0 rgba(0, 0, 0, 0.3), var(--hero-depth);
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight']) .keypad .key.hero:not(.ti-tab, .deck-ac):active {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22), 0 0.5px 0 rgba(0, 0, 0, 0.3);
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight'], [data-motion='off'], [data-motion='reduced']) .keypad .key:not(.ti-tab, .deck-ac):active {
+  transform: translateY(1.5px) scale(0.955);
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight'], [data-motion='off'], [data-motion='reduced']) .keypad .key:is(.hero, .wide):not(.ti-tab, .deck-ac):active {
+  transform: translateY(1.5px) scale(0.975);
+}
+
+:root:not([data-theme='contrast'], [data-theme='contrastLight'], [data-motion='off'], [data-motion='reduced']) .keypad .key.pop:not(.ti-tab, .deck-ac) {
+  animation-name: key-pop-lip;
+}
+
+@keyframes key-pop-lip {
+  0% { transform: translateY(1.5px) scale(0.955); }
+  55% { transform: translateY(-0.25px) scale(1.008); }
+  100% { transform: translateY(0) scale(1); }
 }
 
 @keyframes row-in {
@@ -2620,8 +2721,7 @@ dialog.palette::backdrop {
     color: var(--ink-2);
   }
 
-  .gt-group,
-  [data-pride]:not([data-theme^='contrast']) .gt-group {
+  .gt-group {
     flex-direction: row;
     padding: 0;
     border-radius: 0;
@@ -2853,47 +2953,6 @@ dialog.palette::backdrop {
   .nav-keys {
     padding: 5px 12px;
   }
-}
-
-@media (--desktop) {
-  [data-pride]:not([data-theme^='contrast']) .main:not(.no-graph) {
-    --splitter-w: 3px;
-  }
-
-  [data-pride]:not([data-theme^='contrast']) .splitter {
-    background: linear-gradient(180deg, var(--rainbow));
-  }
-}
-
-[data-pride]:not([data-theme^='contrast']) .modebar {
-  background: linear-gradient(90deg, var(--rainbow)) top / 100% 3px no-repeat;
-}
-
-[data-pride]:not([data-theme^='contrast']) .mark {
-  background: linear-gradient(135deg, var(--rainbow));
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.25);
-  color: #ffffff;
-}
-
-[data-pride]:not([data-theme^='contrast']) .mark .mark-tail {
-  fill: #1b1b19;
-}
-
-[data-pride]:not([data-theme^='contrast']) .mark svg {
-  filter: drop-shadow(0 1px 0.5px rgba(0, 0, 0, 0.45));
-}
-
-[data-pride]:not([data-theme^='contrast']) .key.hero .kl,
-[data-pride]:not([data-theme^='contrast']) .key.hero .ks {
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-}
-
-[data-pride]:not([data-theme^='contrast']) .pill.on,
-[data-pride]:not([data-theme^='contrast']) .nav-view[aria-pressed='true'] {
-  background: linear-gradient(90deg, var(--rainbow));
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .pill.more,
@@ -3363,132 +3422,6 @@ dialog.palette::backdrop {
   }
 }
 
-[data-pride]:not([data-theme^='contrast']) .left {
-  background: var(--wash);
-}
-
-[data-pride]:not([data-theme^='contrast']) .sheet-title {
-  background: linear-gradient(90deg, var(--rainbow-text));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .mark svg {
-  display: none;
-}
-
-[data-pride]:not([data-theme^='contrast']) .mark::before {
-  content: '🦄';
-  font-size: 14px;
-  line-height: 1;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+1) {
-  background: color-mix(in srgb, var(--uv-1) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+1) .idx {
-  color: var(--curve-1);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+2) {
-  background: color-mix(in srgb, var(--uv-2) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+2) .idx {
-  color: var(--curve-2);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+3) {
-  background: color-mix(in srgb, var(--uv-3) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+3) .idx {
-  color: var(--curve-3);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+4) {
-  background: color-mix(in srgb, var(--uv-4) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+4) .idx {
-  color: var(--curve-4);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+5) {
-  background: color-mix(in srgb, var(--uv-5) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n+5) .idx {
-  color: var(--curve-5);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n) {
-  background: color-mix(in srgb, var(--uv-6) 70%, transparent);
-}
-
-[data-pride]:not([data-theme^='contrast']) .row:nth-child(6n) .idx {
-  color: var(--curve-6);
-  font-weight: 700;
-}
-
-[data-pride]:not([data-theme^='contrast']) .row.active,
-[data-pride]:not([data-theme^='contrast']) .row:focus-within {
-  background: var(--well);
-}
-
-[data-pride]:not([data-theme^='contrast']) .rows .starter-card:nth-child(4n+1) { background: var(--uv-1); }
-[data-pride]:not([data-theme^='contrast']) .rows .starter-card:nth-child(4n+2) { background: var(--uv-3); }
-[data-pride]:not([data-theme^='contrast']) .rows .starter-card:nth-child(4n+3) { background: var(--uv-4); }
-[data-pride]:not([data-theme^='contrast']) .rows .starter-card:nth-child(4n) { background: var(--uv-6); }
-
-[data-pride]:not([data-theme^='contrast']) .pill:nth-child(1) { background: var(--uv-1); color: var(--uv-ink); }
-[data-pride]:not([data-theme^='contrast']) .pill:nth-child(2) { background: var(--uv-3); color: var(--uv-ink); }
-[data-pride]:not([data-theme^='contrast']) .pill:nth-child(3) { background: var(--uv-5); color: var(--uv-ink); }
-[data-pride]:not([data-theme^='contrast']) .pill:nth-child(n+4) { background: var(--uv-6); color: var(--uv-ink); }
-
-[data-pride]:not([data-theme^='contrast']) .key.num { background: var(--key); }
-[data-pride]:not([data-theme^='contrast']) .krow:nth-child(even) .key.num { background: var(--uv-2); }
-[data-pride]:not([data-theme^='contrast']) .krow:nth-child(odd) .key.fn:nth-child(even) { background: var(--uv-4); }
-[data-pride]:not([data-theme^='contrast']) .krow:nth-child(odd) .key.fn:nth-child(odd) { background: var(--uv-5); }
-[data-pride]:not([data-theme^='contrast']) .krow:nth-child(even) .key.fn:nth-child(odd) { background: var(--uv-4); }
-[data-pride]:not([data-theme^='contrast']) .krow:nth-child(even) .key.fn:nth-child(even) { background: var(--uv-5); }
-[data-pride]:not([data-theme^='contrast']) .key.op { background: var(--uv-1); }
-[data-pride]:not([data-theme^='contrast']) .key.act { background: var(--uv-6); }
-[data-pride]:not([data-theme^='contrast']) .key.hero { background: var(--hero-fill); }
-
-[data-pride]:not([data-theme^='contrast']) .list-tools button,
-[data-pride]:not([data-theme^='contrast']) .menu-btn,
-[data-pride]:not([data-theme^='contrast']) .help-btn,
-[data-pride]:not([data-theme^='contrast']) .graph-tools button {
-  color: var(--uv-ink);
-}
-
-[data-pride]:not([data-theme^='contrast']) .gt-group {
-  background: linear-gradient(180deg, var(--uv-1), var(--uv-6));
-}
-
-[data-pride]:not([data-theme^='contrast']) .toast {
-  background: linear-gradient(90deg, var(--uv-1), var(--uv-3), var(--uv-4), var(--uv-5), var(--uv-6));
-  color: var(--uv-ink);
-}
-
-[data-pride]:not([data-theme^='contrast']) dialog,
-[data-pride]:not([data-theme^='contrast']) .menu {
-  background: var(--wash);
-}
-
-[data-pride]:not([data-theme^='contrast']) .graph-pane {
-  background: var(--graph-bg);
-}
-
 /* ⌫ held: the armed red wins over the pressed color, which comes later and would otherwise hide it while held. */
 @media (--phone) {
   .key.arming,
@@ -3609,7 +3542,7 @@ dialog.palette::backdrop {
     margin-left: 14px;
   }
 
-  #app > .modebar :is(.seg, .tog, .desk-more, .bar-tog, .appear-btn, .menu-btn, .help-btn, .head-find) {
+  #app > .modebar :is(.seg, .tog, .desk-more, .bar-tog, .appear-btn, .menu-btn, .help-btn, .head-find, .head-history) {
     box-sizing: border-box;
     height: 30px;
     margin: 0;
@@ -3631,7 +3564,7 @@ dialog.palette::backdrop {
     padding: 0 11px;
   }
 
-  #app > .modebar :is(.appear-btn, .help-btn) {
+  #app > .modebar :is(.appear-btn, .help-btn, .head-history) {
     width: 30px;
     padding: 0;
   }
@@ -3664,7 +3597,7 @@ dialog.palette::backdrop {
     color: var(--ink);
   }
 
-  #app > .modebar :is(.tog, .desk-more, .bar-tog, .appear-btn, .menu-btn, .help-btn, .head-find):hover {
+  #app > .modebar :is(.tog, .desk-more, .bar-tog, .appear-btn, .menu-btn, .help-btn, .head-find, .head-history):hover {
     background: color-mix(in srgb, var(--well) 88%, var(--ink));
     color: var(--ink);
   }
@@ -4052,8 +3985,7 @@ input[type='range']:is(.slider, .round-slider):focus-visible {
     z-index: 2;
   }
 
-  .gt-group,
-  [data-pride]:not([data-theme^='contrast']) .gt-group {
+  .gt-group {
     gap: 2px;
     padding: 0;
     border-radius: 0;

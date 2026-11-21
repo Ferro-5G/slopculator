@@ -8,7 +8,8 @@ import { TYPING_PAUSE_MS } from '../ui/text';
 import { backspaceEdit, matrixPrevCell, matrixRowStep, slotForEnd, slotStep } from '../ui/slots';
 import type { Row } from './docmodel';
 import { h, lineIcon } from './dom';
-import { moveRow, addRow, deleteRow, dragEnds, recordTyping, pushStep, setLineText, commitRow, committed } from './edits';
+import { COMBINE_OPS, combineLines as numericLines } from '../ui/combine';
+import { moveRow, addRow, combineAll, deleteRow, dragEnds, recordTyping, pushStep, setLineText, commitRow, committed } from './edits';
 import { pulse, copy } from './feedback';
 
 import { syncGraphChips, syncGraphSliders } from './graphpane';
@@ -21,7 +22,7 @@ import { renderResults } from './render';
 import { type RowView, views, viewOfInput, focusRow, isHostedRow } from './rowviews';
 import { doc, activeId, setActiveId, rowIndex, results, opts, currentResults, keepSelection, setTarget, sheetChanged, rowsChanged } from './sheet';
 import { makeTableView } from './tableview';
-import { composerHead, composerRowId, composerSlot, draftId } from './composer';
+import { composerHead, composerRowId, composerSlot, draftId, finishEdit } from './composer';
 
 export function rebuildRows(): void {
   draftId();
@@ -103,12 +104,21 @@ export function openLineMenu(row: Row, x: number, y: number): void {
     return b;
   };
   const move = ({ row }: At, d: number) => moveRow(row.id, d);
+  const canCombine = numericLines(doc.rows, results, doc.settings.lineNames).length >= 2;
+  const combineRow = canCombine
+    ? h('div', { class: 'menu-row combine-row', role: 'group', 'aria-label': 'Combine every line with a number into a new line' },
+      h('span', { 'aria-hidden': 'true' }, 'Combine all'),
+      h('div', { class: 'menu-btns' }, ...COMBINE_OPS.map(([op, label, word]) =>
+        h('button', { type: 'button', role: 'menuitem', 'aria-label': `${word} all lines`, title: `${word} all lines`, onclick: () => { close(); combineAll(op); } }, label))))
+    : null;
   const menuEl = h('div', { class: 'menu line-menu', role: 'menu' },
     act('Copy result', kb('Ctrl+Alt+C'), ({ r }) => { const value = copyableValue(r, opts()); if (value) void copy(value(), views.get(id)?.el.querySelector('.out .result, .dist-prob')); }, !copyableValue(r, opts())),
     act('Duplicate', kb('Alt+Shift+↓'), ({ row }) => row.kind === 'expr' && addRow(row.id, lineCopy(row)), row.kind !== 'expr'),
     act(row.hidden ? 'Show on graph' : 'Hide on graph', '', ({ row }) => { row.hidden = !row.hidden; sheetChanged(); focusRow(row.id); }, !r || r.graph.length === 0),
     act('Move up', kb('Alt+↑'), (a) => move(a, -1), i === 0),
     act('Move down', kb('Alt+↓'), (a) => move(a, 1), i === doc.rows.length - 1),
+    ...(coarse.matches && doc.rows.length >= 2 ? [act('Reorder lines', '', () => setReorder(true))] : []),
+    ...(combineRow ? [h('hr'), combineRow] : []),
     h('hr'),
     act('Delete', kb('Ctrl+Shift+⌫'), ({ row }) => deleteRow(row.id)),
   );
@@ -156,6 +166,7 @@ export function makeGutter(row: Row): { gutter: HTMLElement; idx: HTMLElement; c
 export let reordering = false;
 const reorderDone = h('button', { type: 'button', class: 'reorder-done', hidden: true, onclick: () => setReorder(false) }, 'Done');
 export function setReorder(on: boolean): void {
+  if (on) finishEdit();
   reordering = on;
   listEl.classList.toggle('reordering', on);
   reorderDone.hidden = !on;
