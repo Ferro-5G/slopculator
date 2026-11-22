@@ -355,7 +355,7 @@ export function initFile(): void {
       menuBtn.focus();
     }
   });
-  addPopover({ close: () => setMenu(false), exclusive: true, outside: true });
+  addPopover({ close: () => setMenu(false), exclusive: true, outside: true, isOpen: () => !menu.hidden, returnFocus: () => menuBtn.focus() });
   setCurrentSheet(currentSheet);
   modeBar.append(
     brandHome

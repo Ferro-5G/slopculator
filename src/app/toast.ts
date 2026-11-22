@@ -1,5 +1,5 @@
 import { h } from './dom';
-import { toast, composerDock, listEl, tape } from './layout';
+import { toast, composerDock, deskRail, listEl, railList, tape } from './layout';
 import { narrow } from './platform';
 import { TOAST_GAP, TOAST_MS } from '../ui/feedback';
 
@@ -10,6 +10,7 @@ export function hideToast(): void {
   toast.classList.remove('show');
   toast.inert = true;
   tape.style.removeProperty('--toast-room');
+  deskRail.style.removeProperty('--rail-toast-room');
 }
 /**
  * Where the toast goes, at every width: centred over the composer, TOAST_GAP above its tabs. That keeps it off the
@@ -27,7 +28,13 @@ function placeToast(): void {
     toast.style.left = `${Math.round(box.left + box.width / 2)}px`;
     toast.style.maxWidth = `${Math.max(200, box.width - 24)}px`;
   }
-  if (!narrow.matches || !shown) return;
+  if (!shown) return;
+  if (!narrow.matches) {
+    const room = Math.ceil(toast.offsetHeight + TOAST_GAP + 6);
+    deskRail.style.setProperty('--rail-toast-room', `${room}px`);
+    railList.scrollTop = railList.scrollHeight;
+    return;
+  }
   const before = listEl.clientHeight;
   tape.style.setProperty('--toast-room', `${Math.ceil(toast.offsetHeight + 2 * TOAST_GAP)}px`);
   // What was just above the composer stays in sight, above the toast.

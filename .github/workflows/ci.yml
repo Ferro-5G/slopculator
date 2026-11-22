@@ -2,8 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [main, release]
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: 'Run the browser E2E suite'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,9 +27,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast checks only on automatic runs (~1–2 min) to stay well under the Actions quota; browser E2E runs locally via
+  # `npm run verify` or on demand via workflow_dispatch.
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -37,38 +53,12 @@ jobs:
       - run: npm run build
       - if: hashFiles('mobile/package-lock.json') != ''
         run: npm run typecheck --prefix mobile
-
-  # The browser checks are most of the run, so they are split across runners. Each check opens its own
-  # browser profile, so a shard doesn't depend on the checks before it. `npm run e2e` still runs them all.
-  e2e:
-    name: e2e (${{ matrix.suite }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: ['0/4', '1/4', '2/4', '3/4', audit]
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx vite build
-      - if: matrix.suite == 'audit'
-        run: node scripts/audit-e2e.mjs
-      - if: matrix.suite == 'audit'
-        run: node scripts/site-e2e.mjs
-      - if: matrix.suite != 'audit'
-        run: node scripts/e2e.mjs
-        env:
-          E2E_SHARD: ${{ matrix.suite }}
-      - if: failure()
+      - if: github.event_name == 'workflow_dispatch' && inputs.e2e
+        name: Browser E2E
+        run: npm run e2e
+      - if: failure() && github.event_name == 'workflow_dispatch' && inputs.e2e
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: e2e-shots-${{ strategy.job-index }}
+          name: e2e-shots
           path: .shots/
           if-no-files-found: ignore

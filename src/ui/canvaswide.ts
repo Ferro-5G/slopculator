@@ -20,9 +20,9 @@ export const FRAME_TOP = 44;
 export const EXAMPLE_ROW_GAP = 20;
 export const EXAMPLE_WIRE_GAP = 40;
 /** The keypad panel, beside which the composer centres: its width with the room round it. */
-export const KEYS_ROOM = 352;
+export const KEYS_ROOM = 400;
 /** The keypad panel's own width, its key gap and its inset from the window's corner. */
-export const KEYS_W = 330;
+export const KEYS_W = 376;
 export const KEYS_INSET = 22;
 /** The composer's widest, and the room kept either side of it. */
 export const COMPOSER_MAX_W = 680;
@@ -233,7 +233,7 @@ function layoutAt(input: WideInput, s: number, graphUnder: boolean, valuesUnder 
   for (const [id, r] of flow) if (id !== EXAMPLE_UNIT && !id.endsWith('#below')) next.set(id, r);
   if (unit) for (const [id, r] of inside) next.set(id, { ...r, x: unit.x + r.x, y: unit.y + r.y });
   if (input.keep && !dropped) {
-    for (const [id, r] of next) { const was = input.keep.get(id); if (was) next.set(id, { ...r, x: was.x, y: was.y }); }
+    for (const [id, r] of next) { const was = input.keep.get(id); if (was) next.set(id, id === GRAPH_BLOCK ? { ...was } : { ...r, x: was.x, y: was.y }); }
     for (const [id, t] of trays) { const l = next.get(id)!; trays.set(id, { ...t, x: l.x, y: l.y + l.h + BELOW_GAP }); }
   }
 
@@ -305,11 +305,20 @@ export function wideHomeView(rects: readonly Rect[], area: Rect, composer: Rect 
   const b = boundsOf(rects);
   if (!b) return { scale: 1, dx: 0, dy: 0 };
   const covers = [...(composer ? [composer] : []), ...(keys ? [keys] : [])];
-  if (fitsAsIs(rects, area, covers)) {
-    const room = keys ? keys.x : area.w;
-    const dx = Math.max(0, Math.round((room - b.w) / 2 - b.x));
+  const room = keys ? keys.x - area.x : area.w;
+  if (area.x === 0) {
+    if (fitsAsIs(rects, area, covers)) {
+      const dx = Math.max(0, Math.round((room - b.w) / 2 - b.x));
+      const shifted = rects.map((r) => ({ ...r, x: r.x + dx }));
+      return { scale: 1, dx: fitsAsIs(shifted, area, covers) ? dx : 0, dy: 0 };
+    }
+  } else {
+    const dx = area.x + Math.max(16, Math.round((room - b.w) / 2)) - b.x;
     const shifted = rects.map((r) => ({ ...r, x: r.x + dx }));
-    return { scale: 1, dx: fitsAsIs(shifted, area, covers) ? dx : 0, dy: 0 };
+    if (fitsAsIs(shifted, area, covers)) return { scale: 1, dx, dy: 0 };
+    const dxMin = area.x + 16 - b.x;
+    const shiftedMin = rects.map((r) => ({ ...r, x: r.x + dxMin }));
+    if (fitsAsIs(shiftedMin, area, covers)) return { scale: 1, dx: dxMin, dy: 0 };
   }
   // A small free area (a phone on its side) keeps less room round the sheet, so it isn't shrunk to nothing.
   const views = (Array.isArray(free) ? free : [free] as readonly Rect[]).filter((f) => f.w > 0 && f.h > 0).map((f) => fitAll(rects, f, Math.min(48, Math.round(Math.min(f.w, f.h) / 10))));

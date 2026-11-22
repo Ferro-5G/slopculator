@@ -279,8 +279,8 @@ function closeModeSheet(): void {
 export const refreshModeBar = roving(modeBar, '.brand-home, .sheet-title,.desk-modes .seg button, .desk-modes .tog, .bar-round-slider, .pill, .bar-tog, .appear-btn, .head-find, .menu-btn, .head-history, .help-btn');
 
 export function initSettings(): void {
-  addPopover({ close: closeModeMenu, exclusive: true, outside: true });
-  addPopover({ close: () => { if (!roundPop.hidden) setRoundPop(false); }, outside: true });
+  addPopover({ close: closeModeMenu, exclusive: true, outside: true, isOpen: () => !modeMenu.hidden, returnFocus: () => (modeMenuAnchor?.offsetParent ? modeMenuAnchor : views.get(activeId ?? '')?.input)?.focus() });
+  addPopover({ close: () => { if (!roundPop.hidden) setRoundPop(false); }, outside: true, isOpen: () => !roundPop.hidden, returnFocus: () => roundChip.focus() });
   bindRound(roundSlider, (pl) => { roundOut.textContent = roundShort(pl); });
   document.body.append(modeMenu);
   modeMenu.addEventListener('click', (e) => e.stopPropagation());

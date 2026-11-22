@@ -28,7 +28,7 @@
 }
 
 .canvas-ui {
-  --cv-dot: color-mix(in srgb, var(--ink) 11%, var(--bg));
+  --cv-dot: color-mix(in srgb, var(--ink) 8.5%, var(--bg));
   --cv-block: var(--panel);
   --cv-raised: var(--active-fill, var(--well));
   --cv-edge: var(--rule);
@@ -38,15 +38,17 @@
   --cv-accent-soft: color-mix(in srgb, var(--cv-accent) 16%, transparent);
   --cv-sky: color-mix(in srgb, var(--cv-accent) 55%, #58c4f5);
   --cv-iris: color-mix(in srgb, var(--cv-accent) 55%, #8e7bff);
-  --cv-wire: color-mix(in srgb, var(--ink-3) 52%, var(--bg));
+  --cv-wire: color-mix(in srgb, var(--ink-3) 54%, var(--bg));
   --cv-gutter: 34px;
   /* One corner radius for blocks, the graph and the composer (CASCADE_RADIUS in src/ui/cascade.ts). */
   --cv-radius: 22px;
+  --cv-comp-r: 24px;
   --cv-ac: var(--key-ac-ink, var(--err));
   position: relative;
 }
 :root[data-look='retro'] .canvas-ui {
   --cv-radius: 10px;
+  --cv-comp-r: 10px;
 }
 
 /* ---------- the stage ---------- */
@@ -93,29 +95,29 @@
   top: 0;
   z-index: 30;
   height: auto;
-  padding: 14px 22px 0;
+  padding: 12px 20px 8px;
   background: none;
   border: 0;
   box-shadow: none;
   pointer-events: none;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 #app.canvas-ui > .modebar > * {
   pointer-events: auto;
 }
 #app.canvas-ui > .modebar .brand-home {
   font-weight: 700;
-  font-size: 17px;
-  letter-spacing: -0.01em;
+  font-size: 16px;
+  letter-spacing: -0.015em;
 }
 #app.canvas-ui > .modebar .sheet-title {
   position: relative;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 400;
   color: var(--ink-2);
   margin-left: 0;
-  padding: 4px 10px 4px 14px;
+  padding: 5px 10px 5px 14px;
   border-left: 0;
   border-radius: 8px;
   transition: background 0.12s, color 0.12s;
@@ -126,13 +128,13 @@
   left: 0;
   top: 50%;
   width: 1px;
-  height: 15px;
+  height: 14px;
   transform: translateY(-50%);
   background: var(--cv-edge-2);
   pointer-events: none;
 }
 #app.canvas-ui > .modebar .sheet-title:hover {
-  background: var(--cv-raised);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
   color: var(--ink);
 }
 [data-theme^='contrast'] #app.canvas-ui > .modebar .sheet-title {
@@ -142,8 +144,7 @@
 [data-theme^='contrast'] #app.canvas-ui > .modebar .sheet-title::before {
   display: none;
 }
-/* The bar's groups are the mockup's segmented controls: a surface, a fine edge, the chosen one raised. One 34 px
-   height across every group and button so the top bar sits on a single baseline. */
+/* The bar's groups are uniform 34 px desktop command clusters so the top bar sits on a single baseline. */
 #app.canvas-ui > .modebar .desk-modes .seg,
 #app.canvas-ui > .modebar .cv-tools,
 #app.canvas-ui > .modebar .head-pill,
@@ -162,6 +163,7 @@
   min-height: 0;
   height: 34px;
   box-shadow: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 #app.canvas-ui > .modebar .desk-modes .seg button,
 #app.canvas-ui > .modebar .cv-tools .cv-btn,
@@ -170,16 +172,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 11px;
+  padding: 0 10px;
   height: 26px;
   min-height: 0;
   border-radius: 7px;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   line-height: 1;
   color: var(--ink-2);
   background: none;
   border: 0;
   box-shadow: none;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 #app.canvas-ui > .modebar .desk-modes .seg button[aria-pressed='true'] {
   background: var(--cv-raised);
@@ -191,20 +195,76 @@
 #app.canvas-ui > .modebar .help-btn,
 #app.canvas-ui > .modebar .appear-btn {
   padding: 0 11px;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   color: var(--ink-2);
+}
+#app.canvas-ui > .modebar .appear-btn,
+#app.canvas-ui > .modebar .help-btn {
+  width: 34px;
+  padding: 0;
 }
 #app.canvas-ui > .modebar .bar-tog::before {
   display: none;
 }
 #app.canvas-ui > .modebar .bar-tog[aria-pressed='true'] {
   color: var(--ink);
-  background: var(--cv-raised);
+  background: color-mix(in srgb, var(--cv-accent) 16%, var(--cv-block));
+  border-color: color-mix(in srgb, var(--cv-accent) 42%, var(--cv-edge));
+}
+#app.canvas-ui > .modebar :is(.bar-tog, .desk-more, .appear-btn, .help-btn):hover {
+  color: var(--ink);
   border-color: var(--cv-edge-2);
+}
+#app.canvas-ui > .modebar :is(.desk-more, .appear-btn)[aria-expanded='true'],
+#app.canvas-ui > .modebar .head-pill .menu-btn[aria-expanded='true'] {
+  color: var(--ink);
+  background: var(--cv-raised);
+}
+#app.canvas-ui > .modebar .head-pill > :is(.head-find, .head-history):hover,
+#app.canvas-ui > .modebar .head-pill .menu-btn:hover,
+#app.canvas-ui > .modebar .cv-tools .cv-btn:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+#app.canvas-ui > .modebar .head-pill .menu-wrap,
+#app.canvas-ui > .modebar .head-pill .head-history {
+  position: relative;
+  margin-left: 3px;
+  padding-left: 3px;
+}
+#app.canvas-ui > .modebar .head-pill .head-history {
+  padding-left: 0;
+  margin-left: 4px;
+}
+#app.canvas-ui > .modebar .head-pill .menu-wrap::before,
+#app.canvas-ui > .modebar .head-pill .head-history::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 5px;
+  bottom: 5px;
+  width: 1px;
+  background: var(--cv-edge);
+  pointer-events: none;
+}
+#app.canvas-ui > .modebar .cv-tools .cv-btn:last-child {
+  position: relative;
+  margin-left: 4px;
+}
+#app.canvas-ui > .modebar .cv-tools .cv-btn:last-child::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 5px;
+  bottom: 5px;
+  width: 1px;
+  background: var(--cv-edge);
+  pointer-events: none;
 }
 #app.canvas-ui > .modebar .head-find kbd,
 #app.canvas-ui > .modebar .head-find .kbd {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ink-3);
   border: 1px solid var(--cv-edge-2);
   border-radius: 5px;
@@ -230,12 +290,12 @@
   color: var(--ink);
 }
 .canvas-ui .cv-zoom {
-  min-width: 46px;
-  padding: 0 6px;
+  min-width: 44px;
+  padding: 0 5px;
   line-height: 26px;
   text-align: center;
-  font-size: 14px;
-  color: var(--ink-3);
+  font-size: 13px;
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -579,7 +639,8 @@
 .canvas-ui .example-frame {
   position: absolute;
   z-index: 2;
-  border: 1.5px dashed color-mix(in srgb, var(--ink-3) 30%, var(--bg));
+  border: 1px dashed color-mix(in srgb, var(--ink-3) 26%, var(--bg));
+  background: color-mix(in srgb, var(--cv-block) 18%, transparent);
   border-radius: calc(var(--cv-radius) + 8px);
   pointer-events: none;
 }
@@ -602,22 +663,26 @@
 }
 .canvas-ui .example-clear {
   position: absolute;
-  right: 16px;
+  right: 14px;
   top: 10px;
   pointer-events: auto;
-  font: 14px var(--sans);
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--cv-edge);
+  background: color-mix(in srgb, var(--cv-block) 78%, transparent);
+  font: 500 12.5px/1 var(--sans);
   color: var(--ink-2);
-  background: none;
-  border: 0;
-  padding: 2px 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: var(--cv-wire);
+  text-decoration: none;
   cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 .canvas-ui .example-clear:hover {
   color: var(--ink);
-  text-decoration-color: currentColor;
+  border-color: var(--cv-edge-2);
+  background: var(--cv-raised);
 }
 
 /* ---------- the graph block ---------- */
@@ -1093,23 +1158,200 @@
   animation: none;
 }
 
+/* ---------- floating desktop sidebar: live sheet list + composer + fused keypad ---------- */
+.canvas-ui .desk-rail {
+  position: absolute;
+  left: 18px;
+  top: 62px;
+  bottom: 18px;
+  width: clamp(312px, 25.5vw, 364px);
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 0.18);
+}
+:root[data-look='retro'] .canvas-ui .desk-rail {
+  border-radius: 12px;
+}
+.canvas-ui .rail-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cv-edge) 70%, transparent);
+}
+.canvas-ui .rail-title {
+  font: 600 11.5px/1 var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.canvas-ui .rail-count {
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  font: 600 11px/1 var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+.canvas-ui .rail-count[hidden] {
+  display: none;
+}
+.canvas-ui .rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 10px calc(6px + var(--rail-toast-room, 0px));
+  scrollbar-width: thin;
+}
+.canvas-ui .rail-list > :first-child {
+  margin-top: auto;
+}
+.canvas-ui .rail-empty {
+  padding: 14px 12px 10px;
+  text-align: center;
+  font: 400 13px/1.45 var(--sans);
+  color: var(--ink-3);
+  user-select: none;
+}
+.canvas-ui .rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+.canvas-ui .rail-item:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.canvas-ui .rail-item:focus-visible {
+  outline: 2px solid var(--cv-accent);
+  outline-offset: -2px;
+}
+.canvas-ui .rail-item.editing {
+  background: color-mix(in srgb, var(--cv-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cv-accent) 42%, transparent);
+}
+.canvas-ui .rail-item.is-heading {
+  min-height: 28px;
+  padding: 6px 10px 3px;
+  cursor: default;
+}
+.canvas-ui .rail-item.is-heading:hover {
+  background: transparent;
+}
+.canvas-ui .rail-item.is-heading .rail-expr {
+  font: 600 11.5px/1.2 var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.canvas-ui .rail-dot {
+  flex: none;
+  width: 3.5px;
+  height: 16px;
+  border-radius: 2px;
+  background: transparent;
+}
+.canvas-ui .rail-item.has-curve .rail-dot {
+  background: var(--c, var(--cv-accent));
+}
+.canvas-ui .rail-expr {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 16px/1.25 var(--math);
+  color: var(--ink);
+}
+.canvas-ui .rail-expr .m-math {
+  font-size: inherit;
+}
+.canvas-ui .rail-meta {
+  flex: none;
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 14.5px/1.2 var(--sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--cv-accent);
+}
+.canvas-ui .rail-meta:empty {
+  display: none;
+}
+.canvas-ui .rail-meta.kind {
+  font: 500 11.5px/1 var(--sans);
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.canvas-ui .rail-meta.err {
+  color: var(--err);
+  font-weight: 700;
+}
+.canvas-ui .rail-del {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin-right: -4px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-3);
+  font: 400 16px/1 var(--sans);
+  cursor: pointer;
+  opacity: 0;
+  display: grid;
+  place-items: center;
+  transition: opacity 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+.canvas-ui .rail-item:is(:hover, :focus-within) .rail-del {
+  opacity: 1;
+}
+.canvas-ui .rail-del:hover {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  color: var(--ink);
+}
+/* Hovering a row in the sidebar highlights its spatial block on the canvas. */
+.canvas-ui .rows > .row.blk.rail-lit {
+  border-color: var(--cv-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cv-accent) 28%, transparent), 0 10px 28px rgb(0 0 0 / 0.28);
+}
+
 /* ---------- the composer ---------- */
 .canvas-ui .composer-dock {
-  position: absolute;
-  bottom: 22px;
-  left: calc((100% - var(--cv-keys-w, 352px)) / 2);
-  transform: translateX(-50%);
-  width: min(680px, calc(100% - var(--cv-keys-w, 352px) - 48px));
-  z-index: 22;
-  transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
+  flex: none;
+  width: 100%;
+  padding: 2px 10px 8px;
+  z-index: 4;
 }
 .canvas-ui .composer-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 4px;
-  height: 34px;
-  padding: 0 16px 0 var(--cv-radius);
+  gap: 6px;
+  height: 26px;
+  padding: 0 4px 0 10px;
 }
 .canvas-ui .composer-head > .spacer {
   flex: 1;
@@ -1173,14 +1415,14 @@
 .canvas-ui .deck-pad {
   flex: none;
   width: auto;
-  height: 26px;
+  height: 28px;
   min-height: 0;
-  padding: 0 9px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--cv-edge);
   background: transparent;
   color: var(--ink-2);
-  font: 600 12px/1 var(--sans);
+  font: 600 12.5px/1 var(--sans);
   letter-spacing: -0.01em;
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
@@ -1210,7 +1452,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1221,10 +1463,10 @@
   flex: none;
   position: relative;
   top: 0;
-  height: 26px;
+  height: 28px;
   min-height: 0;
   width: auto;
-  padding: 0 7px;
+  padding: 0 9px;
   border-radius: 999px;
   background: var(--cv-block);
   border: 1px solid transparent;
@@ -1264,22 +1506,25 @@
 }
 .canvas-ui .composer-head .composer-ac {
   flex: none;
-  height: auto;
+  height: 24px;
   min-height: 0;
   width: auto;
-  padding: 6px 12px;
-  margin-bottom: 3px;
-  border-radius: 10px;
-  background: none;
+  padding: 0 10px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cv-block) 82%, transparent);
   box-shadow: none;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--cv-ac) 30%, var(--cv-edge));
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .canvas-ui .composer-head .composer-ac .kl {
-  font: 600 14px var(--sans);
+  font: 600 12px/1 var(--sans);
+  letter-spacing: 0.04em;
   color: var(--cv-ac);
 }
 .canvas-ui .composer-head .composer-ac:hover {
-  background: color-mix(in srgb, var(--cv-ac) 10%, transparent);
+  background: color-mix(in srgb, var(--cv-ac) 14%, var(--cv-block));
+  border-color: color-mix(in srgb, var(--cv-ac) 52%, var(--cv-edge));
 }
 .canvas-ui .composer-head .nav-keys {
   margin-bottom: 3px;
@@ -1288,12 +1533,12 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 72px;
-  padding: 12px 12px 12px 22px;
+  gap: 12px;
+  min-height: 62px;
+  padding: 9px 10px 9px 20px;
   background: var(--cv-raised);
-  border-radius: var(--cv-radius);
-  box-shadow: 0 4px 20px rgb(0 0 0 / 0.2);
+  border-radius: var(--cv-comp-r);
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.22);
 }
 :root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer {
   background: var(--cv-block);
@@ -1305,7 +1550,7 @@
   content: '';
   position: absolute;
   inset: -1px;
-  border-radius: calc(var(--cv-radius) + 1px);
+  border-radius: calc(var(--cv-comp-r) + 1px);
   padding: 1.25px;
   pointer-events: none;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -1316,6 +1561,9 @@
   background: var(--cv-edge-2);
   transition: background 0.25s;
 }
+.canvas-ui .composer:focus-within::before {
+  background: color-mix(in srgb, var(--cv-accent) 42%, var(--cv-edge-2));
+}
 .canvas-ui .composer::after {
   background: conic-gradient(from var(--cv-ang), transparent 0deg, var(--cv-sky) 30deg, var(--cv-accent) 70deg, var(--cv-iris) 110deg, transparent 150deg, transparent 360deg);
   opacity: 0;
@@ -1324,7 +1572,7 @@
 .canvas-ui .composer-halo {
   position: absolute;
   inset: -8px;
-  border-radius: calc(var(--cv-radius) + 8px);
+  border-radius: calc(var(--cv-comp-r) + 8px);
   pointer-events: none;
   opacity: 0;
   z-index: -1;
@@ -1420,26 +1668,26 @@
   padding: 0;
 }
 .canvas-ui .composer-slot > .row .line {
-  min-height: 48px;
+  min-height: 44px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 .canvas-ui .composer-slot > .row .tex,
 .canvas-ui .composer-slot > .row .expr,
 .canvas-ui .composer-slot > .row .slots {
-  font-size: 26px;
-  line-height: 34px;
+  font-size: 23px;
+  line-height: 32px;
   color: var(--ink);
 }
 .canvas-ui .composer-slot > .row .expr::placeholder {
-  font: 400 21px var(--math);
+  font: 400 19px var(--math);
   color: var(--ink-3);
   opacity: 1;
 }
 .canvas-ui .composer-slot > .row .out,
 .canvas-ui .composer-slot > .row .out .result {
-  font: 600 22px var(--sans);
-  letter-spacing: -0.01em;
+  font: 600 21px var(--sans);
+  letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
   white-space: nowrap;
@@ -1496,19 +1744,24 @@
 }
 .canvas-ui .composer-enter {
   flex: none;
-  height: 48px;
-  padding: 0 22px;
+  height: 44px;
+  padding: 0 20px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--cv-accent);
   color: var(--hero-ink);
-  font: 700 14.5px var(--sans);
+  font: 600 13.5px var(--sans);
   letter-spacing: 0.04em;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 8px color-mix(in srgb, var(--cv-accent) 30%, transparent);
+  transition: background-color 0.12s ease, transform 0.08s ease;
 }
 .canvas-ui .composer-enter:hover {
   background: color-mix(in srgb, var(--cv-accent) 88%, white);
+}
+.canvas-ui .composer-enter:active {
+  transform: scale(0.97);
 }
 .canvas-ui .composer-cancel {
   flex: none;
@@ -1548,7 +1801,7 @@
   pointer-events: none;
   display: flex;
   align-items: center;
-  font: 500 26px/34px var(--math);
+  font: 500 23px/32px var(--math);
   color: var(--ink);
   white-space: pre;
 }
@@ -1579,7 +1832,7 @@
   color: color-mix(in srgb, var(--cv-accent) 70%, var(--ink-2));
 }
 .canvas-ui .cv-mirror .ph {
-  font: 400 21px var(--math);
+  font: 400 19px var(--math);
   color: var(--ink-3);
   /* Clear of the caret, which sits before it. */
   margin-left: 6px;
@@ -1676,27 +1929,27 @@
   box-shadow: none;
 }
 
-/* ---------- the keypad, floating at the bottom right (wide) ---------- */
-.canvas-ui .main > .left > .keypad {
-  position: absolute;
-  right: 22px;
-  bottom: 22px;
-  width: 342px;
-  z-index: 20;
-  padding: 9px 10px 10px;
-  background: var(--cv-block);
-  border: 1px solid var(--cv-edge);
-  border-radius: 18px;
+/* ---------- the keypad, fused into the foot of the desktop sidebar ---------- */
+.canvas-ui .main > .left .keypad {
+  position: relative;
+  flex: none;
+  width: 100%;
+  z-index: 3;
+  padding: 8px 10px 10px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--cv-edge);
+  border-radius: 0 0 24px 24px;
   --kgap: 6px;
 }
-.canvas-ui .main > .left > .keypad[hidden] {
+.canvas-ui .main > .left .keypad[hidden] {
   display: none;
 }
-.canvas-ui .main > .left > .keypad .pad {
+.canvas-ui .main > .left .keypad .pad {
   transition: opacity 0.12s ease-out, visibility 0s;
 }
 /* The pad fades out under an opening deck rather than cutting away; it keeps its room, so nothing shifts. */
-.canvas-ui .main > .left > .keypad.deck-open .pad {
+.canvas-ui .main > .left .keypad.deck-open .pad {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1704,24 +1957,26 @@
 }
 /* The panel is as tall as its keys. What a pointed-at key or tile does shows in a strip that rises over the panel,
    and only while there is something to say. */
-.canvas-ui .main > .left > .keypad .key-foot {
+.canvas-ui .main > .left .keypad .key-foot {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 10px;
+  right: 10px;
   bottom: calc(100% + 8px);
+  z-index: 30;
   height: auto;
   margin: 0;
   pointer-events: none;
 }
-.canvas-ui .main > .left > .keypad .key-hint {
+.canvas-ui .main > .left .keypad .key-hint {
   height: auto;
   min-height: 34px;
   padding: 8px 12px;
   background: var(--cv-raised);
   border: 1px solid var(--cv-edge-2);
   border-radius: 12px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.36);
 }
-.canvas-ui .main > .left > .keypad .key-hint:empty {
+.canvas-ui .main > .left .keypad .key-hint:empty {
   visibility: hidden;
 }
 .canvas-ui .keypad .key:not(.ti-tab) {
@@ -1744,7 +1999,85 @@
   color: var(--ink-2);
 }
 .canvas-ui {
-  --pad-h: calc(5 * 44px + 4 * var(--kgap));
+  --pad-h: calc(5 * 46px + 4 * var(--kgap));
+}
+@media (--desktop) and (max-height: 660px) {
+  .canvas-ui {
+    --pad-h: calc(5 * 43px + 4 * var(--kgap));
+  }
+}
+@media (--desktop) {
+  .canvas-ui .composer {
+    min-height: 54px;
+    padding: 6px 6px 6px 14px;
+    gap: 8px;
+    border-radius: 18px;
+  }
+  .canvas-ui .composer::before,
+  .canvas-ui .composer::after {
+    border-radius: 19px;
+  }
+  .canvas-ui .composer-slot > .row .line {
+    min-height: 40px;
+    gap: 8px;
+  }
+  .canvas-ui .composer-slot > .row .out .err {
+    font-size: 13px;
+    line-height: 1.15;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .canvas-ui .composer-slot > .row .out .err[data-full]:is(:hover, :focus-visible, .full) {
+    overflow: visible;
+  }
+  .canvas-ui .composer-slot > .row .tex,
+  .canvas-ui .composer-slot > .row .expr,
+  .canvas-ui .composer-slot > .row .slots,
+  .canvas-ui .cv-mirror {
+    font-size: 20px;
+    line-height: 28px;
+  }
+  .canvas-ui .composer-slot > .row .expr::placeholder,
+  .canvas-ui .cv-mirror .ph {
+    font-size: 16.5px;
+  }
+  .canvas-ui .composer-slot > .row .out,
+  .canvas-ui .composer-slot > .row .out .result {
+    font-size: 17.5px;
+  }
+  .canvas-ui .composer-enter {
+    height: 40px;
+    padding: 0 15px;
+    border-radius: 12px;
+    font-size: 12.5px;
+  }
+  .canvas-ui .composer-cancel {
+    height: 36px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .canvas-ui .deck-bar {
+    gap: 4px;
+    padding: 0 0 7px;
+    margin-bottom: 7px;
+  }
+  .canvas-ui .deck-pad {
+    height: 27px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .canvas-ui .composer-tabs {
+    gap: 2px;
+  }
+  .canvas-ui .composer-tabs .key.ti-tab {
+    height: 27px;
+    padding: 0 7px;
+  }
+  .canvas-ui .composer-tabs .key.ti-tab .kl {
+    font-size: 12px;
+  }
 }
 .canvas-ui .keypad .ti-rows {
   flex: 1 0 0;
@@ -1768,6 +2101,16 @@
 
 /* ---------- narrow: one column, wires in the gutter, the composer over the keys ---------- */
 @media (--phone) {
+  .canvas-ui {
+    --cv-comp-r: var(--cv-radius);
+  }
+  .canvas-ui .desk-rail {
+    display: contents;
+  }
+  .canvas-ui .rail-head,
+  .canvas-ui .rail-list {
+    display: none !important;
+  }
   #app.canvas-ui > .modebar {
     position: relative;
     padding: 0;
@@ -1949,7 +2292,7 @@
     height: 44px;
     padding: 0 18px;
   }
-  .canvas-ui .main > .left > .keypad {
+  .canvas-ui .main > .left .keypad {
     position: relative;
     right: auto;
     bottom: auto;
@@ -1960,21 +2303,21 @@
     border-radius: 0;
     background: var(--bg);
   }
-  .canvas-ui .main > .left > .keypad.bar-only {
+  .canvas-ui .main > .left .keypad.bar-only {
     padding: 0 8px 4px;
   }
-  .canvas-ui .main > .left > .keypad.bar-only .deck-bar {
+  .canvas-ui .main > .left .keypad.bar-only .deck-bar {
     margin-bottom: 0;
     border-bottom: 0;
   }
-  .canvas-ui .main > .left > .keypad.bar-only.deck-open .deck-bar {
+  .canvas-ui .main > .left .keypad.bar-only.deck-open .deck-bar {
     margin-bottom: 6px;
     border-bottom: 1px solid var(--cv-edge);
   }
-  .canvas-ui .main > .left > .keypad.bar-only .pad {
+  .canvas-ui .main > .left .keypad.bar-only .pad {
     display: none;
   }
-  .canvas-ui .main > .left > .keypad.bar-only .ti-page:not([hidden]) {
+  .canvas-ui .main > .left .keypad.bar-only .ti-page:not([hidden]) {
     position: relative;
     inset: auto;
     max-height: 276px;
@@ -2144,11 +2487,11 @@
     grid-column: 1;
     grid-row: 2;
   }
-  .canvas-ui .main > .left > .composer-dock {
+  .canvas-ui .main > .left .composer-dock {
     grid-column: 1;
     grid-row: 3;
   }
-  .canvas-ui .main > .left > .keypad {
+  .canvas-ui .main > .left .keypad {
     grid-column: 2;
     grid-row: 1 / 4;
     align-self: stretch;
@@ -3541,35 +3884,133 @@ dialog.examples-dialog .sc-lines {
   }
 }
 
-/* ---------- frosted glass chrome (Modern look, non-high-contrast) ---------- */
+/* ---------- Liquid Glass desktop & mobile chrome (Modern look, non-high-contrast) ---------- */
 :root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  --lg-fill: rgba(24, 28, 42, 0.56);
+  --lg-fill-strong: rgba(14, 17, 26, 0.76);
+  --lg-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.24), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  --lg-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.28);
+
+  /* Rich midnight obsidian canvas with subtle studio cobalt-violet atmosphere on Dark; OLED stays pure black. */
+  &[data-theme='ink'] .canvas-ui .tape.cv-viewport {
+    background-color: #06070c;
+    --cv-dot: rgba(190, 210, 255, 0.14);
+  }
+  &[data-theme='ink'] .canvas-ui .tape.cv-viewport::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(56% 52% at 18% 8%, rgba(56, 110, 235, 0.18), transparent 72%),
+      radial-gradient(48% 50% at 86% 36%, rgba(124, 92, 240, 0.13), transparent 72%),
+      radial-gradient(55% 42% at 50% 100%, rgba(30, 58, 138, 0.1), transparent 70%);
+  }
+  &[data-theme='oled'] .canvas-ui .tape.cv-viewport {
+    --cv-dot: rgba(190, 210, 255, 0.12);
+  }
   & #app.canvas-ui > .modebar {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 86%, transparent) 0%, color-mix(in srgb, var(--bg) 42%, transparent) 64%, transparent 100%);
+    padding: 14px 22px 10px;
+    background: linear-gradient(180deg, rgba(6, 7, 12, 0.72) 0%, rgba(6, 7, 12, 0.25) 65%, transparent 100%);
+  }
+  /* Left brand + sheet title sits in a matching Liquid Glass capsule on desktop. */
+  @media (--desktop) {
+    & #app.canvas-ui > .modebar .brand {
+      height: 36px;
+      padding: 0 12px 0 6px;
+      gap: 8px;
+      border-radius: 999px;
+      background: var(--lg-fill);
+      border: 0;
+      backdrop-filter: blur(32px) saturate(200%);
+      -webkit-backdrop-filter: blur(32px) saturate(200%);
+      box-shadow: var(--lg-rim), var(--lg-shadow);
+    }
+    & #app.canvas-ui > .modebar .brand-home {
+      padding: 0 2px;
+      gap: 8px;
+      color: #f8fafc;
+    }
+    & #app.canvas-ui > .modebar .brand-home .mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+    & #app.canvas-ui > .modebar .sheet-title {
+      padding: 4px 10px 4px 12px;
+      border-radius: 999px;
+      color: rgba(241, 245, 249, 0.72);
+    }
+    & #app.canvas-ui > .modebar .sheet-title:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
   }
   & #app.canvas-ui > .modebar :is(.desk-modes .seg, .cv-tools, .head-pill, .bar-tog, .desk-more, .appear-btn, .help-btn) {
+    height: 36px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--cv-block) 72%, transparent);
-    backdrop-filter: blur(22px) saturate(185%);
-    -webkit-backdrop-filter: blur(22px) saturate(185%);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+    border: 0;
+    background: var(--lg-fill);
+    backdrop-filter: blur(32px) saturate(200%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%);
+    box-shadow: var(--lg-rim), var(--lg-shadow);
+  }
+  & #app.canvas-ui > .modebar :is(.bar-tog, .desk-more, .appear-btn, .help-btn) {
+    color: rgba(248, 250, 252, 0.88);
+  }
+  & #app.canvas-ui > .modebar :is(.appear-btn, .help-btn) {
+    width: 36px;
+  }
+  & #app.canvas-ui > .modebar :is(.desk-modes .seg button, .cv-tools .cv-btn, .head-pill > button, .head-pill .menu-btn) {
+    height: 28px;
+    border-radius: 999px;
+    color: rgba(248, 250, 252, 0.82);
+  }
+  & #app.canvas-ui > .modebar .head-pill .head-history {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+  }
+  & #app.canvas-ui > .modebar :is(.head-pill > :is(.head-find, .head-history), .head-pill .menu-btn, .cv-tools .cv-btn):hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+  }
+  & #app.canvas-ui > .modebar :is(.bar-tog, .desk-more, .appear-btn, .help-btn):hover {
+    background: rgba(42, 48, 68, 0.68);
+    color: #ffffff;
+  }
+  & #app.canvas-ui > .modebar .bar-tog[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--cv-accent) 26%, rgba(20, 26, 44, 0.66));
+    box-shadow: inset 0 1px 0.5px rgba(180, 215, 255, 0.36), inset 0 0 0 0.5px color-mix(in srgb, var(--cv-accent) 62%, transparent), var(--lg-shadow);
+    color: #ffffff;
+  }
+  & #app.canvas-ui > .modebar :is(.desk-more, .appear-btn)[aria-expanded='true'] {
+    background: rgba(54, 62, 86, 0.78);
+    color: #ffffff;
+  }
+  & #app.canvas-ui > .modebar .head-find .find-key {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: rgba(241, 245, 249, 0.7);
   }
   /* A sliding-lens segmented control for Deg | Rad, at every width. */
   & #app.canvas-ui .modebar .desk-modes .seg {
     position: relative;
     display: inline-grid;
     grid-template-columns: 1fr 1fr;
-    padding: 2px;
+    padding: 3px;
   }
   & #app.canvas-ui .modebar .desk-modes .seg::before {
     content: '';
     position: absolute;
-    top: 2px;
-    bottom: 2px;
-    left: 2px;
-    width: calc(50% - 2px);
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 18%, var(--cv-raised));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent), 0 1px 4px rgb(0 0 0 / 0.28);
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.34), 0 2px 6px rgba(0, 0, 0, 0.32);
     transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
     pointer-events: none;
   }
@@ -3583,84 +4024,456 @@ dialog.examples-dialog .sc-lines {
     background: transparent !important;
     box-shadow: none !important;
   }
+  & #app.canvas-ui .modebar .desk-modes .seg button[aria-pressed='true'] {
+    color: #ffffff;
+    font-weight: 600;
+  }
+  & .canvas-ui .desk-rail {
+    border: 0;
+    background: rgba(13, 16, 26, 0.62);
+    backdrop-filter: blur(40px) saturate(210%);
+    -webkit-backdrop-filter: blur(40px) saturate(210%);
+    box-shadow: var(--lg-rim), 0 24px 64px rgba(0, 0, 0, 0.6);
+  }
+  & .canvas-ui .rail-head {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+  }
+  & .canvas-ui .rail-count {
+    background: rgba(255, 255, 255, 0.09);
+    color: rgba(241, 245, 249, 0.78);
+  }
+  & .canvas-ui .rail-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  & .canvas-ui .rail-item.editing {
+    background: color-mix(in srgb, var(--cv-accent) 18%, rgba(255, 255, 255, 0.04));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cv-accent) 52%, transparent);
+  }
   & .canvas-ui .composer-head {
-    align-items: center;
-    padding: 0 10px 0 6px;
-    height: 30px;
+    align-items: flex-end;
+    padding: 0 4px 0 8px;
+    height: 26px;
   }
-  /* The composer floats as a frosted island: matching --cv-radius, a specular top
-     hairline and a lifted shadow. */
+  & .canvas-ui .composer-head .composer-ac {
+    border-radius: 999px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  }
+  & .canvas-ui .composer-head .composer-ac:hover {
+    background: color-mix(in srgb, var(--cv-ac) 18%, rgba(255, 255, 255, 0.08));
+  }
+  /* The composer sits inside the Liquid Glass sidebar as a deep recessed well with a glowing electric-cobalt ENTER. */
   & .canvas-ui .composer {
-    background: color-mix(in srgb, var(--cv-raised) 82%, transparent);
-    backdrop-filter: blur(26px) saturate(185%);
-    -webkit-backdrop-filter: blur(26px) saturate(185%);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.28);
+    background: rgba(5, 7, 12, 0.78);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 6px 20px rgba(0, 0, 0, 0.36);
   }
-  & .canvas-ui .main > .left > .keypad {
-    background: color-mix(in srgb, var(--cv-block) 78%, transparent);
-    backdrop-filter: blur(24px) saturate(185%);
-    -webkit-backdrop-filter: blur(24px) saturate(185%);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 10px 30px rgb(0 0 0 / 0.24);
+  & .canvas-ui .composer-enter {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 84%, #ffffff), var(--cv-accent));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 0 22px color-mix(in srgb, var(--cv-accent) 52%, transparent), 0 4px 12px rgba(0, 0, 0, 0.34);
+  }
+  & .canvas-ui .composer-enter:hover {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 76%, #ffffff), color-mix(in srgb, var(--cv-accent) 92%, #ffffff));
+  }
+  /* The desktop keypad is physically fused beneath the composer inside the Liquid Glass sidebar. */
+  & .canvas-ui .main > .left .keypad {
+    border-radius: 0 0 24px 24px;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(5, 7, 12, 0.32);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+  & .canvas-ui .deck-bar {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+  & .canvas-ui .deck-pad {
+    border: 0;
+  }
+  & .canvas-ui .deck-pad.lit {
+    background: color-mix(in srgb, var(--cv-accent) 68%, #dbeafe);
+    color: #081226;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 10px color-mix(in srgb, var(--cv-accent) 35%, transparent);
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab:not(.lit) {
+    background: transparent;
+    color: rgba(241, 245, 249, 0.78);
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab.lit,
+  & .canvas-ui .composer-tabs .key.ti-tab.lit:hover {
+    background: var(--tab);
+    border-color: transparent;
+    color: var(--tab-on);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 2px 10px color-mix(in srgb, var(--tab) 36%, transparent);
+  }
+  & .canvas-ui .keypad .key:not(.ti-tab) {
+    border-radius: 13px;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.num {
+    background-color: rgba(34, 38, 48, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 0 rgba(0, 0, 0, 0.85), 0 4px 10px rgba(0, 0, 0, 0.35);
+    color: #ffffff;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.num:hover {
+    background-color: rgba(44, 49, 62, 0.96);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) {
+    background-color: rgba(19, 22, 30, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 0.5px rgba(255, 255, 255, 0.05), 0 2px 0 rgba(0, 0, 0, 0.85), 0 3px 8px rgba(0, 0, 0, 0.32);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) .kl {
+    color: rgba(248, 250, 252, 0.92);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit):hover {
+    background-color: rgba(28, 32, 44, 0.95);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.op {
+    background-color: rgba(22, 31, 52, 0.94);
+    box-shadow: inset 0 1px 0 rgba(140, 188, 255, 0.22), inset 0 0 0 0.5px rgba(120, 170, 255, 0.14), 0 2px 0 rgba(0, 0, 0, 0.85), 0 4px 10px rgba(0, 0, 0, 0.35);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.op:hover {
+    background-color: rgba(30, 42, 70, 0.96);
+  }
+  & .canvas-ui .ti-grid .ti-tile {
+    background-color: rgba(24, 28, 38, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 0 rgba(0, 0, 0, 0.85);
+  }
+  & .canvas-ui .ti-grid .ti-tile:hover {
+    background-color: rgba(36, 42, 58, 0.95);
+  }
+  & .canvas-ui .rows > .blk-graph,
+  & .canvas-ui .rows > .blk-example-graph,
+  & .canvas-ui .rows > .blk-psych {
+    background: rgba(14, 17, 26, 0.76);
+    border-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(26px) saturate(190%);
+    -webkit-backdrop-filter: blur(26px) saturate(190%);
+    box-shadow: var(--lg-rim), var(--lg-shadow);
+  }
+  & .menu {
+    background: var(--lg-fill-strong);
+    backdrop-filter: blur(36px) saturate(210%);
+    -webkit-backdrop-filter: blur(36px) saturate(210%);
+    border: 0;
+    border-radius: 18px;
+    box-shadow: var(--lg-rim), 0 22px 60px rgba(0, 0, 0, 0.6);
   }
   & dialog.mx,
   & dialog.examples-dialog,
   & dialog.palette,
   & dialog.help,
   & dialog.history-dialog {
-    background: color-mix(in srgb, var(--panel) 84%, transparent);
-    backdrop-filter: blur(28px) saturate(185%);
-    -webkit-backdrop-filter: blur(28px) saturate(185%);
+    background: var(--lg-fill-strong);
+    backdrop-filter: blur(36px) saturate(210%);
+    -webkit-backdrop-filter: blur(36px) saturate(210%);
+    border: 0;
+    box-shadow: var(--lg-rim), 0 26px 70px rgba(0, 0, 0, 0.65);
   }
   & .menu .seg button[aria-pressed='true'] {
-    background: var(--cv-raised);
-    color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--cv-edge-2), 0 1px 2px rgb(0 0 0 / 0.18);
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 3px rgba(0, 0, 0, 0.26);
   }
   @media (--phone) {
     & #app.canvas-ui .left > .modebar {
+      padding: 0 12px;
       background: color-mix(in srgb, var(--bg) 76%, transparent);
       backdrop-filter: blur(22px) saturate(180%);
       -webkit-backdrop-filter: blur(22px) saturate(180%);
       border-bottom-color: color-mix(in srgb, var(--rule) 55%, transparent);
     }
     & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
+      height: 33px;
       border-radius: 999px;
-      background: color-mix(in srgb, var(--cv-block) 72%, transparent);
-      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+      background: var(--lg-fill);
+      border: 0;
+      box-shadow: var(--lg-rim);
+    }
+    & #app.canvas-ui .left > .modebar .desk-modes .seg {
+      padding: 2px;
+    }
+    & #app.canvas-ui .left > .modebar .desk-modes .seg::before {
+      top: 2px;
+      bottom: 2px;
+      left: 2px;
+      width: calc(50% - 2px);
+      border-radius: 999px;
+    }
+    & #app.canvas-ui .left > .modebar .desk-modes .seg button {
+      height: 27px;
+      border-radius: 999px;
     }
     & #app.canvas-ui .left > .modebar .brand-home .mark {
       width: 33px;
       height: 33px;
       border-radius: 999px;
-      background: color-mix(in srgb, var(--cv-block) 72%, transparent);
-      border: 1px solid var(--cv-edge);
-      box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+      background: var(--lg-fill);
+      border: 0;
+      box-shadow: var(--lg-rim);
     }
-    & .canvas-ui .main > .left > .keypad {
+    & .canvas-ui .composer {
+      min-height: 58px;
+      padding: 6px 6px 6px 16px;
+    }
+    & .canvas-ui .composer-enter {
+      height: 44px;
+      padding: 0 18px;
+      border-radius: 14px;
+    }
+    & .canvas-ui .main > .left .keypad {
+      border-radius: 0;
       background: var(--bg);
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       box-shadow: none;
     }
+    & .canvas-ui .main > .left .keypad .pad .key.op {
+      background-color: var(--key-op);
+    }
   }
 }
 :root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) {
+  --lg-fill: rgba(255, 255, 255, 0.7);
+  --lg-fill-strong: rgba(255, 255, 255, 0.86);
+  --lg-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.98), inset 0 -0.5px 0.5px rgba(15, 23, 42, 0.05), inset 0 0 0 0.5px rgba(15, 23, 42, 0.09);
+  --lg-shadow: 0 8px 26px rgba(15, 23, 42, 0.09), 0 2px 6px rgba(15, 23, 42, 0.05);
+
+  & .canvas-ui .tape.cv-viewport {
+    background-color: #f3f5f9;
+    --cv-dot: rgba(15, 23, 42, 0.11);
+  }
+  & .canvas-ui .tape.cv-viewport::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(56% 48% at 16% 6%, rgba(59, 130, 246, 0.1), transparent 72%),
+      radial-gradient(48% 50% at 88% 36%, rgba(139, 92, 246, 0.08), transparent 72%);
+  }
+  & #app.canvas-ui > .modebar {
+    background: linear-gradient(180deg, rgba(243, 245, 249, 0.8) 0%, rgba(243, 245, 249, 0.28) 65%, transparent 100%);
+  }
+  @media (--desktop) {
+    & #app.canvas-ui > .modebar .brand-home {
+      color: #0f172a;
+    }
+    & #app.canvas-ui > .modebar .sheet-title {
+      color: #475569;
+    }
+    & #app.canvas-ui > .modebar .sheet-title:hover {
+      background: rgba(15, 23, 42, 0.06);
+      color: #0f172a;
+    }
+  }
+  & #app.canvas-ui > .modebar :is(.bar-tog, .desk-more, .appear-btn, .help-btn) {
+    color: #334155;
+  }
+  & #app.canvas-ui > .modebar :is(.desk-modes .seg button, .cv-tools .cv-btn, .head-pill > button, .head-pill .menu-btn) {
+    color: #334155;
+  }
+  & #app.canvas-ui > .modebar :is(.head-pill > :is(.head-find, .head-history), .head-pill .menu-btn, .cv-tools .cv-btn):hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: #0f172a;
+  }
+  & #app.canvas-ui > .modebar :is(.bar-tog, .desk-more, .appear-btn, .help-btn):hover {
+    background: rgba(255, 255, 255, 0.88);
+    color: #0f172a;
+  }
   & #app.canvas-ui .modebar .desk-modes .seg::before {
-    background: #fff;
-    box-shadow: 0 1px 3px rgb(23 23 26 / 0.14), 0 0 0 0.5px rgb(23 23 26 / 0.08);
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+  }
+  & #app.canvas-ui .modebar .desk-modes .seg button[aria-pressed='true'] {
+    color: #0f172a;
+  }
+  & #app.canvas-ui > .modebar .bar-tog[aria-pressed='true'] {
+    background: color-mix(in srgb, var(--cv-accent) 12%, rgba(255, 255, 255, 0.88));
+    box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.98), inset 0 0 0 0.5px color-mix(in srgb, var(--cv-accent) 44%, transparent), var(--lg-shadow);
+    color: var(--cv-accent);
+  }
+  & #app.canvas-ui > .modebar :is(.desk-more, .appear-btn)[aria-expanded='true'] {
+    background: #ffffff;
+    color: #0f172a;
+  }
+  & #app.canvas-ui > .modebar .head-find .find-key {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #475569;
+  }
+  & .canvas-ui .desk-rail {
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: var(--lg-rim), 0 18px 46px rgba(15, 23, 42, 0.12);
+  }
+  & .canvas-ui .rail-head {
+    border-bottom-color: rgba(15, 23, 42, 0.07);
+  }
+  & .canvas-ui .rail-count {
+    background: rgba(15, 23, 42, 0.07);
+    color: #334155;
+  }
+  & .canvas-ui .rail-item:hover {
+    background: rgba(15, 23, 42, 0.05);
+  }
+  & .canvas-ui .composer-head .composer-ac {
+    background: rgba(15, 23, 42, 0.05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(15, 23, 42, 0.09);
   }
   & .canvas-ui .composer {
-    background: color-mix(in srgb, var(--cv-block) 86%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 6px 18px rgba(30, 45, 90, 0.08);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 1px 0 #ffffff, 0 4px 16px rgba(15, 23, 42, 0.07);
   }
-  & #app.canvas-ui > .modebar :is(.desk-modes .seg, .cv-tools, .head-pill, .bar-tog, .desk-more, .appear-btn, .help-btn) {
-    background: color-mix(in srgb, var(--cv-block) 80%, transparent);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.8), 0 1px 3px rgb(23 23 26 / 0.06);
+  & .canvas-ui .main > .left .keypad {
+    border-top-color: rgba(15, 23, 42, 0.08);
+    background: rgba(241, 245, 249, 0.5);
+    box-shadow: none;
+  }
+  & .canvas-ui .deck-bar {
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+  }
+  & .canvas-ui .deck-pad.lit {
+    background: var(--cv-accent);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px color-mix(in srgb, var(--cv-accent) 30%, transparent);
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab:not(.lit) {
+    color: #475569;
+  }
+  & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+    background: rgba(15, 23, 42, 0.06);
+    color: #0f172a;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.num {
+    background-color: rgba(255, 255, 255, 0.96);
+    box-shadow: inset 0 1px 0 #ffffff, 0 1.5px 0 rgba(15, 23, 42, 0.12), 0 2px 5px rgba(15, 23, 42, 0.06);
+    color: #0f172a;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.num:hover {
+    background-color: #ffffff;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) {
+    background-color: rgba(235, 238, 246, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1.5px 0 rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.04);
+  }
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) .kl {
+    color: #1e293b;
+  }
+  & .canvas-ui .main > .left .keypad .pad .key.op {
+    background-color: rgba(230, 239, 255, 0.95);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1.5px 0 rgba(37, 99, 235, 0.18), 0 2px 5px rgba(37, 99, 235, 0.06);
+  }
+  & .canvas-ui .ti-grid .ti-tile {
+    background-color: rgba(240, 243, 250, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1.5px 0 rgba(15, 23, 42, 0.1);
+  }
+  & .canvas-ui .rows > .blk-graph,
+  & .canvas-ui .rows > .blk-example-graph,
+  & .canvas-ui .rows > .blk-psych {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(255, 255, 255, 0.9);
   }
   & .menu .seg button[aria-pressed='true'] {
-    background: #fff;
-    color: var(--ink);
-    box-shadow: 0 1px 3px rgb(23 23 26 / 0.12), 0 0 0 0.5px rgb(23 23 26 / 0.08);
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+  }
+}
+
+/* ---------- desktop popover layout: compact Appearance (clears keypad at 800 px) and aligned Modes ---------- */
+@media (--desktop) {
+  .menu.appear-menu {
+    width: 306px;
+    padding: 7px 9px 8px;
+  }
+  .appear-menu .appear-sample {
+    margin: 0 0 5px;
+    border-radius: 10px;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--cv-dot) 1px, transparent 1px);
+    background-size: 10px 10px;
+  }
+  :root[data-look='modern'] .appear-menu .as-line {
+    height: 27px;
+    margin: 5px 7px;
+    padding: 0 9px;
+    border-radius: 8px;
+    border: 1px solid var(--cv-edge);
+    background: var(--cv-block);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+  }
+  :root[data-look='modern'] .appear-menu .as-idx {
+    display: none;
+  }
+  :root[data-look='modern'] .appear-menu .as-expr {
+    font: 500 14px/1 var(--math);
+    color: var(--ink-2);
+  }
+  :root[data-look='modern'] .appear-menu .as-ans {
+    font: 600 14.5px/1 var(--sans);
+  }
+  :root[data-look='modern'] .appear-menu .as-ans::before {
+    content: '= ';
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+  .appear-menu .as-keys {
+    height: 32px;
+    padding: 4px 6px;
+    gap: 5px;
+  }
+  .appear-menu .menu-row {
+    padding: 2px 6px;
+    min-height: 24px;
+    font-size: 12.5px;
+  }
+  .appear-menu .appear-pride {
+    padding: 2px 6px;
+    min-height: 23px;
+    font-size: 12.5px;
+  }
+  .appear-menu .menu-row select {
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+  .appear-menu .seg button {
+    padding: 2px 9px;
+    font-size: 12px;
+  }
+  .menu.mode-menu {
+    width: 318px;
+    padding: 10px 12px;
+  }
+  .mode-menu .mode-row,
+  .mode-menu .mode-row.toggles {
+    grid-template-columns: 88px 1fr;
+    gap: 10px;
+    padding: 3.5px 2px;
+  }
+  .mode-menu .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .mode-menu .seg button {
+    min-width: 0;
+    padding: 4px 8px;
+  }
+  .mode-menu .togs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+  }
+  .mode-menu .togs .tog {
+    padding: 4px 4px;
+    font-size: 12px;
+    text-align: center;
   }
 }
 
@@ -3677,15 +4490,16 @@ dialog.examples-dialog .sc-lines {
 }
 :root[data-look='modern'][data-theme='ink'] {
   & .canvas-ui .rows > .row.blk {
-    background: rgba(26, 30, 42, 0.74);
-    border-color: rgba(255, 255, 255, 0.09);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 4px 14px rgba(0, 0, 0, 0.26);
+    background: rgba(20, 24, 36, 0.64);
+    border-color: rgba(255, 255, 255, 0.11);
+    box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.2), inset 0 -0.5px 0 rgba(255, 255, 255, 0.06), 0 10px 28px rgba(0, 0, 0, 0.42);
   }
   & .canvas-ui .rows > .row.blk:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(26, 31, 46, 0.72);
+    border-color: rgba(255, 255, 255, 0.2);
   }
   & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 6px rgba(0, 0, 0, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.36);
   }
 }
 :root[data-look='modern'][data-theme='oled'] {
@@ -4100,8 +4914,8 @@ dialog.examples-dialog .sc-lines {
    DURATIONS.emptyDraw, emptyFillDelay, emptyFadeOut and STAGGER.starterMs in src/ui/motiontokens.ts. */
 .canvas-ui .tape > .cv-empty {
   position: absolute;
-  left: calc((100% - var(--cv-keys-w, 0px)) / 2);
-  top: calc((100% - 150px) / 2);
+  left: calc((100% + var(--cv-rail-w, 0px)) / 2);
+  top: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
   display: flex;
@@ -4124,7 +4938,22 @@ dialog.examples-dialog .sc-lines {
 .canvas-ui .tape > .cv-empty.gone * {
   pointer-events: none;
 }
+.canvas-ui .cv-empty-badge {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+}
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .cv-empty-badge {
+  background: var(--lg-fill);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  box-shadow: var(--lg-rim), var(--lg-shadow);
+}
 .canvas-ui .cv-empty-mark {
+  width: 40px;
+  height: 40px;
   overflow: visible;
 }
 .canvas-ui .cv-empty-mark .curve,
@@ -4136,18 +4965,18 @@ dialog.examples-dialog .sc-lines {
   stroke-dashoffset: 0;
 }
 .canvas-ui .cv-empty-mark .curve {
-  stroke: var(--cv-accent);
-  stroke-width: 2.25;
+  stroke: var(--ink);
+  stroke-width: 3;
   animation: cv-empty-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .canvas-ui .cv-empty-mark .base {
-  stroke: var(--cv-edge-2);
-  stroke-width: 1.5;
+  stroke: color-mix(in srgb, var(--ink) 40%, transparent);
+  stroke-width: 2;
   animation: cv-empty-draw 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .canvas-ui .cv-empty-mark .area {
   fill: var(--cv-accent);
-  opacity: 0.18;
+  opacity: 0.24;
   animation: cv-empty-fill 0.3s ease-out 0.6s both;
 }
 @keyframes cv-empty-draw {
@@ -4163,32 +4992,52 @@ dialog.examples-dialog .sc-lines {
     opacity: 0;
   }
   to {
-    opacity: 0.18;
+    opacity: 0.24;
   }
+}
+.canvas-ui .cv-empty-tips {
+  margin: 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 12.5px/1.2 var(--sans);
+  color: var(--ink-3);
+  animation: cv-empty-chip-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s both;
+}
+.canvas-ui .cv-empty-dot {
+  opacity: 0.45;
 }
 .canvas-ui .cv-empty-starters {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 }
 .canvas-ui .cv-empty-chip {
   pointer-events: auto;
-  height: 34px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 18px;
   border: 1px solid var(--cv-edge);
   border-radius: 999px;
   background: color-mix(in srgb, var(--cv-block) 72%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  backdrop-filter: blur(12px) saturate(1.3);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent), 0 1px 2px rgb(0 0 0 / 0.08);
-  color: var(--ink-2);
-  font: 500 14px/1 var(--sans);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent), 0 4px 14px rgb(0 0 0 / 0.14);
+  color: var(--ink);
+  font: 500 14.5px/1 var(--sans);
   letter-spacing: -0.01em;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.12s, border-color 0.12s, background-color 0.12s, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: color 0.12s, border-color 0.12s, background-color 0.12s, box-shadow 0.12s, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   animation: cv-empty-chip-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) calc(0.45s + var(--i, 0) * var(--stagger, 40ms)) both;
+}
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .cv-empty-chip {
+  border: 0;
+  background: var(--lg-fill);
+  box-shadow: var(--lg-rim), var(--lg-shadow);
+}
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .cv-empty-chip:hover {
+  background: color-mix(in srgb, var(--ink) 10%, var(--lg-fill));
 }
 .canvas-ui .cv-empty-chip:hover {
   color: var(--ink);
@@ -4231,6 +5080,8 @@ dialog.examples-dialog .sc-lines {
 }
 @media (prefers-reduced-motion: reduce) {
   .canvas-ui .cv-empty-mark :is(.curve, .base, .area),
+  .canvas-ui .cv-empty-copy,
+  .canvas-ui .cv-empty-tips,
   .canvas-ui .cv-empty-chip {
     animation: none;
   }
@@ -4239,5 +5090,9 @@ dialog.examples-dialog .sc-lines {
   .canvas-ui .tape > .cv-empty {
     left: 50%;
     top: 50%;
+  }
+  .canvas-ui .cv-empty-copy,
+  .canvas-ui .cv-empty-tips {
+    display: none;
   }
 }

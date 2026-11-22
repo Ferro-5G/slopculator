@@ -1,5 +1,5 @@
 import { fitGraph } from './graphpane';
-import { dialogOpen, mountDialog, modalOpen } from './overlay';
+import { closeOpenPopover, dialogOpen, mountDialog, modalOpen } from './overlay';
 import { flipMode, type Mode, MODES } from './controls';
 import { plainValue } from '../engine/format';
 import { appearanceOf } from '../ui/appearance';
@@ -17,7 +17,7 @@ import { reordering, setReorder } from './rows';
 import { views, focusLine, isLineField } from './rowviews';
 import { opts, currentResults, activeId, rowIndex, doc } from './sheet';
 import { keypadOn, setKeypad, graphOn, setGraph } from './shell';
-import { appearMenu, setAppear, appearBtn, cycleTheme, applyTheme } from './theme';
+import { cycleTheme, applyTheme } from './theme';
 import { closeThumb, toggleTab, ti, tiPage, turnPage } from './thumb';
 import { showToast } from './toast';
 
@@ -176,6 +176,7 @@ export function initCommands(): void {
       return;
     }
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !dialogOpen()) {
+      if (e.defaultPrevented) return;
       const inLine = isLineField(document.activeElement);
       // A tab's page opened with the mouse or a finger leaves the caret in the line, and Esc there closes the page too.
       if (ti.tab !== null) {
@@ -184,10 +185,8 @@ export function initCommands(): void {
         if (!inLine) focusLine();
         return;
       }
-      if (!appearMenu.hidden) {
+      if (closeOpenPopover()) {
         e.preventDefault();
-        setAppear(false);
-        appearBtn.focus();
         return;
       }
       if (!inLine) {

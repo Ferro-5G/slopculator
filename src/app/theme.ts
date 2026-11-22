@@ -247,7 +247,7 @@ function syncTabColors(): void {
 }
 
 export function initTheme(): void {
-  addPopover({ close: () => setAppear(false), exclusive: true, outside: true });
+  addPopover({ close: () => setAppear(false), exclusive: true, outside: true, isOpen: () => !appearMenu.hidden, returnFocus: () => appearBtn.focus() });
   document.head.append(lookSheet);
   syncers.push(syncAppearance);
   lookSel.addEventListener('change', () => {

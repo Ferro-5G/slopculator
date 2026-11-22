@@ -14,9 +14,19 @@ export const coverBottom = h('div', { class: 'edge-cover bottom', 'aria-hidden':
 export const keypadEl = h('section', { class: 'keypad', id: 'keypad' });
 /** The canvas's viewport: it clips the world and takes the pan and zoom gestures. */
 export const tape = h('div', { class: 'tape cv-viewport' }, listEl, coverTop, coverBottom);
+/** Desktop sidebar header: quiet section title and line count. */
+export const railCount = h('span', { class: 'rail-count', 'aria-hidden': 'true' }, '0');
+export const railHead = h('div', { class: 'rail-head' },
+  h('span', { class: 'rail-title' }, 'Sheet'),
+  railCount,
+);
+/** Desktop sidebar outliner: ordered sent lines directly above the composer. */
+export const railList = h('div', { class: 'rail-list', role: 'list', 'aria-label': 'Sheet lines' });
 /** Where the composer docks; src/app/composer.ts fills it. */
 export const composerDock = h('div', { class: 'composer-dock' });
-export const leftPane = h('div', { class: 'left' }, modeBar, tape, composerDock, keypadEl);
+/** On desktop, the unified Liquid Glass sidebar fusing sheet lines, composer, and collapsible keypad; transparent on phone. */
+export const deskRail = h('aside', { class: 'desk-rail', 'aria-label': 'Sheet and controls' }, railHead, railList, composerDock, keypadEl);
+export const leftPane = h('div', { class: 'left' }, modeBar, tape, deskRail);
 export const graphHost = h('div', { class: 'graph-host' });
 export const graphTools = h('div', { class: 'graph-tools' });
 export const graphChips = h('div', { class: 'graph-chips', role: 'toolbar', 'aria-label': 'Plotted lines', hidden: true });

@@ -571,7 +571,14 @@
   }
 
   .ti-page:not([hidden]) {
+    --ti-strip: 30px;
+    --ti-note: 19px;
+    --ti-gap: 6px;
     padding: 0;
+  }
+
+  .ti-scroll {
+    padding: 4px 2px 6px 0;
   }
 
   .ti-strip {

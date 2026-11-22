@@ -1416,9 +1416,9 @@ await check('desktop: a tab\'s page swaps inside the keypad under the deck bar, 
     await page.waitForTimeout(250);
     const g = await page.evaluate(() => {
       const p = document.querySelector('.ti-page').getBoundingClientRect(), c = document.querySelector('.composer').getBoundingClientRect(), k = document.querySelector('#keypad').getBoundingClientRect(), bar = document.querySelector('.deck-bar').getBoundingClientRect();
-      return { p: { t: p.top, b: p.bottom, l: p.left, r: p.right, h: p.height }, compRight: c.right, keys: { t: k.top, b: k.bottom, l: k.left, r: k.right }, barBottom: bar.bottom };
+      return { p: { t: p.top, b: p.bottom, l: p.left, r: p.right, h: p.height }, compRight: c.right, compBottom: c.bottom, keys: { t: k.top, b: k.bottom, l: k.left, r: k.right }, barBottom: bar.bottom };
     });
-    expect(g.p.l >= g.compRight - 1, `tab ${i}: the page runs onto the composer: ${JSON.stringify(g)}`);
+    expect(g.p.l >= g.compRight - 1 || g.p.t >= g.compBottom - 1, `tab ${i}: the page runs onto the composer: ${JSON.stringify(g)}`);
     expect(g.p.t >= g.barBottom - 1 && g.p.b <= g.keys.b + 1 && g.p.l >= g.keys.l - 1 && g.p.r <= g.keys.r + 1, `tab ${i}: the page left the keypad card: ${JSON.stringify(g)}`);
     sizes.push(Math.round(g.p.h));
     await page.keyboard.press('Escape');

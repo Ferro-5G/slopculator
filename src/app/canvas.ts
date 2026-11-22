@@ -8,7 +8,7 @@ import {
   type Size, type Wire,
 } from '../ui/canvas';
 import {
-  DOT_PITCH, dragGraph, dragTo, DRAG_SLOP, FRAME_PAD, FRAME_TOP, GRAPH_SIZE, KEYS_ROOM, needsFreshFlow, viewRects, wideFreeArea, wideHomeView, wideScreen,
+  DOT_PITCH, dragGraph, dragTo, DRAG_SLOP, FRAME_PAD, FRAME_TOP, GRAPH_SIZE, needsFreshFlow, viewRects, wideHomeView, wideScreen,
   wideLayout, wideWireRoute, ZOOM_STEP, type WideBlock, type WideScreen,
 } from '../ui/canvaswide';
 import { CASCADE_PHONE, cascadeColumn, cascadeGaps, cascadeWires, heldLit, heldTraces, type CascadeBlock, type CascadeOptions } from '../ui/cascade';
@@ -29,7 +29,8 @@ import { slotForEnd } from '../ui/slots';
 import { slotInfo } from '../ui/linestate';
 import { setDragListener } from './edits';
 import { motionNow } from './feedback';
-import { app, exampleGraph, exampleGraphPane, graph, graphGrip, graphPane, graphResize, listEl, tape, composerDock, keypadEl, modeBar } from './layout';
+import { app, deskRail, exampleGraph, exampleGraphPane, graph, graphGrip, graphPane, graphResize, listEl, tape, modeBar } from './layout';
+import { syncRail } from './rail';
 import { narrow, kb } from './platform';
 import { setHostedCheck, views } from './rowviews';
 import { openLineMenu } from './rows';
@@ -86,13 +87,18 @@ function graphShown(): boolean {
 function blockEl(id: string): HTMLElement | undefined {
   return id === GRAPH_BLOCK ? graphPane : id === EXAMPLE_GRAPH ? exampleGraphPane : id === PSYCH_BLOCK ? psychBlock : views.get(id)?.el;
 }
-const keypadVisible = (): boolean => !keypadEl.hidden && keypadEl.dataset.presence !== 'exiting' && keypadEl.dataset.presence !== 'exited';
-/** The part of the viewport the composer and keypad leave free, in viewport pixels. */
+/** How much of the canvas's left edge the floating desktop sidebar takes, in viewport px. */
+function railRoom(): number {
+  if (!wide() || !deskRail.offsetParent) return 0;
+  const r = deskRail.getBoundingClientRect(), t = tape.getBoundingClientRect();
+  return Math.max(0, Math.round(r.right - t.left));
+}
+/** The part of the viewport the floating sidebar and top bar leave free, in viewport pixels. */
 function freeArea(): Rect {
-  const keys = keypadVisible() && keypadEl.offsetParent ? keypadEl.offsetWidth : 0;
+  const left = railRoom() ? railRoom() + 14 : 0;
   // Under the top bar, which floats over the canvas.
   const top = modeBar.parentElement === app ? modeBar.offsetHeight + 8 : 0;
-  return wideFreeArea({ w: tape.clientWidth, h: tape.clientHeight }, top, keys, composerDock.offsetHeight);
+  return { x: left, y: top, w: Math.max(200, tape.clientWidth - left), h: Math.max(160, tape.clientHeight - top - 16) };
 }
 function applyView(): void {
   listEl.style.transform = wide() ? `translate(${view.dx}px, ${view.dy}px) scale(${view.scale})` : '';
@@ -195,8 +201,9 @@ export function layoutCanvas(): void {
   if (!showExampleGraph && exampleGraphPane.isConnected) exampleGraphPane.remove();
   for (const el of [exampleFrame, ghost]) if (el.parentElement !== listEl) listEl.prepend(el);
   if (svg.parentNode !== listEl) listEl.prepend(svg);
-  // The composer centres in the room the keypad leaves.
-  app.style.setProperty('--cv-keys-w', keypadVisible() && wide() ? `${KEYS_ROOM}px` : '0px');
+  // The empty canvas centres in the open space right of the floating desktop sidebar.
+  app.style.setProperty('--cv-rail-w', wide() ? `${railRoom()}px` : '0px');
+  syncRail(cid, wide());
   for (const v of views.values()) if (!watched.has(v.el)) { watched.add(v.el); blockSizes?.observe(v.el); }
   if (tagLayer.parentElement !== listEl) listEl.append(tagLayer);
   // Tags and steps first: a narrow column keeps room above a block a tag rides into, and a wide line for its steps.
@@ -214,13 +221,9 @@ export function layoutCanvas(): void {
   syncEmpty();
 }
 
-/** Where the composer and the keys sit over the canvas, in its own coordinates at the default view. */
+/** On desktop the composer and keypad live inside the left sidebar, so nothing floats over the open canvas. */
 function overlays(): Rect[] {
-  const t = tape.getBoundingClientRect();
-  return [composerDock, ...(keypadVisible() && keypadEl.offsetParent ? [keypadEl] : [])].map((el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.left - t.left, y: r.top - t.top, w: r.width, h: r.height };
-  }).filter((r) => r.w > 0 && r.h > 0);
+  return [];
 }
 
 function layoutWide(cid: string): void {
@@ -333,12 +336,12 @@ function showTrays(): void {
   else applyView();
 }
 
-/** Where the home view fits the sheet: the canvas under the top bar, with the composer and keys where they sit over it. */
+/** Where the home view fits the sheet: the unobstructed canvas right of the floating sidebar and under the top bar. */
 function homeScreen(): WideScreen {
   const t = tape.getBoundingClientRect();
   const top = modeBar.parentElement === app ? modeBar.offsetHeight + 8 : 0;
-  const [composer = null, keys = null] = overlays();
-  return wideScreen({ w: t.width, h: t.height }, top, composer, keys);
+  const left = railRoom() ? railRoom() + 14 : 0;
+  return wideScreen({ w: t.width, h: t.height }, top, null, null, left);
 }
 /** The view that shows the whole sheet (wideHomeView), with the composer and keys where they sit over the canvas. */
 function homeView(): CanvasView {
@@ -685,8 +688,15 @@ function emptyCanvas(): HTMLElement {
     return b;
   });
   emptyEl = h('div', { class: 'cv-empty', hidden: true },
-    mark,
-    h('div', { class: 'cv-empty-starters', role: 'group', 'aria-label': 'Start with an example' }, ...chips));
+    h('div', { class: 'cv-empty-badge', 'aria-hidden': 'true' }, mark),
+    h('div', { class: 'cv-empty-starters', role: 'group', 'aria-label': 'Start with an example' }, ...chips),
+    h('p', { class: 'cv-empty-tips', 'aria-hidden': 'true' },
+      h('span', {}, kb('Ctrl+K'), ' Find'),
+      h('span', { class: 'cv-empty-dot' }, '·'),
+      h('span', {}, 'Drag blocks to arrange'),
+      h('span', { class: 'cv-empty-dot' }, '·'),
+      h('span', {}, 'Scroll to zoom'),
+    ));
   return emptyEl;
 }
 /** Shows the empty canvas while the sheet has no lines and nothing is typed; fades it out otherwise. */

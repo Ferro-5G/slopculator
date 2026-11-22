@@ -357,7 +357,7 @@ export function placeThumbPage(): void {
   tiPage.style.top = '';
   tiPage.style.width = '';
   tiPage.style.height = '';
-  tiPage.style.setProperty('--tile-h', desk ? '45px' : '44px');
+  tiPage.style.setProperty('--tile-h', desk ? '43px' : '44px');
   fitTiles();
 }
 /** A face or name too wide for its tile shrinks to fit rather than run off it: a face to 10 px, a name to 8.25 (¾ of 11, as iOS). */

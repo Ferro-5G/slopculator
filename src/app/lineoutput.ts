@@ -23,7 +23,7 @@ import { syncListEdges } from './listscroll';
 import { kb } from './platform';
 import { setActive } from './rows';
 import { type RowView, views } from './rowviews';
-import { doc, setKeepSelection, rowIndex, results, setTarget, sheetChanged } from './sheet';
+import { doc, renderNow, saveSoon, setKeepSelection, rowIndex, results, setTarget, sheetChanged } from './sheet';
 
 /** `names` is what the sheet defines (and `namesKey` its key), so a word sets as letters where the engine splits it. */
 export function renderTex(v: RowView, row: Extract<Row, { kind: 'expr' }>, r: RowResult, names?: SheetNames, namesKey = ''): void {
@@ -338,7 +338,8 @@ function buildDist(row: Extract<Row, { kind: 'expr' }>): HTMLElement {
   cb.addEventListener('change', () => {
     d.cdf = cb.checked;
     if (d.cdf && !d.max.trim() && !d.min.trim()) d.min = '-inf';
-    sheetChanged();
+    saveSoon();
+    renderNow();
   });
   for (const [inp, k] of [[min, 'min'], [max, 'max']] as const) {
     inp.addEventListener('input', () => { d[k] = inp.value; sheetChanged(); });

@@ -23,13 +23,21 @@ export function cancelButton(): HTMLElement {
 }
 
 /** A popover, once. `exclusive`: opening another closes it. `outside`: a click elsewhere on the page closes it. */
-export interface Popover { close: () => void; exclusive?: boolean; outside?: boolean }
+export interface Popover { close: () => void; exclusive?: boolean; outside?: boolean; isOpen?: () => boolean; returnFocus?: () => void }
 const popovers: Popover[] = [];
 export function addPopover(p: Popover): void {
   popovers.push(p);
 }
 export function closePopovers(): void {
   for (const p of popovers) if (p.exclusive) p.close();
+}
+/** Closes the currently open popover (if any) and restores focus to its trigger. */
+export function closeOpenPopover(): boolean {
+  const open = popovers.find((p) => p.isOpen?.());
+  if (!open) return false;
+  open.close();
+  open.returnFocus?.();
+  return true;
 }
 export function initOverlay(): void {
   document.addEventListener('click', () => { for (const p of popovers) if (p.outside) p.close(); });

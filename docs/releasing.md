@@ -42,4 +42,4 @@ Releases are web-only for now. The web app runs in any browser, on any system.
 
 ## What CI runs
 
-`.github/workflows/ci.yml` runs on every pull request and on every push to `main` and `release`: the lint, the typecheck, the unit tests, the production build, and the browser walkthrough (`npm run e2e`). That is the same list as `npm run verify`.
+`.github/workflows/ci.yml` runs the fast checks (`lint`, `typecheck`, `test`, `build`) on pull requests and pushes to `main` (skipping doc-only changes). The browser walkthrough (`npm run e2e`) runs locally via `npm run verify` or on demand via manual workflow dispatch.

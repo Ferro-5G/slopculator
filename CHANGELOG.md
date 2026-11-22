@@ -4,6 +4,13 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.3-alpha] - 2026-11-21
+
+- Desktop Liquid Glass overhaul: a floating left sidebar fuses the live sheet outliner (sent calculations rise directly above the composer, click to edit, hover to highlight on the canvas), the composer, and the collapsible keypad/function deck beside a full-bleed 2D spatial canvas.
+- Liquid Glass chrome on desktop (Modern Dark and Light): floating capsule top bar, circular empty-state bell-curve medallion, sculpted squircle keycaps, glowing Enter, and 4 full rows of function tiles with no clipping.
+- Unified Escape dismissal and focus return for File, Modes and Appearance popovers, desktop toast clearance above the composer, immediate graph redraw when toggling cumulative probability shading, and stable graph sizing during point drags.
+- Redesigned public landing page with a centered hero, browser-framed desktop showcase, and structured capability cards.
+
 ## [0.2.2-alpha] - 2026-11-21
 
 - Keyboard Glow, on its own switch beside Aurora Glow in Appearance: keys softly take on the open tab's color, and the canvas's atmosphere continues behind the keypad.
