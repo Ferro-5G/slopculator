@@ -2,40 +2,40 @@
  * The privacy policy: shown in the app, published at /privacy on a hosted copy, and kept as PRIVACY.md (a test holds
  * the three together). A paragraph may hold [text](https://link) links and nothing else.
  */
-export const PRIVACY_UPDATED = '15 November 2026';
-export const PRIVACY_INTRO = 'Slopculator collects nothing about you. It has no accounts, analytics, ads, cookies or tracking, and it never sends your calculations anywhere.';
+export const PRIVACY_UPDATED = '21 November 2026';
+export const PRIVACY_INTRO = 'Slopculator collects nothing about you. The app itself has no accounts, analytics, ads, cookies or tracking, and it never sends your calculations anywhere.';
 export const PRIVACY: { heading: string; paragraphs: string[] }[] = [
   {
     heading: 'What stays on your device',
     paragraphs: [
-      'Your lines, saved sheets, history and settings are kept in your browser\'s local storage, on your device. They leave it only when you export a file, copy, or share something yourself. Clearing this site\'s data in your browser deletes them.',
+      'Your lines, saved sheets, history and settings are stored only in your browser\'s local storage on your device. They leave your device only when you export a file, copy, or share something yourself. Clearing this site\'s data in your browser deletes them.',
     ],
   },
   {
     heading: 'What the app sends',
     paragraphs: [
-      'Nothing. Once the page has loaded it makes no network requests: no fonts, scripts or images from other sites. In a link that ends in #q=sqrt(2), the calculation sits after the #, and browsers never send that part to a server.',
+      'Nothing. Once the page loads, the app makes no network requests — no external fonts, scripts or images, and its Content Security Policy sets connect-src \'none\'. In a link ending in #q=sqrt(2), the calculation sits after the # fragment, which browsers do not send to a server.',
     ],
   },
   {
     heading: 'Hosting',
     paragraphs: [
-      'The website is served by Cloudflare. To deliver a page and block attacks, Cloudflare handles your IP address, your browser\'s name and the address you asked for, like any web host. Its [privacy policy](https://www.cloudflare.com/privacypolicy/) covers that data.',
-      'We don\'t get a log of visitors, and Cloudflare\'s visitor analytics stays off. Cloudflare\'s dashboard shows us totals, such as how many requests came in and from which countries, but nothing about any one person.',
-      'If Cloudflare decides a visit looks like an attack, it may show a check and set a cookie, cf_clearance, that records only that you passed it.',
-      'If your browser can\'t reach the site, it may send Cloudflare a short report about the failed connection. Cloudflare uses these reports to watch its network, and says it drops your IP address from them right away.',
+      'The website is hosted on Cloudflare Pages. To serve pages and mitigate abuse, Cloudflare processes your IP address, user-agent string and requested URL, as any web host does. Cloudflare\'s [privacy policy](https://www.cloudflare.com/privacypolicy/) covers that processing.',
+      'We do not collect visitor logs, and Cloudflare Web Analytics is off. Cloudflare\'s dashboard shows aggregate totals (such as request counts and countries), not individual visitors.',
+      'If Cloudflare flags a visit as suspicious, it may show a challenge and set a strictly necessary cookie (cf_clearance) recording that you passed it.',
+      'Cloudflare Pages sends Network Error Logging (NEL) headers with success_fraction set to 0.0, so your browser may send Cloudflare a short report only if a connection fails, never on normal page loads. Cloudflare states that it strips IP addresses from NEL reports.',
     ],
   },
   {
     heading: 'Source code and downloads',
     paragraphs: [
-      'The code and the downloadable file are on GitHub, which has its own [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). The downloaded file works like the website: it makes no requests and keeps everything in the browser that opens it.',
+      'The source code and downloadable single-file HTML releases are hosted on GitHub, under GitHub\'s [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement). The downloaded file runs offline in your browser and makes no network requests.',
     ],
   },
   {
     heading: 'Changes and questions',
     paragraphs: [
-      'If this ever changes, this policy will say so, with a new date, before the app collects anything. Every past version is public in the repository.',
+      'If this ever changes, this policy will be updated with a new date before anything is collected. Every past version is public in the repository.',
       'Questions go to [the issue tracker](https://github.com/Ferro-5G/slopculator/issues).',
     ],
   },

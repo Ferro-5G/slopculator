@@ -1,8 +1,8 @@
 # Functions
 
-Every built-in, grouped by area. To search by name or by what a function does: press Ctrl+/ in the app, or type a name on the keypad and read the hint.
+Every built-in, grouped by area. To search by name or by what a function does, press Ctrl+K (⌘K on Mac) or Ctrl+/ in the app.
 
-Most functions also sit on a keypad tab. Point at a key and the strip under the keypad explains it.
+Most functions also sit on a keypad tab. Point at a key or tile on desktop and the strip above the keypad explains it.
 
 ## Arithmetic and variables
 

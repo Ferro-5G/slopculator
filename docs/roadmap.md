@@ -2,9 +2,8 @@
 
 Plans, not promises. Dates are not set.
 
-## Before the next alpha
+## Near term
 
-- Cut it from the `release` branch with the workflow in [docs/releasing.md](releasing.md).
 - Release the iOS and Android apps, which are in development.
 
 ## 3D and XR

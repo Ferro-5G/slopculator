@@ -20,7 +20,7 @@ npm run e2e            # drives dist/index.html in Chrome (needs Google Chrome i
 npm run verify         # all of the above, in order
 ```
 
-CI runs the same list on every pull request. A pull request should pass it before review.
+CI runs `lint`, `typecheck`, `test`, and `build` automatically on pull requests (with `e2e` available via manual workflow dispatch). Run `npm run verify` locally before opening a pull request for review.
 
 ## Branches and pull requests
 

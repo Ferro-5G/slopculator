@@ -2,17 +2,19 @@
 
 Everything here applies on a computer and on a phone, except where it says otherwise. [Functions](functions.md) lists what you can type, and the [guide](guide.md) has worked examples.
 
-## Lines
+## Lines and the canvas
 
-Type one calculation per line. The answer appears beside it.
+Type one calculation in the composer and press Enter to send it.
 
-- `a = 3` defines a variable and gives it a slider. `f(x) = x^2` defines a function you can call, and the graph draws it.
-- `ans` is the answer of the line above. With Line letters on, line 1 is also `A`, line 2 is `B`, and later lines can use them.
+- On desktop, sent lines rise into the **Sheet** list in the left sidebar and appear as wired blocks on the 2D canvas beside it. Click any line in the sidebar or on the canvas to edit it in the composer; hover a sidebar line to highlight its block on the canvas.
+- On phones and narrow windows (`≤ 760 px`), blocks stack vertically in a single Cascade column with wires running down the left gutter.
+- `a = 3` defines a variable and creates a slider block. `f(x) = x^2` defines a function you can call, and the graph draws it.
+- `ans` is the answer of the line above. With **Line letters** on, line 1 is also `A`, line 2 is `B`, and later lines can use them.
 - Anything with an `x` is drawn on the graph: `y = 2x + 1`, `x = 3`, `x^2 + y^2 = 16`, `y > x^2`.
 - Start a line with `#` to make a heading.
-- Pasting several lines makes several lines.
+- Pasting several lines creates several lines as one undoable step.
 - `y1 ~ m x1 + b` is a regression: it fits `m` and `b` to the lists `x1` and `y1` and draws the fit. With a table headed `x` and `y`, write `y ~ mx + b`.
-- A line copied out of Desmos or typed the way a TI takes it mostly works as it is. [functions.md](functions.md#written-the-way-other-calculators-take-it) lists what is read.
+- Lines copied from Desmos or typed in TI notation mostly work as written. [functions.md](functions.md#written-the-way-other-calculators-take-it) lists what is read.
 
 Write math the way you would on paper. `2x`, `3(4 + 5)`, `sin 30`, `√16`, `|x|`, `5!` and `x²` all work. Brackets close themselves, and typing the closing bracket steps over it. Select text and type `(` to wrap it.
 
@@ -71,43 +73,42 @@ Choosing a function puts it in your line with the caret inside the brackets. The
 
 ## The keypad
 
-The number pad never changes. The digits are in the middle, the operators run down the right edge, and enter is at their foot. Over the pad are x, y, π, e, % and ans, then five tabs: Math, Stats, Chance, Matrix and HVAC.
+The keypad sits directly under the composer (inside the floating left sidebar on desktop, or docked at the bottom on phones). Above the number pad is a deck bar with **123** and five category tabs: **Math**, **Stats**, **Chance**, **Matrix**, and **HVAC**.
 
-- A tab opens a page of tiles over your lines, never over the keys. Each tile shows what it works out, like P(X = k) or area → z, with the function's name underneath. Point at a tile or key and the line under the keypad says what it does.
-- Click a tile and the function goes into your line. Grey names show the inputs still to type, as in `binompdf(10, 0.3, k)`, and each one disappears as you type it. The line shows no error until the inputs it needs are in.
-- The 2 × 2 and 3 × 3 matrix tiles put in a grid of empty cells. Type a number, then comma or Next to move to the next cell.
-- The page closes with ✕, its tab, a tile, Esc, or any key on the pad, which still types.
-- Hold ← or → to keep moving the caret. Hold ⌫ to clear the line. AC clears every line, and Undo brings them back.
+- Clicking a category tab swaps the number pad in place for that category's function tiles and guided builders, keeping the canvas in view. Click **123**, the active tab, a tile, or press Esc to return to the number pad.
+- On desktop, hovering a key or tile shows what it does in a hint strip above the keypad.
+- Clicking a tile inserts the function into the composer with grey input slots (such as `binompdf(n, p, k)`), which clear as you type.
+- The 2 × 2 and 3 × 3 matrix tiles insert a grid of empty cells; type a number, then comma or Enter to move to the next cell. Guided builders for matrices, shapes, vectors, calculus, distributions, and HVAC open from the top card on their tabs.
+- Hold `←` or `→` to keep moving the caret. Hold `⌫` to clear the current line. **AC** clears the sheet (with a 10-second Undo toast), and **ENTER** lives on the right end of the composer bar.
 
-**Keypad** in the top bar hides the keys, and the app remembers.
+**Keypad** in the desktop top bar hides or shows the keypad, and the choice is remembered.
 
 ## The graph
 
-Drag to pan, scroll to zoom, and hover to trace a curve. Shift+drag zooms into the box you draw. The buttons at the side zoom, fit every curve, square the axes, go home and save a picture.
+When a sheet plots something, the graph appears as a block on the canvas. On desktop, drag the graph's top strip to move it and drag its bottom-right corner to resize it.
 
-Each curve is named on the plot in its own color. Its zeros, highs and lows, y-intercept and crossings are marked with dots. Point near a dot and the readout snaps to it, like "zero (1.2247, 0)". Click to pin the label.
+Drag inside the plot to pan, scroll to zoom, and hover to trace a curve. Shift+drag zooms into a selection box. The toolbar in the top-right corner of the graph block zooms, fits every curve, squares the axes (`1:1`), resets to home, and exports a PNG.
 
-A slider line gets its slider under the line. Dragging it moves every curve that uses the variable. A slider for a whole number steps by 1 and runs from 0 to twice the number.
+Each plotted expression block carries its curve color along its left edge. Zeros, extrema, y-intercepts and intersections are marked with dots; hover near a dot to snap the readout and click to pin the label.
 
-With the keyboard in the graph, the arrows pan, + and − zoom, F fits, S squares the axes, 0 resets, P saves a PNG, C copies the image, [ and ] step through the marked points, Enter pins one, and Delete clears the pins.
+A slider block moves every curve and dependent block wired to that variable in real time, showing values along the wires while you drag. A slider for a whole number steps by 1 and runs from 0 to twice the number.
+
+With keyboard focus in the graph, arrow keys pan, `+` and `−` zoom, `F` fits, `S` squares the axes, `0` resets, `P` saves a PNG, `C` copies the image, `[` and `]` step through marked points, Enter pins one, and Delete clears pins.
 
 ## The top bar
 
-The top bar holds the modes you change most: Deg or Rad, Dec or Exact, Pop or Sample (population or sample standard deviation), the Percent, Line letters and Complex switches, and Round. **Modes** holds the rest, plus any the bar has no room for on a narrow window. To the right are Keypad, Graph, Appearance, Find, File and ? (every shortcut).
-
-Drag the line between the notebook and the graph to resize them.
+On desktop, the top bar holds **Deg | Rad**, canvas zoom controls (`− 100% + Fit all`), **Find** (`Ctrl+K` / `⌘K`), **File**, **History**, **Keypad**, **Modes** (Exact, Sample SD, Round, Percent, Line letters, Complex, Graph, Huge answers, and adding a percent), **Appearance** (the sliders icon), and **?** (all shortcuts).
 
 ## On a phone or a narrow window
 
-Under 760 px wide the app shows one pane at a time, Calculate or Graph, switched at the bottom.
+Under 760 px wide, the app switches to a single vertical Cascade canvas with the composer and keypad docked below it.
 
-- The keypad keeps the phone's own keyboard down. The keyboard button at the bottom right brings it back.
-- The modes and Appearance are in the Modes sheet, behind the sliders button at the top.
-- Clear all is in File, and its Undo stays for 10 seconds.
-- Long-press a line's number for its menu. File → Reorder lines puts ↑ and ↓ on every line until you tap Done.
-- On Graph, a chip for each plotted line sits over the graph tools, with a slider for each variable the curves use.
-- File → Share as text sends the sheet to another app where the browser can share.
-- Add the page to your home screen and it opens full screen.
+- Blocks stack in order with dependent blocks indented and wired down the left gutter; graphs and figures appear inline in the column.
+- The deck bar holds **123**, the five category tabs, **ABC** (to toggle the system keyboard on touch devices), and **AC**.
+- The top bar shows **Deg | Rad**, **Modes** (which includes both modes and Appearance), **Find**, **File**, and **History**. Below 390 px, **Find** becomes a magnifier icon.
+- Long-press a block for its menu. **File → Reorder lines** adds `↑` and `↓` buttons until you tap **Done**.
+- **File → Share as text** shares the sheet through the browser's share sheet where supported.
+- Adding the page to your home screen opens it full screen.
 
 ## Keyboard shortcuts
 
@@ -138,15 +139,17 @@ On a Mac, read Ctrl as ⌘ and Ctrl+Alt as Ctrl+Option. The app shows shortcuts 
 
 ## Looks and themes
 
-Appearance, beside Find, has two looks. **Modern** is a plain notebook beside the plot with one accent color. **Retro** draws the app as lab hardware, with green-bar printer paper and sculpted keycaps.
+**Appearance** (the sliders icon beside Modes on desktop, or inside the Modes sheet on phones) switches between two looks: **Modern** (frosted Liquid Glass sidebar and canvas blocks) and **Retro** (lab hardware with green-bar paper and ruled keycaps).
 
-A small sample at the top of Appearance shows your choices as you make them.
+A live preview at the top of Appearance reflects your choices as you change them:
 
-- **Mode** is System, which follows your computer, or Light or Dark.
-- **Pure black when dark** puts Dark on true black.
-- **High contrast** draws black and white with an outline on every control.
-- **Color** sets the accent: the caret, the line you're typing, enter and the operators.
-- **Motion** can be Full, Reduced or Off.
+- **Mode:** System (follows your OS), Light, or Dark.
+- **Pure black when dark:** switches Dark to true OLED black.
+- **High contrast:** black and white with explicit outlines on every control.
+- **Color:** sets the accent for the caret, active states, Enter, and operators.
+- **Aurora Glow** and **Keyboard Glow** (Modern): ambient deck-colored lighting on the canvas, composer rim, and keypad.
+- **Motion:** Full, Reduced, or Off.
+- **Key sounds:** toggles the recorded key clicks and feedback sounds.
 
 There is one more set of colors, and it isn't in the menu until you've earned it. The code is older than this calculator. Enter it the calculator's way: the number pad's arrows, then B A.
 

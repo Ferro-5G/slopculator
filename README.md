@@ -3,11 +3,13 @@
 [![CI](https://github.com/Ferro-5G/slopculator/actions/workflows/ci.yml/badge.svg)](https://github.com/Ferro-5G/slopculator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A keyboard-first calculator and grapher. Type expressions one per line, read each answer on the right, and anything with an `x` is drawn on the graph. One TypeScript engine with no dependencies computes every answer.
+A keyboard-first calculator and grapher on a live wired canvas. Type calculations in the composer, inspect results and curves as connected blocks, and drag sliders or points to see every dependent value update live. One zero-dependency TypeScript engine computes every answer.
 
-![Slopculator in the Modern look: a sheet of lines on the left, the graph on the right](docs/images/modern.png)
+Use it live at **[slopculator.com](https://slopculator.com)** or run it offline as a single HTML file.
 
-It was built for Algebra 2 homework (Acellus units 7 to 13) and grew past it: exact arithmetic, statistics and distributions, matrices, calculus, regressions, unit conversion, and HVAC engineering. 296 functions in all.
+![Slopculator in Modern Dark: a floating left sidebar with the sheet list, composer and keypad beside a spatial canvas with a slider wired to an area calculation, two curves, and a graph](docs/images/modern.png)
+
+Started for Algebra 2 coursework and expanded to 296 functions across exact arithmetic, statistics and distributions, matrices, calculus, regressions, unit conversion, and HVAC engineering.
 
 ## Quick start
 
@@ -26,7 +28,7 @@ npm run build    # dist/index.html, one file that works offline
 
 | Platform | How | More |
 | --- | --- | --- |
-| Web | Download the page from the [latest release](https://github.com/Ferro-5G/slopculator/releases/latest), or `npm run build` and open `dist/index.html` | [Using the app](docs/using.md) |
+| Web | Use [slopculator.com](https://slopculator.com), download the single-file page from the [latest release](https://github.com/Ferro-5G/slopculator/releases/latest), or run `npm run build` and open `dist/index.html` | [Using the app](docs/using.md) |
 
 iOS and Android apps are in development and aren't in this repository yet.
 
