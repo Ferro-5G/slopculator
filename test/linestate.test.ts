@@ -4,7 +4,7 @@ import { evaluateDocument, type RowResult } from '../src/engine/document';
 import { ENDS_EARLY } from '../src/engine/errors';
 import type { DisplayOpts } from '../src/engine/format';
 import { isLongAnswer } from '../src/ui/answerlayout';
-import { copyableValue, lineLabel, typingState } from '../src/ui/linestate';
+import { copyableValue, lineLabel, selectedBlockActions, typingState } from '../src/ui/linestate';
 
 const at = (n: number) => ({ start: n, end: n });
 
@@ -80,5 +80,22 @@ describe('isLongAnswer', () => {
   it('is never scientific notation or an answer with no text', () => {
     expect(isLongAnswer('1.51534200448232 × 10³⁰¹', every)).toBe(false);
     expect(isLongAnswer(null, every)).toBe(false);
+  });
+});
+
+describe('selectedBlockActions', () => {
+  const S = { deg: true, complex: false, sample: false };
+  const o: DisplayOpts = { places: null, exact: false, percent: false };
+  const evalRow = (text: string) => evaluateDocument([{ id: '0', kind: 'expr', text }], S)[0];
+  it('offers Edit, Copy, Delete and More for a value line', () => {
+    const acts = selectedBlockActions({ id: '0', kind: 'expr', text: '2 + 3' }, evalRow('2 + 3'), o);
+    expect(acts.map((a) => a.label)).toEqual(['Edit', 'Copy', 'Delete', '⋯']);
+    expect(acts[0].primary).toBe(true);
+  });
+  it('offers Hide or Show on graph for a curve, and skips Edit on a table', () => {
+    const curve = evalRow('y = sin(x)');
+    expect(selectedBlockActions({ id: '0', kind: 'expr', text: 'y = sin(x)', hidden: false }, curve, o).map((a) => a.label)).toEqual(['Edit', 'Hide', 'Delete', '⋯']);
+    expect(selectedBlockActions({ id: '0', kind: 'expr', text: 'y = sin(x)', hidden: true }, curve, o).map((a) => a.label)).toEqual(['Edit', 'Show', 'Delete', '⋯']);
+    expect(selectedBlockActions({ id: '0', kind: 'table', columns: [] }, undefined, o).map((a) => a.label)).toEqual(['Delete', '⋯']);
   });
 });

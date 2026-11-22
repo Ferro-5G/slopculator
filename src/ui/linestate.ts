@@ -90,3 +90,21 @@ export function copyableValue(r: RowResult | undefined, o: DisplayOpts): (() => 
   if (distProb !== undefined) return () => plainValue(distProb, o, true);
   return value !== undefined && !isDist(value) ? () => plainValue(value, o, prob, precise) : undefined;
 }
+
+export interface BlockQuickAction {
+  id: 'edit' | 'copy' | 'toggleGraph' | 'delete' | 'more';
+  label: string;
+  primary?: boolean;
+  danger?: boolean;
+}
+
+/** Quick actions shown on mobile when a canvas block is tapped once to select it. */
+export function selectedBlockActions(row: RowInput & { hidden?: boolean }, r: RowResult | undefined, o: DisplayOpts): BlockQuickAction[] {
+  const out: BlockQuickAction[] = [];
+  if (row.kind === 'expr') out.push({ id: 'edit', label: 'Edit', primary: true });
+  if (copyableValue(r, o)) out.push({ id: 'copy', label: 'Copy' });
+  if (r && r.graph.length > 0) out.push({ id: 'toggleGraph', label: row.hidden ? 'Show' : 'Hide' });
+  out.push({ id: 'delete', label: 'Delete', danger: true });
+  out.push({ id: 'more', label: '⋯' });
+  return out;
+}

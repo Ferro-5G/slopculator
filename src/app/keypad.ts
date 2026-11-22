@@ -5,7 +5,7 @@ import { backspaceEdit } from '../ui/slots';
 import { h } from './dom';
 import { pushStep, deleteRow, addTable, clearAll, withoutRecording } from './edits';
 import { buildMenu } from './file';
-import { keypadEl } from './layout';
+import { keypadEl, composerDock } from './layout';
 import { applyBackspace, editText, commitLine, commaSteps, insertText } from './lineeditor';
 import { openMatrixEditor } from './editors';
 import { kb } from './platform';
@@ -379,8 +379,9 @@ export function buildKeypad(): void {
   keypadEl.append(
     deckBar,
     h('div', { class: 'pad-stage' }, h('div', { class: 'pad' }, h('div', { class: 'pad-main' }, grid, keyHelp)), tiPage),
-    h('div', { class: 'key-foot' }, keyHint),
   );
+  // Mount the hover hint on the composer dock so it floats cleanly above the composer and still works when the keypad is folded.
+  composerDock.append(h('div', { class: 'key-foot' }, keyHint));
   show();
 }
 let lastKeyFocus: Element | null = null;

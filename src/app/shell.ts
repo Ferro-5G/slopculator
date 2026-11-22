@@ -118,6 +118,7 @@ export function applyUI({ glide = false } = {}): void {
   syncMobileNav();
   buildMenu();
   if (views.size) layoutCanvas();
+  replaceToast();
 }
 const navCalc = h('button', { type: 'button', class: 'nav-view', 'aria-pressed': 'true' }, 'Calculate');
 const navGraph = h('button', { type: 'button', class: 'nav-view' }, 'Graph');

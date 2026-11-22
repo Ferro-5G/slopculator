@@ -2151,8 +2151,14 @@ await check('phone: the Refrig chips fill in the fluid, and tapping the end of a
   await page.evaluate(() => window.slopculator.setLines(['poissoncdf(2)', '']));
   await page.waitForTimeout(200);
   const box = await page.locator('.rows .row').first().locator('.expr').boundingBox();
+  // First tap selects the block in place and opens its quick-action bar; second tap (or Edit) enters edit mode.
+  await page.touchscreen.tap(box.x + box.width - 4, box.y + box.height / 2);
+  await page.waitForTimeout(150);
+  expect(await page.locator('.mobile-actions .mob-act-edit').isVisible(), 'first tap on phone did not show quick actions');
+  expect(!(await page.evaluate(() => !!document.querySelector('.composer.editing'))), 'first tap on phone opened editor immediately');
   await page.touchscreen.tap(box.x + box.width - 4, box.y + box.height / 2);
   await page.waitForTimeout(250);
+  expect(await page.locator('.blk-editing-pin').isVisible(), 'edited block disappeared from phone column');
   l = await lineNow(page);
   expect(l.text === 'poissoncdf(2)' && l.caret === 12, `the caret after a tap at the end: ${JSON.stringify(l)}`);
   await tapKeys(page, ',3');
@@ -3877,6 +3883,7 @@ for (const [where, narrow] of [['desktop', false], ['phone', true]]) {
   await check(`H1 ${where}: the ⌫ key steps back out of an empty matrix cell, and never takes a bracket`, async (page) => {
     await page.evaluate(() => window.slopculator.setLines(['[[1, 2], [ , 4]]']));
     await page.locator('.rows .expr').first().click();
+    if (narrow) await page.locator('.mobile-actions .mob-act.primary').click();
     await placeCaret(page, 10);
     await backKey(page).click();
     await page.waitForTimeout(120);
@@ -3898,6 +3905,7 @@ for (const [where, narrow] of [['desktop', false], ['phone', true]]) {
   if (!narrow) await check(`H1 ${where}: the physical Backspace follows the same matrix rule`, async (page) => {
     await page.evaluate(() => window.slopculator.setLines(['[[1, 2], [ , 4]]']));
     await page.locator('.rows .expr').first().click();
+    if (narrow) await page.locator('.mobile-actions .mob-act.primary').click();
     await placeCaret(page, 10);
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(120);

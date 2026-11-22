@@ -114,6 +114,7 @@ export function openLineMenu(row: Row, x: number, y: number): void {
   const menuEl = h('div', { class: 'menu line-menu', role: 'menu' },
     act('Copy result', kb('Ctrl+Alt+C'), ({ r }) => { const value = copyableValue(r, opts()); if (value) void copy(value(), views.get(id)?.el.querySelector('.out .result, .dist-prob')); }, !copyableValue(r, opts())),
     act('Duplicate', kb('Alt+Shift+↓'), ({ row }) => row.kind === 'expr' && addRow(row.id, lineCopy(row)), row.kind !== 'expr'),
+    ...(row.at ? [act('Reset position', '', ({ row }) => { delete row.at; sheetChanged(); })] : []),
     act(row.hidden ? 'Show on graph' : 'Hide on graph', '', ({ row }) => { row.hidden = !row.hidden; sheetChanged(); focusRow(row.id); }, !r || r.graph.length === 0),
     act('Move up', kb('Alt+↑'), (a) => move(a, -1), i === 0),
     act('Move down', kb('Alt+↓'), (a) => move(a, 1), i === doc.rows.length - 1),
@@ -123,10 +124,12 @@ export function openLineMenu(row: Row, x: number, y: number): void {
     act('Delete', kb('Ctrl+Shift+⌫'), ({ row }) => deleteRow(row.id)),
   );
   menuEl.style.position = 'fixed';
-  menuEl.style.left = `${Math.min(x, window.innerWidth - 240)}px`;
-  menuEl.style.top = `${Math.min(y, window.innerHeight - 240)}px`;
   menuEl.style.right = 'auto';
   document.body.append(menuEl);
+  const mw = menuEl.offsetWidth || 220;
+  const mh = menuEl.offsetHeight || 220;
+  menuEl.style.left = `${Math.max(8, Math.min(x, window.innerWidth - mw - 8))}px`;
+  menuEl.style.top = `${Math.max(8, Math.min(y, window.innerHeight - mh - 8))}px`;
   menuEl.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
   menuEl.addEventListener('keydown', (e) => {
     const items = [...menuEl.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
@@ -231,6 +234,7 @@ function makeExprView(row: Extract<Row, { kind: 'expr' }>): RowView {
   el.addEventListener('mouseenter', () => { if (!v.chip.hidden) graph.update({ hoverRowId: row.id }); });
   el.addEventListener('mouseleave', () => { if (graph.hoveredRow === row.id) graph.update({ hoverRowId: null }); });
   body.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || el.classList.contains('blk')) return;
     const t = e.target as HTMLElement;
     if (t === body || t.classList.contains('line') || t.classList.contains('src') || t.classList.contains('out')) {
       e.preventDefault();

@@ -34,10 +34,21 @@ export const marksHint = h('div', { class: 'marks-hint', 'aria-hidden': 'true' }
 export const graphSliders = h('div', { class: 'graph-sliders', role: 'group', 'aria-label': 'Sliders', hidden: true });
 /** What sits over or under the plot. On a phone it floats, and the graph is told how much it covers. */
 export const graphDock = h('div', { class: 'graph-dock' }, graphChips, graphSliders, graphTools);
-/** The graph block: a move strip along its top, the plot, its tools, and a corner to resize it by. */
-export const graphGrip = h('div', { class: 'blk-grip', title: 'Drag to move the graph', 'aria-hidden': 'true' });
-export const graphResize = h('div', { class: 'blk-resize', title: 'Drag to resize the graph', 'aria-hidden': 'true' });
-export const graphPane = h('section', { class: 'graph-pane blk blk-graph', 'aria-label': 'Graph' }, graphHost, graphDock, marksHint, graphGrip, graphResize);
+/** The graph block: a full-width drag header bar, the plot beneath it, its tools, and a corner to resize it by. */
+export const graphUnpin = h('button', {
+  type: 'button',
+  class: 'blk-unpin',
+  title: 'Return graph to automatic layout',
+  'aria-label': 'Reset graph position and size',
+  hidden: true,
+}, 'Auto');
+export const graphGrip = h('div', { class: 'blk-grip', title: 'Drag to move graph · Double-click to reset layout' },
+  h('span', { class: 'blk-grip-dots', 'aria-hidden': 'true' }),
+  h('span', { class: 'blk-grip-title', 'aria-hidden': 'true' }, 'Graph'),
+  graphUnpin,
+);
+export const graphResize = h('div', { class: 'blk-resize', title: 'Drag to resize graph · Double-click to reset size', 'aria-hidden': 'true' });
+export const graphPane = h('section', { class: 'graph-pane blk blk-graph', 'aria-label': 'Graph' }, graphGrip, graphHost, graphDock, marksHint, graphResize);
 export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize', hidden: true });
 export const main = h('main', { class: 'main' }, leftPane);
 export const toast = h('div', { class: 'toast', role: 'status' });

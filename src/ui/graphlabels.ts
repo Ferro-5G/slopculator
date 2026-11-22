@@ -131,3 +131,70 @@ export function piLabel(k: number, num: number, den: number): string {
   return `${k < 0 ? '−' : ''}${p === 1 ? '' : p}π${q === 1 ? '' : `/${q}`}`;
 }
 
+export type YTickAlign = 'left' | 'right';
+export type YTickBase = 'top' | 'middle' | 'bottom';
+
+export interface YTickSpotInput {
+  /** Screen x of the y-axis, and screen y of this tick. */
+  ax: number;
+  py: number;
+  /** Label width and height in screen px. */
+  tw: number;
+  th: number;
+  /** Usable plot bounds: [left, top, right, bottom]. */
+  view: Box;
+  /** True when the y-axis is pinned near the left edge so labels default to the right of the axis. */
+  pinLeft: boolean;
+  /** True when a candidate label box crowds a plotted curve, POI ring, or already-placed label. */
+  isCrowded: (box: Box) => boolean;
+}
+
+export interface YTickPlacement {
+  x: number;
+  y: number;
+  align: YTickAlign;
+  base: YTickBase;
+}
+
+/**
+ * Picks a clean spot for a y-axis tick label so curves and crossing markers (such as a parabola vertex at (0, −2))
+ * never strike through the number. Tries the default side first, then the opposite side and gentle vertical offsets.
+ */
+export function yTickSpot(o: YTickSpotInput): YTickPlacement {
+  const { ax, py, tw, th, view: [vl, vt, vr, vb], pinLeft, isCrowded } = o;
+  const leftX = Math.min(ax - 5, vr - 5);
+  const rightX = Math.max(ax + 6, vl + 5);
+  const shift = Math.max(11, Math.ceil(th * 0.65));
+  const primary: YTickPlacement = pinLeft
+    ? { x: Math.max(ax + 5, vl + 5), y: py, align: 'left', base: 'middle' }
+    : { x: leftX, y: py, align: 'right', base: 'middle' };
+
+  const candidates: YTickPlacement[] = pinLeft
+    ? [
+        primary,
+        { x: primary.x, y: py + shift, align: 'left', base: 'top' },
+        { x: primary.x, y: py - shift, align: 'left', base: 'bottom' },
+      ]
+    : [
+        primary,
+        { x: rightX, y: py, align: 'left', base: 'middle' },
+        { x: rightX, y: py + shift, align: 'left', base: 'top' },
+        { x: leftX, y: py + shift, align: 'right', base: 'top' },
+        { x: rightX, y: py - shift, align: 'left', base: 'bottom' },
+        { x: leftX, y: py - shift, align: 'right', base: 'bottom' },
+      ];
+
+  const boxOf = (c: YTickPlacement): Box => {
+    const l = c.align === 'right' ? c.x - tw : c.x;
+    const t = c.base === 'top' ? c.y : c.base === 'bottom' ? c.y - th : c.y - th / 2;
+    return [l, t, l + tw, t + th];
+  };
+
+  for (const c of candidates) {
+    const b = boxOf(c);
+    if (b[0] < vl + 2 || b[2] > vr - 2 || b[1] < vt + 2 || b[3] > vb - 2) continue;
+    if (!isCrowded(b)) return c;
+  }
+  return primary;
+}
+

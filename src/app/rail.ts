@@ -3,17 +3,23 @@
 // spatial canvas beside it. Clicking a line loads it into the composer; hovering highlights its block on the canvas.
 import { isHeading } from '../engine/parser';
 import { composerAnswer } from '../ui/composerline';
-import { isEmptyLine } from '../ui/document';
 import { sheetNames, typeset } from '../ui/typeset';
 import { editLine, editingId } from './composer';
 import { h } from './dom';
 import { deleteRow } from './edits';
 import { railCount, railList } from './layout';
 import { mathNode } from './mathdom';
+import { openLineMenu } from './rows';
 import { views } from './rowviews';
 import { doc, opts, results } from './sheet';
 
 let lastCount = 0;
+let onReveal: (id: string) => void = () => {};
+
+/** Registers a callback that brings a clicked sheet line's block into view on the canvas. */
+export function setRailReveal(fn: (id: string) => void): void {
+  onReveal = fn;
+}
 
 /** Syncs the desktop sidebar's ordered sheet list from the current document and results. */
 export function syncRail(composerRowId: string, isWide: boolean): void {
@@ -23,8 +29,8 @@ export function syncRail(composerRowId: string, isWide: boolean): void {
   const items: HTMLElement[] = [];
 
   doc.rows.forEach((row, k) => {
-    const isDraftBlank = row.id === composerRowId && !editingId && isEmptyLine(row);
-    if (isDraftBlank) return;
+    // Only sent lines belong in the rail; the unsent composer draft stays in the composer until Enter sends it.
+    if (row.id === composerRowId && !editingId) return;
     if (row.kind === 'expr' && !row.text.trim() && row.id !== editingId) return;
     const r = results[k];
     const hasCurve = !!r && r.graph.length > 0;
@@ -85,11 +91,17 @@ export function syncRail(composerRowId: string, isWide: boolean): void {
     item.addEventListener('mouseenter', () => setLit(true));
     item.addEventListener('mouseleave', () => setLit(false));
     item.addEventListener('click', () => {
+      onReveal(row.id);
       if (row.kind === 'expr') editLine(row.id);
+    });
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openLineMenu(row, e.clientX, e.clientY);
     });
     item.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && row.kind === 'expr') {
         e.preventDefault();
+        onReveal(row.id);
         editLine(row.id);
       }
     });

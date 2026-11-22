@@ -8,13 +8,13 @@ import {
   type Size, type Wire,
 } from '../ui/canvas';
 import {
-  DOT_PITCH, dragGraph, dragTo, DRAG_SLOP, FRAME_PAD, FRAME_TOP, GRAPH_SIZE, needsFreshFlow, viewRects, wideHomeView, wideScreen,
+  DOT_PITCH, dragGraph, dragTo, DRAG_SLOP, FRAME_PAD, FRAME_TOP, GRAPH_MIN, GRAPH_SIZE, needsFreshFlow, viewRects, wideHomeView, wideScreen,
   wideLayout, wideWireRoute, ZOOM_STEP, type WideBlock, type WideScreen,
 } from '../ui/canvaswide';
 import { CASCADE_PHONE, cascadeColumn, cascadeGaps, cascadeWires, heldLit, heldTraces, type CascadeBlock, type CascadeOptions } from '../ui/cascade';
 import { lineDefines, type RowResult } from '../engine/document';
 import { portExpr, rowPorts } from '../ui/ports';
-import { sheetNames } from '../ui/typeset';
+import { sheetNames, typeset } from '../ui/typeset';
 import { beginDrag, dragHeld, focusedWire, focusWire, hasTag, initTags, keepTags, placeTags, releaseDrag, stateOf, syncTags, tagArrived, tagDrag, tagLayer, tagRun } from './wiretags';
 import { drawNarrowTree, initUnfold, openLines, stepRect, syncUnfold, type OpenLine } from './unfold';
 import { figurePorts, initFigures, syncFigures } from './figures';
@@ -23,20 +23,20 @@ import { isPsychState, psychColumn, psychHosts, PSYCH_BLOCK } from '../ui/psych'
 import { pairedRows } from '../ui/figures';
 import { openLineEnds, trayRises } from '../ui/wireplace';
 import { clearExample } from './example';
-import { composerRowId, editingId, editLine, finishEdit } from './composer';
+import { composerBox, composerRowId, editingId, editLine, finishEdit } from './composer';
 import { h } from './dom';
-import { caretAt } from './mathdom';
+import { caretAt, mathNode } from './mathdom';
 import { slotForEnd } from '../ui/slots';
-import { slotInfo } from '../ui/linestate';
-import { setDragListener } from './edits';
-import { motionNow } from './feedback';
-import { app, deskRail, exampleGraph, exampleGraphPane, graph, graphGrip, graphPane, graphResize, listEl, tape, modeBar } from './layout';
+import { copyableValue, selectedBlockActions, slotInfo } from '../ui/linestate';
+import { deleteRow, pushStep, setDragListener } from './edits';
+import { copy, motionNow } from './feedback';
+import { app, composerDock, deskRail, exampleGraph, exampleGraphPane, graph, graphGrip, graphPane, graphResize, graphUnpin, listEl, tape, modeBar } from './layout';
 import { insertText } from './lineeditor';
-import { syncRail } from './rail';
+import { setRailReveal, syncRail } from './rail';
 import { narrow, kb } from './platform';
 import { focusRow, setHostedCheck, views } from './rowviews';
 import { openLineMenu } from './rows';
-import { doc, results, rowIndex, saveSoon } from './sheet';
+import { doc, opts, results, rowIndex, saveSoon, sheetChanged } from './sheet';
 import { play } from './sound';
 import { CURVES, DURATIONS, STAGGER } from '../ui/motiontokens';
 import { EMPTY_STARTERS, STARTERS } from '../ui/starters';
@@ -71,6 +71,9 @@ let portYs = new Map<string, number>();
 let pinnedWire: string | null = null;
 /** The canvas block currently hovered on desktop, for highlighting its connected wires and peers. */
 let hoveredBlock: string | null = null;
+/** The canvas block tapped once on mobile, showing quick actions and highlighting its wires before editing. */
+let selectedBlock: string | null = null;
+let selectedCaret: number | undefined;
 
 let blockSizes: ResizeObserver | null = null;
 const watched = new WeakSet<Element>();
@@ -79,6 +82,9 @@ const svg = document.createElementNS(NS, 'svg');
 svg.classList.add('cv-wires');
 svg.setAttribute('aria-hidden', 'true');
 const ghost = h('div', { class: 'blk-ghost', hidden: true, 'aria-hidden': 'true' });
+/** On mobile, keeps the edited block anchored in the Cascade column while its field sits in the composer. */
+const editPin = h('div', { class: 'blk blk-editing-pin', hidden: true, 'aria-hidden': 'true' });
+const mobileActions = h('div', { class: 'mobile-actions', role: 'toolbar', 'aria-label': 'Selected line actions', hidden: true });
 const clearBtn = h('button', { type: 'button', class: 'example-clear' }, CLEAR_EXAMPLE);
 const exampleFrame = h('div', { class: 'example-frame', hidden: true, role: 'group', 'aria-label': EXAMPLE_TITLE }, clearBtn);
 
@@ -91,6 +97,7 @@ function graphShown(): boolean {
   return doc.ui.graph !== false && (wires.some((w) => w.to === GRAPH_BLOCK) || !!doc.ui.graphPinned);
 }
 function blockEl(id: string): HTMLElement | undefined {
+  if (!wide() && id === editingId && !hostedIds.has(id)) return editPin;
   return id === GRAPH_BLOCK ? graphPane : id === EXAMPLE_GRAPH ? exampleGraphPane : id === PSYCH_BLOCK ? psychBlock : views.get(id)?.el;
 }
 /** How much of the canvas's left edge the floating desktop sidebar takes, in viewport px. */
@@ -309,6 +316,10 @@ function layoutWide(cid: string): void {
   ghost.hidden = !er;
   if (er) Object.assign(ghost.style, { left: `${er.x}px`, top: `${er.y}px`, width: `${er.w}px`, height: `${er.h}px` });
   frameExample(FRAME_PAD, FRAME_TOP);
+  editPin.hidden = true;
+  if (editPin.parentElement === listEl) editPin.remove();
+  syncNodeControls();
+  syncMobileSelection();
   // Until the person pans or zooms, the view keeps the whole sheet in sight: at 100% while it fits, else zoomed out.
   // Never while the pointer is down (a slider held, a point dragged on the graph): the view would move what it holds.
   if (autoView && rects.size && !dragHeld() && !pointerDown && !holdView) setView(homeView());
@@ -368,7 +379,24 @@ function layoutNarrow(cid: string): void {
   Object.assign(exampleGraphPane.style, { left: '', top: '', width: '', height: '' });
   Object.assign(psychBlock.style, { left: '', top: '' });
   ghost.hidden = true;
-  let order = columnOrder(doc.rows.filter((r) => r.id !== cid), wires).filter((id) => (id !== GRAPH_BLOCK || graphPane.isConnected) && (id !== EXAMPLE_GRAPH || exampleGraphPane.isConnected));
+  const keepEditing = !!editingId && !hostedIds.has(editingId) && rowIndex(editingId) >= 0;
+  if (keepEditing && editingId) {
+    const k = rowIndex(editingId);
+    const row = doc.rows[k];
+    const names = sheetNames(doc.rows, results, doc.settings.lineNames);
+    const expr = h('span', { class: 'edit-pin-expr' });
+    if (row.kind === 'expr') {
+      const boxes = typeset(row.text, { names, stack: false, listMax: 4 });
+      if (boxes) expr.append(mathNode(boxes));
+      else expr.textContent = row.text || '…';
+    } else expr.textContent = 'Table';
+    editPin.replaceChildren(expr, h('span', { class: 'edit-pin-tag' }, 'Editing'));
+    editPin.hidden = false;
+  } else {
+    editPin.hidden = true;
+    if (editPin.parentElement === listEl) editPin.remove();
+  }
+  let order = columnOrder(doc.rows.filter((r) => r.id !== cid || (keepEditing && r.id === editingId)), wires).filter((id) => (id !== GRAPH_BLOCK || graphPane.isConnected) && (id !== EXAMPLE_GRAPH || exampleGraphPane.isConnected));
   // The chart where its first state goes, its states (drawn inside it) after it.
   if (psychBlock.isConnected) {
     order = psychColumn(order, [...hostedIds]);
@@ -395,6 +423,8 @@ function layoutNarrow(cid: string): void {
     return [[id, { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }] as const];
   }));
   frameExample(8, 34);
+  syncNodeControls();
+  syncMobileSelection();
   applyView();
 }
 
@@ -513,11 +543,11 @@ function svgTitle(el: SVGElement, text: string): void {
   el.append(t);
 }
 
-/** Highlights wires and neighbor blocks connected to the hovered block or focused wire, without re-laying out. */
+/** Highlights wires and neighbor blocks connected to the hovered/selected block or focused wire, without re-laying out. */
 function syncPeerGlow(): void {
   const fk = focusedWire();
   const peers = new Set<string>();
-  const activeFrom = hoveredBlock;
+  const activeFrom = hoveredBlock ?? (!wide() ? selectedBlock : null);
   if (fk) {
     const w = wires.find((x) => wireKey(x) === fk);
     if (w) { peers.add(hosts.get(w.from) ?? w.from); peers.add(hosts.get(w.to) ?? w.to); }
@@ -536,6 +566,60 @@ function syncPeerGlow(): void {
   graphPane.classList.toggle('cv-peer', peers.has(GRAPH_BLOCK));
   exampleGraphPane.classList.toggle('cv-peer', peers.has(EXAMPLE_GRAPH));
   psychBlock.classList.toggle('cv-peer', peers.has(PSYCH_BLOCK));
+}
+
+function setSelectedBlock(id: string | null): void {
+  if (selectedBlock === id) return;
+  selectedBlock = id;
+  if (!id) selectedCaret = undefined;
+  syncMobileSelection();
+}
+
+function syncMobileSelection(): void {
+  if (wide() || editingId) selectedBlock = null;
+  const k = selectedBlock ? rowIndex(selectedBlock) : -1;
+  if (selectedBlock && k < 0) selectedBlock = null;
+  for (const [id, v] of views) v.el.classList.toggle('cv-selected', !wide() && id === selectedBlock);
+  syncPeerGlow();
+  if (wide() || !selectedBlock || k < 0) {
+    mobileActions.hidden = true;
+    mobileActions.replaceChildren();
+    return;
+  }
+  const row = doc.rows[k];
+  const r = results[k];
+  const id = selectedBlock;
+  const btns = selectedBlockActions(row, r, opts()).map((act) => {
+    const cls = `mob-act mob-act-${act.id}${act.primary ? ' primary' : ''}${act.danger ? ' danger' : ''}`;
+    const b = h('button', { type: 'button', class: cls, 'aria-label': act.id === 'more' ? 'More line actions' : act.label }, act.label);
+    b.addEventListener('pointerdown', (e) => e.stopPropagation());
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (act.id === 'edit') {
+        const caret = selectedCaret;
+        setSelectedBlock(null);
+        play('toggle');
+        editLine(id, caret);
+      } else if (act.id === 'copy') {
+        const fn = copyableValue(r, opts());
+        if (fn) void copy(fn(), views.get(id)?.el.querySelector('.out .result, .dist-prob'));
+        setSelectedBlock(null);
+      } else if (act.id === 'toggleGraph') {
+        row.hidden = !row.hidden;
+        play('toggle');
+        sheetChanged();
+      } else if (act.id === 'delete') {
+        setSelectedBlock(null);
+        deleteRow(id);
+      } else if (act.id === 'more') {
+        const br = b.getBoundingClientRect();
+        openLineMenu(row, br.left, br.top - 10);
+      }
+    });
+    return b;
+  });
+  mobileActions.replaceChildren(...btns);
+  mobileActions.hidden = false;
 }
 
 /** A wire's path and its two ports. `state` is lit, dim, focus or plain; err dashes it coral (after a failing step). */
@@ -601,7 +685,7 @@ function drawWires(): void {
   const isWide = wide();
   // A narrow column's wires: straight down through open lanes, the margin only when none is open (cascadeWires).
   const trays = isWide ? [] : [...openLines().values()].map((o) => ({ x: o.tray.offsetLeft, y: o.tray.offsetTop, w: o.tray.offsetWidth, h: o.tray.offsetHeight })).filter((r) => r.w > 0);
-  const routes = isWide ? null : cascadeWires(rects, wires.filter((w) => w.from !== editingId && w.to !== editingId), {
+  const routes = isWide ? null : cascadeWires(rects, wires, {
     ...columnOptions(), side: hostedIds, obstacles: trays, outY: (w) => (w.fromPort ? portYs.get(`${w.from}.${w.fromPort}`) : undefined),
   });
   const kids: SVGElement[] = [];
@@ -629,7 +713,7 @@ function drawWires(): void {
   }
   for (const w of wires) {
     const a = rects.get(w.from), b = rects.get(w.to);
-    if (!a || !b || w.from === editingId || w.to === editingId) continue;
+    if (!a || !b || (isWide && (w.from === editingId || w.to === editingId))) continue;
     const key = wireKey(w);
     const state = stateOf(key);
     const o = open.get(w.to), tray = trayRects.get(w.to);
@@ -869,8 +953,90 @@ function sendPulse(fromId: string): void {
 }
 
 // Zoom and fit, in the top bar on a wide window.
-const zoomBtn = (label: string, title: string, run: () => void) => h('button', { type: 'button', class: 'cv-btn', title: kb(title), onclick: run }, label);
+const zoomBtn = (label: string, title: string, run: () => void, cls = 'cv-btn') => h('button', { type: 'button', class: cls, title: kb(title), onclick: run }, label);
 const zoomOut = h('output', { class: 'cv-zoom', 'aria-live': 'off' }, '100%');
+const tidyBtn = zoomBtn('Reset layout', 'Return moved blocks and graph to automatic layout', () => resetAllLayout());
+tidyBtn.hidden = true;
+function hasPinnedNodes(): boolean {
+  return !!doc.ui.graphBlock || !!doc.ui.psychAt || doc.rows.some((r) => !!r.at);
+}
+function syncNodeControls(): void {
+  const wideNow = wide();
+  graphUnpin.hidden = !wideNow || !doc.ui.graphBlock;
+  tidyBtn.hidden = !wideNow || !hasPinnedNodes();
+}
+function glideBlocks(): void {
+  if (!motion()) return;
+  listEl.classList.add('cv-settle');
+  const off = (e: TransitionEvent) => {
+    if ((e.target as Element)?.parentElement !== listEl) return;
+    listEl.classList.remove('cv-settle');
+    listEl.removeEventListener('transitionend', off);
+  };
+  listEl.addEventListener('transitionend', off);
+}
+function resetGraphLayout(): void {
+  if (!doc.ui.graphBlock) return;
+  const before = { ...doc.ui.graphBlock };
+  const apply = (next: typeof before | undefined) => {
+    glideBlocks();
+    if (next) doc.ui.graphBlock = { ...next };
+    else delete doc.ui.graphBlock;
+    autoView = true;
+    saveSoon();
+    layoutCanvas();
+  };
+  apply(undefined);
+  play('toggle');
+  pushStep({ label: 'Graph back to auto layout', undo: () => apply(before), redo: () => apply(undefined) });
+}
+function resetGraphSize(): void {
+  const cur = doc.ui.graphBlock;
+  if (!cur || (cur.w === GRAPH_SIZE.w && cur.h === GRAPH_SIZE.h)) return;
+  const before = { ...cur };
+  const after = { x: cur.x, y: cur.y, w: GRAPH_SIZE.w, h: GRAPH_SIZE.h };
+  const apply = (next: typeof before) => {
+    glideBlocks();
+    doc.ui.graphBlock = { ...next };
+    saveSoon();
+    layoutCanvas();
+  };
+  apply(after);
+  play('toggle');
+  pushStep({ label: 'Reset graph size', undo: () => apply(before), redo: () => apply(after) });
+}
+function resetAllLayout(): void {
+  if (!hasPinnedNodes()) return;
+  const prevRows = new Map(doc.rows.filter((r) => r.at).map((r) => [r.id, { ...r.at! }]));
+  const prevGraph = doc.ui.graphBlock ? { ...doc.ui.graphBlock } : undefined;
+  const prevPsych = doc.ui.psychAt ? { ...doc.ui.psychAt } : undefined;
+  const clearAll = () => {
+    glideBlocks();
+    for (const r of doc.rows) delete r.at;
+    delete doc.ui.graphBlock;
+    delete doc.ui.psychAt;
+    autoView = true;
+    saveSoon();
+    layoutCanvas();
+  };
+  const restoreAll = () => {
+    glideBlocks();
+    for (const r of doc.rows) {
+      const p = prevRows.get(r.id);
+      if (p) r.at = { ...p };
+      else delete r.at;
+    }
+    if (prevGraph) doc.ui.graphBlock = { ...prevGraph };
+    else delete doc.ui.graphBlock;
+    if (prevPsych) doc.ui.psychAt = { ...prevPsych };
+    else delete doc.ui.psychAt;
+    saveSoon();
+    layoutCanvas();
+  };
+  clearAll();
+  play('toggle');
+  pushStep({ label: 'Reset canvas layout', undo: restoreAll, redo: clearAll });
+}
 export function zoomBy(factor: number): void {
   autoView = false;
   const a = freeArea();
@@ -881,11 +1047,34 @@ export function fitCanvas(): void {
   autoView = true;
   setView(homeView(), true);
 }
+/** Smoothly pans the wide canvas so a block (or its host psychrometric card) sits inside the unobstructed viewport. */
+export function revealBlock(id: string): void {
+  if (!wide()) return;
+  const targetId = hosts.get(id) ?? id;
+  const r = rects.get(targetId);
+  if (!r) return;
+  const a = freeArea();
+  const pad = 24;
+  const sx1 = view.dx + r.x * view.scale;
+  const sy1 = view.dy + r.y * view.scale;
+  const sx2 = sx1 + r.w * view.scale;
+  const sy2 = sy1 + r.h * view.scale;
+  let dx = 0, dy = 0;
+  if (sx1 < a.x + pad) dx = a.x + pad - sx1;
+  else if (sx2 > a.x + a.w - pad) dx = a.x + a.w - pad - sx2;
+  if (sy1 < a.y + pad) dy = a.y + pad - sy1;
+  else if (sy2 > a.y + a.h - pad) dy = a.y + a.h - pad - sy2;
+  if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+    autoView = false;
+    setView({ scale: view.scale, dx: view.dx + dx, dy: view.dy + dy }, true);
+  }
+}
 export const canvasTools = h('div', { class: 'cv-tools', role: 'group', 'aria-label': 'Canvas' },
-  zoomBtn('−', 'Zoom out (Ctrl+Alt+−)', () => zoomBy(1 / ZOOM_STEP)),
+  zoomBtn('−', 'Zoom out (Ctrl+Alt+−)', () => zoomBy(1 / ZOOM_STEP), 'cv-btn cv-zoom-btn'),
   zoomOut,
-  zoomBtn('+', 'Zoom in (Ctrl+Alt+=)', () => zoomBy(ZOOM_STEP)),
-  zoomBtn('Fit all', 'Show every block (Ctrl+Alt+0)', () => fitCanvas()),
+  zoomBtn('+', 'Zoom in (Ctrl+Alt+=)', () => zoomBy(ZOOM_STEP), 'cv-btn cv-zoom-btn'),
+  zoomBtn('Fit all', 'Show every block (Ctrl+Alt+0)', () => fitCanvas(), 'cv-btn cv-sep'),
+  tidyBtn,
 );
 
 /** What a press on the canvas takes no notice of: controls inside blocks keep their own. A value block's answer button
@@ -902,6 +1091,7 @@ function steady(id: string | null, fn: () => void): void {
 }
 
 export function initCanvas(): void {
+  setRailReveal(revealBlock);
   initTags(() => steady(held, layoutCanvas));
   // Opening or closing a line's steps never moves the line: the view stays, and pans only to bring the steps in sight.
   initUnfold(() => { holdView = true; layoutCanvas(); holdView = false; });
@@ -952,6 +1142,8 @@ export function initCanvas(): void {
   listEl.addEventListener('keyup', (e) => { if (sliderRow(e.target)) release(); });
   const head = modeBar.querySelector('.head-pill');
   modeBar.insertBefore(canvasTools, head);
+  composerDock.insertBefore(mobileActions, composerBox);
+  composerBox.addEventListener('pointerdown', () => { if (selectedBlock) setSelectedBlock(null); }, true);
   clearBtn.addEventListener('click', () => clearExample());
   setDragListener(sendPulse);
   // A block that changes size (a font arriving, an answer getting longer) moves the wires and the blocks under it.
@@ -988,8 +1180,9 @@ export function initCanvas(): void {
     if (!block || e.button !== 0 || ownsPointer(t)) return;
     const id = [...views].find(([, v]) => v.el === block)?.[0];
     if (!id) return;
-    const onResult = !!t.closest('.result');
-    // On a value block's answer button, let a plain click reach the copy handler; only take over once a drag starts.
+    const onResult = wide() && !!t.closest('.result');
+    // On desktop, let a plain click on a value block's answer button reach its copy handler; on mobile, tapping anywhere
+    // on the block selects it so Copy, Edit, Hide and Delete sit together in the quick-action bar.
     if (!onResult) {
       e.preventDefault();
       e.stopPropagation();
@@ -1000,21 +1193,30 @@ export function initCanvas(): void {
     const laid = rects.get(id);
     const at0 = row?.at ? { ...row.at } : laid ? { x: laid.x, y: laid.y } : null;
     let moved = false;
-    if (!onResult) try { block.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track (a synthetic one) */ }
+    let scrolled = false;
+    let lastDx = 0, lastDy = 0;
+    if (!onResult && wide()) try { block.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track (a synthetic one) */ }
     // A long press on a touch screen opens the line's menu, as a right-click does.
     let held = false;
     const hold = e.pointerType === 'mouse' ? 0 : window.setTimeout(() => { held = true; if (row) { play('toggle'); openLineMenu(row, start.x, start.y); } }, 420); // The long-press threshold the line menu has always used.
     const move = (m: PointerEvent) => {
-      if (Math.hypot(m.clientX - start.x, m.clientY - start.y) > 6) clearTimeout(hold);
+      const dist = Math.hypot(m.clientX - start.x, m.clientY - start.y);
+      if (dist > 6) clearTimeout(hold);
+      if (!wide()) {
+        if (dist > 8) scrolled = true;
+        return;
+      }
       // A state inside the chart doesn't leave it: the chart moves as one block.
-      if (!wide() || !at0 || !row || hostedIds.has(id)) return;
+      if (!at0 || !row || hostedIds.has(id)) return;
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
       if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
       if (!moved && onResult) try { block.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
       moved = true;
+      lastDx = dx;
+      lastDy = dy;
       autoView = false;
       block.classList.add('dragging');
-      row.at = dragTo(at0, dx, dy);
+      row.at = { x: Math.round(at0.x + dx), y: Math.round(at0.y + dy) };
       block.style.left = `${row.at.x}px`;
       block.style.top = `${row.at.y}px`;
       rects.set(id, { ...row.at, w: block.offsetWidth, h: block.offsetHeight });
@@ -1033,9 +1235,10 @@ export function initCanvas(): void {
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
       block.classList.remove('dragging');
-      if (held) return;
+      if (held || scrolled) return;
       if (moved) {
         if (onResult) dropClick = true;
+        if (at0 && row) row.at = dragTo(at0, lastDx, lastDy);
         dropped = id;
         saveSoon();
         layoutCanvas();
@@ -1047,6 +1250,20 @@ export function initCanvas(): void {
       let caret = v?.tex && v.el.classList.contains('typeset') && v.tex.offsetParent ? caretAt(v.tex, start.x, start.y, row.text.length) : undefined;
       // A click at the end of an unfinished call goes inside it, to its next slot.
       if (caret === undefined || caret === row.text.length) caret = slotForEnd(row.text, slotInfo) ?? caret;
+      if (!wide()) {
+        if (t.closest('.result')) dropClick = true;
+        // First tap on mobile selects the block and shows quick actions; tapping again opens it to edit.
+        if (selectedBlock === id) {
+          setSelectedBlock(null);
+          play('toggle');
+          editLine(id, caret);
+        } else {
+          selectedCaret = caret;
+          setSelectedBlock(id);
+          play('toggle');
+        }
+        return;
+      }
       play('toggle');
       editLine(id, caret);
     };
@@ -1055,12 +1272,19 @@ export function initCanvas(): void {
     window.addEventListener('pointercancel', up);
   }, true);
 
+  editPin.addEventListener('click', () => {
+    if (editingId) focusRow(editingId);
+  });
+
   // A right-click on a block opens its line's menu: copy, duplicate, show or hide on the graph, move, delete.
   listEl.addEventListener('contextmenu', (e) => {
-    const block = (e.target as Element).closest<HTMLElement>('.row.blk');
-    const id = block && [...views].find(([, v]) => v.el === block)?.[0];
+    const t = e.target as Element;
+    const block = t.closest<HTMLElement>('.row.blk');
+    const id = block
+      ? [...views].find(([, v]) => v.el === block)?.[0]
+      : t.closest('.blk-editing-pin') && editingId ? editingId : undefined;
     const row = id ? doc.rows[rowIndex(id)] : undefined;
-    if (!row || (e.target as Element).closest('input:not(.expr), select, textarea')) return;
+    if (!row || t.closest('input:not(.expr), select, textarea')) return;
     e.preventDefault();
     openLineMenu(row, e.clientX, e.clientY);
   });
@@ -1126,6 +1350,7 @@ export function initCanvas(): void {
     const t = e.target as Element;
     if (e.button !== 0 || (t !== tape && t !== listEl && t !== svg && !t.closest('svg.cv-wires'))) return;
     if (pinnedWire) { pinnedWire = null; focusWire(null); }
+    if (selectedBlock) setSelectedBlock(null);
     if (!rects.size) {
       if (editingId) finishEdit();
       return;
@@ -1153,21 +1378,48 @@ export function initCanvas(): void {
     tape.addEventListener('pointercancel', up);
   });
 
-  // The graph block moves by its top strip and resizes by its corner.
+  // The graph block moves by its header bar and resizes by its corner; neither pins it until dragged past DRAG_SLOP.
+  graphGrip.title = 'Drag to move · Double-click for auto layout';
+  graphResize.title = 'Drag to resize · Double-click to reset size';
+  graphUnpin.addEventListener('pointerdown', (e) => e.stopPropagation());
+  graphUnpin.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetGraphLayout();
+  });
+  graphGrip.addEventListener('dblclick', (e) => {
+    if ((e.target as Element).closest('button')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    resetGraphLayout();
+  });
+  graphResize.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resetGraphSize();
+  });
   const moveGraph = (resize: boolean) => (e: PointerEvent) => {
+    if ((e.target as Element).closest('button')) return;
     const laid = doc.ui.graphBlock ?? rects.get(GRAPH_BLOCK);
     if (!wide() || !laid || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const el = e.currentTarget as HTMLElement;
-    el.setPointerCapture(e.pointerId);
-    // Where it is now, laid out or put there before: a move or a resize pins it.
+    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    // Where it is now, laid out or put there before: dragging past DRAG_SLOP pins it there.
     const g0 = { x: laid.x, y: laid.y, w: laid.w, h: laid.h }, start = { x: e.clientX, y: e.clientY };
-    graphPane.classList.add('dragging');
+    let moved = false;
+    let lastDx = 0, lastDy = 0;
     const move = (m: PointerEvent) => {
-      autoView = false;
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
-      const g = dragGraph(g0, dx, dy, resize);
+      if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
+      moved = true;
+      lastDx = dx;
+      lastDy = dy;
+      autoView = false;
+      graphPane.classList.add('dragging');
+      const g = resize
+        ? { x: g0.x, y: g0.y, w: Math.max(GRAPH_MIN.w, Math.round(g0.w + dx)), h: Math.max(GRAPH_MIN.h, Math.round(g0.h + dy)) }
+        : { x: Math.round(g0.x + dx), y: Math.round(g0.y + dy), w: g0.w, h: g0.h };
       doc.ui.graphBlock = g;
       Object.assign(graphPane.style, { left: `${g.x}px`, top: `${g.y}px`, width: `${g.w}px`, height: `${g.h}px` });
       rects.set(GRAPH_BLOCK, g);
@@ -1178,6 +1430,8 @@ export function initCanvas(): void {
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       graphPane.classList.remove('dragging');
+      if (!moved) return;
+      doc.ui.graphBlock = dragGraph(g0, lastDx, lastDy, resize);
       // Resized, it stays put and the rest flows round it; dropped, it gives way to what it landed on.
       if (!resize) dropped = GRAPH_BLOCK;
       saveSoon();
@@ -1198,14 +1452,17 @@ export function initCanvas(): void {
     e.stopPropagation();
     const at0 = doc.ui.psychAt ?? { x: laid.x, y: laid.y }, start = { x: e.clientX, y: e.clientY };
     let moved = false;
+    let lastDx = 0, lastDy = 0;
     try { psychBlock.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track */ }
     const move = (m: PointerEvent) => {
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
       if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
       moved = true;
+      lastDx = dx;
+      lastDy = dy;
       autoView = false;
       psychBlock.classList.add('dragging');
-      const at = dragTo(at0, dx, dy);
+      const at = { x: Math.round(at0.x + dx), y: Math.round(at0.y + dy) };
       doc.ui.psychAt = at;
       Object.assign(psychBlock.style, { left: `${at.x}px`, top: `${at.y}px` });
       const r = { ...at, w: psychBlock.offsetWidth, h: psychBlock.offsetHeight };
@@ -1219,7 +1476,12 @@ export function initCanvas(): void {
       psychBlock.removeEventListener('pointerup', up);
       psychBlock.removeEventListener('pointercancel', up);
       psychBlock.classList.remove('dragging');
-      if (moved) { dropped = PSYCH_BLOCK; saveSoon(); layoutCanvas(); }
+      if (moved) {
+        doc.ui.psychAt = dragTo(at0, lastDx, lastDy);
+        dropped = PSYCH_BLOCK;
+        saveSoon();
+        layoutCanvas();
+      }
     };
     psychBlock.addEventListener('pointermove', move);
     psychBlock.addEventListener('pointerup', up);
@@ -1228,6 +1490,7 @@ export function initCanvas(): void {
   graphResize.addEventListener('pointerdown', moveGraph(true));
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && selectedBlock) { setSelectedBlock(null); return; }
     if (!wide() || !(e.ctrlKey && e.altKey) || e.metaKey || e.shiftKey) return;
     if (e.code === 'Digit0') { e.preventDefault(); fitCanvas(); }
     else if (e.code === 'Equal') { e.preventDefault(); zoomBy(ZOOM_STEP); }

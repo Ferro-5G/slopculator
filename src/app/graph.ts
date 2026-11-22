@@ -2,7 +2,7 @@ import { sameGraphItem, type GraphItem } from '../engine/document';
 import { normPdf, binomPdf } from '../engine/numeric';
 import { probLabelPlacement } from '../ui/problabel';
 import { niceStep, tickValues } from '../ui/ticks';
-import { nameSpot, piLabel } from '../ui/graphlabels';
+import { nameSpot, piLabel, yTickSpot } from '../ui/graphlabels';
 import { downloadBlob, fileDate } from './download';
 import { findMarks, markText, type Mark } from '../ui/pois';
 import { asymptoteAcross, asymptotesToDraw, BOUNDARY_DASH, POLE_JUMP, clearOfCover, contourCrossings, DEGREE_WAVE, degreeWaves, distNeedsFit, fitBounds, fitCurves, fittableCurves, goodSpan, homeView, isHomeView, isDashed, NO_COVER, normalPdf, type PlotCover, type PiStep, piStep, type PlotView as View, shadeLabel, shadeProb, squareView, tickLabel, vectorArrow } from '../ui/plotmodel';
@@ -800,9 +800,13 @@ export class Graph {
       if (sameCurves) {
         this.poiTimer = window.setTimeout(() => {
           this.pois = this.findPOIs();
+          this.sceneKey = '';
           this.redraw();
         }, 120);
-      } else this.pois = this.findPOIs();
+      } else {
+        this.pois = this.findPOIs();
+        this.sceneKey = '';
+      }
     }
     for (const p of this.pins) this.drawLabel(p, true);
     const fm = this.focusMark;
@@ -919,13 +923,27 @@ export class Graph {
       this.label(text, px, labelY, 'center', 'top');
     }
     const pinLeft = ax < Math.round(48 * size / 11);
-    const yAlign: CanvasTextAlign = pinLeft ? 'left' : 'right';
-    const labelX = pinLeft ? Math.max(ax + 5, 5) : Math.min(ax - 5, w - 5);
+    const yView: [number, number, number, number] = [0, this.cover.top, w, h - this.cover.bottom];
+    const poiScreen = this.pois.map((p) => [this.toPx(p.x), this.toPy(p.y)] as const);
+    const tickCrowded = (box: [number, number, number, number]) => {
+      if (this.crowded(box, 6)) return true;
+      const [l, t, r, b] = box;
+      for (const [px, py] of poiScreen) {
+        if (Math.hypot(Math.max(l - px, 0, px - r), Math.max(t - py, 0, py - b)) < 9) return true;
+      }
+      for (const [l2, t2, r2, b2] of this.usedBoxes) {
+        if (l < r2 + 3 && r > l2 - 3 && t < b2 + 3 && b > t2 - 3) return true;
+      }
+      return false;
+    };
     for (const y of tickValues(this.view.ymin, this.view.ymax, sy)) {
       if (Math.abs(y) < sy / 1e6) continue;
       const py = this.toPy(y);
       if (py < chip / 2 + 3 + this.cover.top || py > h - chip / 2 - 3 - this.cover.bottom) continue;
-      this.label(tickLabel(y, sy), labelX, py, yAlign, 'middle');
+      const text = tickLabel(y, sy);
+      const tw = ctx.measureText(text).width + 4;
+      const spot = yTickSpot({ ax, py, tw, th: chip, view: yView, pinLeft, isCrowded: tickCrowded });
+      this.label(text, spot.x, spot.y, spot.align, spot.base);
     }
     if (ax >= 0 && ax <= w && ay >= 0 && ay <= h) {
       const spots: [number, number, CanvasTextAlign, CanvasTextBaseline][] = [[ax - 5, ay + 4, 'right', 'top'], [ax + 6, ay + 4, 'left', 'top'], [ax - 5, ay - 4, 'right', 'bottom']];

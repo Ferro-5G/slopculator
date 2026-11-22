@@ -4,6 +4,12 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.5-alpha] - 2026-11-22
+
+- Desktop canvas UX: full-width graph drag header with `Auto` unpin button, drag slop before pinning, smooth 1:1 dragging with snap-on-drop, `Reset layout` top-bar control, `Reset position` line menu action, and fixed-width left dock with click-to-reveal.
+- Mobile tap-to-select UX: tapping a block once selects it in place, highlights its connected wires, and opens a quick-action bar (`Edit`, `Copy`, `Hide`/`Show`, `Delete`, `⋯`) above the composer without hijacking input; tapping `Edit` or tapping again opens the editor while keeping an `Editing` pin anchored in place with wires attached.
+- UI and alignment fixes: removed the 8 px horizontal offset on wires and canvas panes, moved key hints above the composer dock, fixed autocomplete placement and toast lift, prevented right-click on a block body from opening edit mode, excluded unsent drafts from the sheet rail, kept `Fit all` visible on narrow desktop windows, and dodged overlapping y-axis graph tick labels.
+
 ## [0.2.4-alpha] - 2026-11-22
 
 - Turning Aurora Glow off now leaves a plain dot-grid and static composer border; turning it on restores the tab-colored canvas glow, rim, and Enter light.

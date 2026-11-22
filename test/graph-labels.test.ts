@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { piLabel, nameSpot } from '../src/ui/graphlabels';
+import { piLabel, nameSpot, yTickSpot } from '../src/ui/graphlabels';
 
 describe('π tick labels', () => {
   it('reduces fractions of π', () => {
@@ -74,5 +74,46 @@ describe('curve names sit on their own stroke', () => {
     const [l, t, r, b] = box!;
     const cx = (l + r) / 2, cy = (t + b) / 2;
     expect(cy).toBeGreaterThan(500 - cx * 0.5);
+  });
+});
+
+describe('y-axis tick dodging', () => {
+  const view: [number, number, number, number] = [0, 0, 500, 360];
+
+  it('keeps the default left spot when nothing crowds it', () => {
+    const spot = yTickSpot({ ax: 250, py: 120, tw: 22, th: 16, view, pinLeft: false, isCrowded: () => false });
+    expect(spot).toEqual({ x: 245, y: 120, align: 'right', base: 'middle' });
+  });
+
+  it('steps right and below when both sides of a vertex at (0, −2) are crowded by curves and a crossing dot', () => {
+    const spot = yTickSpot({
+      ax: 250,
+      py: 240,
+      tw: 22,
+      th: 16,
+      view,
+      pinLeft: false,
+      // Both left and right middle spots intersect a horizontal parabola vertex through y = 240.
+      isCrowded: ([l, t, r, b]) => t <= 244 && b >= 236 && l < 280 && r > 210,
+    });
+    expect(spot.align).toBe('left');
+    expect(spot.base).toBe('top');
+    expect(spot.x).toBeGreaterThan(250);
+    expect(spot.y).toBeGreaterThan(240);
+  });
+
+  it('stays inside the plot when the y-axis is pinned near the left edge', () => {
+    const spot = yTickSpot({
+      ax: 10,
+      py: 180,
+      tw: 22,
+      th: 16,
+      view,
+      pinLeft: true,
+      isCrowded: ([, t, , b]) => t <= 184 && b >= 176,
+    });
+    expect(spot.align).toBe('left');
+    expect(spot.x).toBeGreaterThanOrEqual(15);
+    expect(spot.y).toBeGreaterThan(180);
   });
 });

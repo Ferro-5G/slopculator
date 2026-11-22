@@ -248,11 +248,11 @@
   background: var(--cv-edge);
   pointer-events: none;
 }
-#app.canvas-ui > .modebar .cv-tools .cv-btn:last-child {
+#app.canvas-ui > .modebar .cv-tools .cv-btn.cv-sep {
   position: relative;
   margin-left: 4px;
 }
-#app.canvas-ui > .modebar .cv-tools .cv-btn:last-child::before {
+#app.canvas-ui > .modebar .cv-tools .cv-btn.cv-sep::before {
   content: '';
   position: absolute;
   left: -2px;
@@ -355,14 +355,30 @@
 .canvas-ui .cv-wide > .rows > .row.blk .reorder {
   display: none;
 }
+.canvas-ui .cv-wide > .rows > .row.blk,
+.canvas-ui .cv-wide > .rows > .blk-psych {
+  cursor: grab;
+}
+.canvas-ui .cv-wide > .rows.cv-settle > .row.blk:not(.dragging),
+.canvas-ui .cv-wide > .rows.cv-settle > .blk-graph:not(.dragging),
+.canvas-ui .cv-wide > .rows.cv-settle > .blk-psych:not(.dragging) {
+  transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.15s, box-shadow 0.15s;
+}
+[data-motion='off'] .canvas-ui .cv-wide > .rows.cv-settle > :is(.row.blk, .blk-graph, .blk-psych),
+[data-motion='reduced'] .canvas-ui .cv-wide > .rows.cv-settle > :is(.row.blk, .blk-graph, .blk-psych) {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
 .canvas-ui .rows > .row.blk:hover {
   border-color: var(--cv-edge-2);
   background: var(--cv-block);
 }
-.canvas-ui .rows > .row.blk.dragging {
-  z-index: 7;
+.canvas-ui .rows > .row.blk.dragging,
+.canvas-ui .rows > .blk-graph.dragging,
+.canvas-ui .rows > .blk-psych.dragging {
+  z-index: 9;
   cursor: grabbing;
   border-color: var(--cv-accent);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.34), 0 0 0 1px color-mix(in srgb, var(--cv-accent) 45%, transparent);
 }
 .canvas-ui .rows > .row.blk.cv-peer,
 .canvas-ui .rows > .blk-graph.cv-peer,
@@ -648,6 +664,9 @@
 .canvas-ui .rows > .row.has-error.blk {
   border-color: color-mix(in srgb, var(--err) 55%, var(--cv-edge));
 }
+.canvas-ui .rows > .row.blk.has-error .line > .out::before {
+  display: none;
+}
 
 .canvas-ui .cv-wide > .rows > .row.blk-example {
   min-width: 330px;
@@ -673,11 +692,50 @@
 .canvas-ui .cv-narrow .blk-ghost {
   display: none;
 }
+.canvas-ui .blk-editing-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-height: 48px;
+  padding: 11px 14px 11px 18px;
+  border-radius: var(--cv-radius);
+  background: color-mix(in srgb, var(--cv-accent) 10%, var(--cv-block));
+  border: 1.5px solid var(--cv-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cv-accent) 18%, transparent);
+  color: var(--ink);
+  flex: none;
+}
+.canvas-ui .blk-editing-pin[hidden] {
+  display: none;
+}
+.canvas-ui .edit-pin-expr {
+  font: 500 19px/1.25 var(--math);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.canvas-ui .edit-pin-tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cv-accent) 22%, transparent);
+  color: var(--cv-accent);
+  font: 600 11px/1.2 var(--sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.canvas-ui .mobile-actions {
+  display: none;
+}
+.canvas-ui .rows > .row.blk.cv-selected {
+  border-color: var(--cv-accent);
+  box-shadow: 0 0 0 1px var(--cv-accent), 0 0 0 4px color-mix(in srgb, var(--cv-accent) 18%, transparent);
+}
 
-/* The example's group and the editing ghost. Positioned by the layout, so no list margins move them off their blocks. */
-.canvas-ui .rows > .example-frame,
-.canvas-ui .rows > .blk-ghost,
-.canvas-ui .rows > .blk-example-graph {
+/* Every non-row child of .rows (wires SVG, graph, psych chart, step trays, tags, example frame, editing ghost) is
+   positioned by the canvas layout, so neutralise modern.css's `.rows > :not(.row) { margin-inline: 8px }`. */
+.canvas-ui .rows > :not(.row) {
   margin: 0;
 }
 .canvas-ui .example-frame {
@@ -746,6 +804,9 @@
   position: absolute;
   inset: 0;
 }
+.canvas-ui .cv-wide > .rows > .blk-graph .graph-host {
+  top: 38px;
+}
 .canvas-ui .rows > .blk-graph .graph-chips,
 .canvas-ui .rows > .blk-graph .graph-sliders,
 .canvas-ui .rows > .blk-graph .marks-hint {
@@ -755,8 +816,8 @@
   display: block;
   position: absolute;
   z-index: 3;
-  top: 10px;
-  right: 10px;
+  top: 5px;
+  right: 8px;
   left: auto;
   bottom: auto;
   width: auto;
@@ -764,6 +825,10 @@
   background: none;
   border: 0;
   pointer-events: none;
+}
+.canvas-ui .cv-narrow > .rows > .blk-graph .graph-dock {
+  top: 10px;
+  right: 10px;
 }
 .canvas-ui .rows > .blk-graph .graph-tools {
   position: static;
@@ -825,43 +890,95 @@
 .canvas-ui .blk-grip {
   position: absolute;
   left: 0;
-  right: 175px;
+  right: 0;
   top: 0;
-  height: 24px;
+  height: 38px;
+  padding: 0 202px 0 12px;
+  overflow: hidden;
   cursor: grab;
   z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--cv-raised) 52%, transparent);
+  border-bottom: 1px solid var(--cv-edge);
+  user-select: none;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
 }
-.canvas-ui .blk-grip::after {
-  content: '';
-  width: 36px;
-  height: 4px;
+.canvas-ui .blk-grip:hover {
+  background: color-mix(in srgb, var(--cv-raised) 82%, transparent);
+}
+.canvas-ui .blk-grip-dots {
+  width: 10px;
+  height: 14px;
+  flex: none;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image: radial-gradient(circle, var(--ink-2) 1.25px, transparent 1.4px);
+  background-size: 5px 4.5px;
+  transition: opacity 0.14s ease;
+}
+.canvas-ui .blk-grip:hover .blk-grip-dots,
+.canvas-ui .rows > .blk-graph.dragging .blk-grip-dots {
+  opacity: 0.95;
+}
+.canvas-ui .blk-grip-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 11.5px/1 var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.canvas-ui .blk-grip:hover .blk-grip-title {
+  color: var(--ink-2);
+}
+.canvas-ui .blk-unpin {
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ink-3) 34%, transparent);
-  transition: background-color 0.14s ease, width 0.14s ease;
+  border: 1px solid var(--cv-edge-2);
+  background: color-mix(in srgb, var(--cv-block) 88%, transparent);
+  color: var(--ink-2);
+  font: 500 11px/1 var(--sans);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
-.canvas-ui .rows > .blk-graph:hover .blk-grip::after,
-.canvas-ui .blk-grip:hover::after {
-  width: 44px;
-  background: color-mix(in srgb, var(--ink-2) 60%, transparent);
+.canvas-ui .blk-unpin[hidden] {
+  display: none;
+}
+.canvas-ui .blk-unpin:hover {
+  background: color-mix(in srgb, var(--cv-accent) 16%, var(--cv-block));
+  border-color: color-mix(in srgb, var(--cv-accent) 55%, transparent);
+  color: var(--ink);
 }
 .canvas-ui .rows > .blk-graph.dragging .blk-grip {
   cursor: grabbing;
-}
-.canvas-ui .rows > .blk-graph.dragging .blk-grip::after {
-  background: var(--cv-accent);
+  background: color-mix(in srgb, var(--cv-accent) 14%, var(--cv-block));
+  border-bottom-color: color-mix(in srgb, var(--cv-accent) 45%, var(--cv-edge));
 }
 .canvas-ui .blk-resize {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   cursor: nwse-resize;
-  z-index: 2;
-  background: linear-gradient(135deg, transparent 52%, var(--ink-3) 52%, var(--ink-3) 57%, transparent 57%, transparent 68%, var(--ink-3) 68%, var(--ink-3) 73%, transparent 73%);
+  z-index: 3;
+  background: linear-gradient(135deg, transparent 54%, var(--ink-3) 54%, var(--ink-3) 59%, transparent 59%, transparent 69%, var(--ink-3) 69%, var(--ink-3) 74%, transparent 74%);
+  opacity: 0.72;
+  transition: opacity 0.14s ease;
+}
+.canvas-ui .blk-resize:hover,
+.canvas-ui .rows > .blk-graph.dragging .blk-resize {
+  opacity: 1;
+}
+.canvas-ui .cv-tools .cv-btn[hidden] {
+  display: none;
 }
 .canvas-ui .cv-narrow .blk-grip,
 .canvas-ui .cv-narrow .blk-resize {
@@ -1298,6 +1415,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1371,6 +1489,9 @@
 }
 .canvas-ui .rail-expr .m-math {
   font-size: inherit;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .canvas-ui .rail-meta {
   flex: none;
@@ -1520,7 +1641,8 @@
   color: var(--ink);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
-.canvas-ui .deck-pad.lit {
+.canvas-ui .deck-bar .deck-pad.lit,
+.canvas-ui .deck-bar .deck-pad.ti-close.lit {
   background: var(--cv-accent);
   border-color: var(--cv-accent);
   color: var(--hero-ink);
@@ -1731,6 +1853,7 @@
   margin-inline: 0;
 }
 .canvas-ui .composer-slot > .row {
+  position: static;
   display: flex;
   margin: 0;
   padding: 0;
@@ -1786,13 +1909,18 @@
   font: 500 15px var(--sans);
   color: var(--cv-ac);
 }
-/* The hint line (completions, a function's inputs) opens above the composer, over the canvas. */
+/* The hint line (completions, a function's inputs) opens above the composer and AC button, never over the deck bar. */
 .canvas-ui .composer-slot > .row .hint-line {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(100% + 44px);
-  z-index: 30;
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 34px);
+  z-index: 44;
+  pointer-events: auto;
+  background: var(--cv-raised);
+  border: 1px solid var(--cv-edge-2);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.36);
 }
 .canvas-ui .composer-slot > .row .line {
   flex-wrap: nowrap;
@@ -1809,8 +1937,16 @@
 }
 .canvas-ui .composer-slot > .row .out {
   flex: 0 1 auto;
-  max-width: 55%;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
   white-space: normal;
+}
+.canvas-ui .composer-slot > .row .out .result {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .canvas-ui .composer-preview {
   display: inline-flex;
@@ -1955,6 +2091,7 @@
 .canvas-ui .composer-slot > .row.has-error .line > .out {
   flex: 0 1 auto !important;
   max-width: 55% !important;
+  overflow: visible;
   white-space: normal !important;
 }
 /* A line's full error, over it, on hover, focus or a tap (the short form stays on the row). */
@@ -1967,7 +2104,7 @@
   right: 0;
   bottom: calc(100% + 8px);
   width: max-content;
-  max-width: 340px;
+  max-width: min(340px, calc(100vw - 32px));
   padding: 8px 12px;
   border-radius: 10px;
   background: var(--cv-raised);
@@ -1978,6 +2115,10 @@
   text-align: left;
   z-index: 40;
   pointer-events: none;
+}
+.canvas-ui .rows > .row.blk .out .err[data-full]:is(:hover, :focus-visible, .full)::after {
+  left: 0;
+  right: auto;
 }
 .canvas-ui .composer-slot > .row.has-error .line > .out::before {
   display: none;
@@ -2039,19 +2180,23 @@
   pointer-events: none;
   transition: opacity 0.12s ease-out, visibility 0s 0.12s;
 }
-/* The panel is as tall as its keys. What a pointed-at key or tile does shows in a strip that rises over the panel,
-   and only while there is something to say. */
-.canvas-ui .main > .left .keypad .key-foot {
+/* What a pointed-at key, tile, or AC button does shows in a crisp strip floating above the composer dock,
+   so it never bleeds behind the composer and still works when the keypad is folded. */
+.canvas-ui .composer-dock .key-foot {
   position: absolute;
   left: 10px;
   right: 10px;
-  bottom: calc(100% + 8px);
-  z-index: 30;
+  bottom: calc(100% + 6px);
+  z-index: 42;
   height: auto;
   margin: 0;
   pointer-events: none;
 }
-.canvas-ui .main > .left .keypad .key-hint {
+/* Lift an active toast clear of key-hint or autocomplete pills so they never stack on top of each other. */
+#app.canvas-ui:has(.composer-dock .key-hint:not(:empty), .composer-slot .hint-line:not([hidden])) > .toast.show {
+  transform: translate(-50%, -56px);
+}
+.canvas-ui .composer-dock .key-hint {
   height: auto;
   min-height: 34px;
   padding: 8px 12px;
@@ -2059,8 +2204,17 @@
   border: 1px solid var(--cv-edge-2);
   border-radius: 12px;
   box-shadow: 0 10px 28px rgb(0 0 0 / 0.36);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 12.5px/1.35 var(--sans);
+  color: var(--ink-2);
 }
-.canvas-ui .main > .left .keypad .key-hint:empty {
+.canvas-ui .composer-dock .key-hint .kh-text {
+  white-space: normal;
+  overflow: visible;
+}
+.canvas-ui .composer-dock .key-hint:empty {
   visibility: hidden;
 }
 .canvas-ui .keypad .key:not(.ti-tab) {
@@ -2300,8 +2454,53 @@
     padding: 0 8px 4px;
     height: auto;
   }
+  .canvas-ui .composer-dock .key-foot {
+    display: none;
+  }
+  .canvas-ui .mobile-actions:not([hidden]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 2px 7px;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .canvas-ui .mobile-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .canvas-ui .mob-act {
+    flex: none;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid var(--cv-edge-2);
+    background: var(--cv-block);
+    color: var(--ink-2);
+    font: 600 13px/1 var(--sans);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.16);
+    transition: background-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  }
+  .canvas-ui .mob-act:active {
+    transform: scale(0.96);
+  }
+  .canvas-ui .mob-act.primary {
+    background: var(--cv-accent);
+    border-color: var(--cv-accent);
+    color: var(--hero-ink);
+  }
+  .canvas-ui .mob-act.danger {
+    color: var(--cv-ac);
+    border-color: color-mix(in srgb, var(--cv-ac) 38%, var(--cv-edge-2));
+  }
+  #app.canvas-ui:has(.mobile-actions:not([hidden])) > .toast.show {
+    transform: translate(-50%, -44px);
+  }
   .canvas-ui .composer-slot > .row .hint-line {
-    bottom: calc(100% + 10px);
+    top: auto;
+    bottom: calc(100% + 14px);
   }
   .canvas-ui .deck-bar {
     padding: 5px 0 6px;
@@ -2494,6 +2693,9 @@
   display: inline-flex;
   align-items: center;
 }
+[data-look='retro'] #app.canvas-ui > .modebar .brand-name {
+  display: none;
+}
 #app.canvas-ui > .modebar .appear-btn svg {
   display: block;
 }
@@ -2518,9 +2720,15 @@
 
 /* A narrower window drops what it can do without, so the bar never runs past the edge. */
 @media (max-width: 1060px) {
-  #app.canvas-ui > .modebar .cv-tools .cv-btn:not(:last-child),
+  #app.canvas-ui > .modebar .cv-tools .cv-btn.cv-zoom-btn,
   #app.canvas-ui > .modebar .cv-zoom,
   #app.canvas-ui > .modebar .find-key {
+    display: none;
+  }
+  #app.canvas-ui > .modebar .cv-tools .cv-btn.cv-sep {
+    margin-left: 0;
+  }
+  #app.canvas-ui > .modebar .cv-tools .cv-btn.cv-sep::before {
     display: none;
   }
 }
@@ -4607,9 +4815,12 @@ dialog.examples-dialog .sc-lines {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.08);
   }
 }
-/* Held and keyboard-focused blocks take the accent edge over any resting or hover edge. */
-:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk:is(.dragging, :has(:focus-visible)) {
+/* Held, selected and keyboard-focused blocks take the accent edge over any resting or hover edge. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk:is(.dragging, .cv-selected, :has(:focus-visible)) {
   border-color: var(--cv-accent);
+}
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk.cv-selected {
+  box-shadow: 0 0 0 1px var(--cv-accent), 0 0 0 4px color-mix(in srgb, var(--cv-accent) 22%, transparent);
 }
 
 /* ---------- Aurora Glow: an atmosphere that answers the line ----------
