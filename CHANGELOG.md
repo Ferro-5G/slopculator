@@ -99,21 +99,16 @@ The first public version.
 - Privacy: nothing is collected. Sheets stay in the browser and the page makes no network requests. The policy is under File > Privacy and in [PRIVACY.md](PRIVACY.md).
 - Two looks: Modern (Light, Dark, OLED black, High contrast, six accent colors) and Retro (printer paper and sculpted keycaps).
 - Motion can be Full, Reduced or Off, and anything that animates can be interrupted or reversed partway.
-<!-- private -->
-- Windows: the same page in a Tauri app, built from source with `npm run app:build`. This release doesn't include it.
-<!-- /private -->
 
 ### Known gaps
 
 - Results below 1e-14 round to 0.
 - `integral` can miss a spike much narrower than a hundredth of its range, such as a normal curve with σ = 0.001 integrated from 0 to 1. Put the bounds close around the spike. The t, χ², F and Poisson functions lose accuracy at df or λ around 1e12 and above.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
-<!-- private -->
-- The Windows app isn't in this release. A build from source isn't code-signed, so SmartScreen warns before its installer runs.
-<!-- /private -->
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.5-alpha...HEAD
+[0.2.5-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...v0.2.5-alpha
 [0.2.4-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.3-alpha...v0.2.4-alpha
 [0.2.3-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.2-alpha...v0.2.3-alpha
 [0.2.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.1-alpha...v0.2.2-alpha
