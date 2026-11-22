@@ -4,6 +4,15 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.4-alpha] - 2026-11-22
+
+- Honest Aurora Glow toggle: switching Aurora Glow off leaves a clean obsidian or paper dot-grid with a static accent border on the composer; switching it on restores the deck-reactive canvas glow, conic rim, composer halo, and Enter bloom.
+- Spatial grid and editing polish: dragging any block, graph, or psychrometric chart keeps the dot-grid camera still where you drop it; clearing lines over a pinned graph hides the empty-canvas starter chips; the graph block shows a visible top drag pill; and editing a block separates Cancel into a pill, keeps the full expression clear on desktop, and shows a clean dashed `Editing` placeholder.
+- Interactive canvas nodes, wires, and cleaner routing: wires from blocks below a target exit right into the target's bottom edge instead of detouring left behind a slider; line letter badges sit above the top-left border clear of curve rails and appear on value and slider blocks; clicking an output or readout port inserts its variable or port expression into the composer; clicking a wire pins its value tag and flashes its source; and hovering a block highlights connected wires and peers.
+- Completed Steps: fixed missing parser spans on chained postfixes and bare-argument calls (`3!!`, `5!%`, `sin -(2+3)`, `sin 2a`), respected Exact fractions and decimal places in step answers, unblocked subscripted logs, lazy conditional branches (`piece` and `if` evaluate only taken branches), truth relations, compound unit conversions, non-binder sums, and failing binders, spread multiple wires entering one step across distinct ports, fixed keyboard Tab access and typeset highlight gaps, skipped hosted psychrometric states, and added click/tap-to-copy across web and mobile.
+- Synthesized tactile UI sounds: replaced the 14 sound clips with shorter damped keycap taps, detents, chimes, and low double-knock errors synced across web and mobile.
+- Updated repository docs, landing page copy, phone showcase screenshot, and Cloudflare privacy policy.
+
 ## [0.2.3-alpha] - 2026-11-21
 
 - Desktop Liquid Glass overhaul: a floating left sidebar fuses the live sheet outliner (sent calculations rise directly above the composer, click to edit, hover to highlight on the canvas), the composer, and the collapsible keypad/function deck beside a full-bleed 2D spatial canvas.
