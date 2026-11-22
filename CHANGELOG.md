@@ -6,9 +6,11 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [0.2.5-alpha] - 2026-11-22
 
-- Desktop canvas UX: full-width graph drag header with `Auto` unpin button, drag slop before pinning, smooth 1:1 dragging with snap-on-drop, `Reset layout` top-bar control, `Reset position` line menu action, and fixed-width left dock with click-to-reveal.
-- Mobile tap-to-select UX: tapping a block once selects it in place, highlights its connected wires, and opens a quick-action bar (`Edit`, `Copy`, `Hide`/`Show`, `Delete`, `⋯`) above the composer without hijacking input; tapping `Edit` or tapping again opens the editor while keeping an `Editing` pin anchored in place with wires attached.
-- UI and alignment fixes: removed the 8 px horizontal offset on wires and canvas panes, moved key hints above the composer dock, fixed autocomplete placement and toast lift, prevented right-click on a block body from opening edit mode, excluded unsent drafts from the sheet rail, kept `Fit all` visible on narrow desktop windows, and dodged overlapping y-axis graph tick labels.
+- The graph block now has a full-width top drag bar and an `Auto` button to send it back to automatic layout. Small clicks no longer pin a block by accident, dragging follows the pointer 1:1 and snaps on drop, `Reset layout` in the top bar resets every moved block, and `Reset position` in a line's menu resets one block.
+- The desktop left dock keeps a fixed width, hides unsent drafts from the sheet list, supports right-clicking list rows, and scrolls to a block when you click it.
+- On phones, tapping a block selects it in place, highlights its wires, and opens `Edit`, `Copy`, `Hide` or `Show`, `Delete`, and `⋯` above the input instead of jumping straight into edit mode. Scrolling over a block cancels the tap. Tapping `Edit` or tapping the block a second time opens it in the input while keeping an `Editing` pin in its slot with wires still attached.
+- Fixed an 8 px wire and graph alignment shift, moved key hints above the input bar so they never sit behind it, lifted autocomplete and toasts clear of the deck bar and action pills, clamped long live answers clear of `ENTER`, kept `Fit all` visible on narrower desktop windows, stopped right-clicking a block from opening edit mode, and moved y-axis tick labels clear of crossing markers.
+- Fixed the Retro look's duplicate header name and dark `123` pill, and tightened copy across the landing page, examples, privacy policy, and docs.
 
 ## [0.2.4-alpha] - 2026-11-22
 
@@ -97,12 +99,18 @@ The first public version.
 - Privacy: nothing is collected. Sheets stay in the browser and the page makes no network requests. The policy is under File > Privacy and in [PRIVACY.md](PRIVACY.md).
 - Two looks: Modern (Light, Dark, OLED black, High contrast, six accent colors) and Retro (printer paper and sculpted keycaps).
 - Motion can be Full, Reduced or Off, and anything that animates can be interrupted or reversed partway.
+<!-- private -->
+- Windows: the same page in a Tauri app, built from source with `npm run app:build`. This release doesn't include it.
+<!-- /private -->
 
 ### Known gaps
 
 - Results below 1e-14 round to 0.
 - `integral` can miss a spike much narrower than a hundredth of its range, such as a normal curve with σ = 0.001 integrated from 0 to 1. Put the bounds close around the spike. The t, χ², F and Poisson functions lose accuracy at df or λ around 1e12 and above.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
+<!-- private -->
+- The Windows app isn't in this release. A build from source isn't code-signed, so SmartScreen warns before its installer runs.
+<!-- /private -->
 - iOS and Android apps are in development and not part of this release.
 
 [Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...HEAD
