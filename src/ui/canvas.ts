@@ -692,7 +692,7 @@ export const EXAMPLE_LINES: readonly { text: string; slider?: { min: number; max
 export const EXAMPLE_TITLE = 'Example';
 export const CLEAR_EXAMPLE = 'Clear example';
 /** The first run's example, listed first under Examples while it's off the sheet so it can come back. */
-export const WELCOME_EXAMPLE = { title: 'Welcome example', subtitle: 'A slider wired to a curve and the graph' } as const;
+export const WELCOME_EXAMPLE = { title: 'Welcome example', subtitle: 'Slider, curve, and graph' } as const;
 export const EXAMPLE_CLEARED = 'Example cleared';
 export const isExampleRow = (r: { example?: boolean }): boolean => r.example === true;
 

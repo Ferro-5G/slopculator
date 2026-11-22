@@ -6,19 +6,19 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [0.2.4-alpha] - 2026-11-22
 
-- Honest Aurora Glow toggle: switching Aurora Glow off leaves a clean obsidian or paper dot-grid with a static accent border on the composer; switching it on restores the deck-reactive canvas glow, conic rim, composer halo, and Enter bloom.
-- Spatial grid and editing polish: dragging any block, graph, or psychrometric chart keeps the dot-grid camera still where you drop it; clearing lines over a pinned graph hides the empty-canvas starter chips; the graph block shows a visible top drag pill; and editing a block separates Cancel into a pill, keeps the full expression clear on desktop, and shows a clean dashed `Editing` placeholder.
-- Interactive canvas nodes, wires, and cleaner routing: wires from blocks below a target exit right into the target's bottom edge instead of detouring left behind a slider; line letter badges sit above the top-left border clear of curve rails and appear on value and slider blocks; clicking an output or readout port inserts its variable or port expression into the composer; clicking a wire pins its value tag and flashes its source; and hovering a block highlights connected wires and peers.
-- Completed Steps: fixed missing parser spans on chained postfixes and bare-argument calls (`3!!`, `5!%`, `sin -(2+3)`, `sin 2a`), respected Exact fractions and decimal places in step answers, unblocked subscripted logs, lazy conditional branches (`piece` and `if` evaluate only taken branches), truth relations, compound unit conversions, non-binder sums, and failing binders, spread multiple wires entering one step across distinct ports, fixed keyboard Tab access and typeset highlight gaps, skipped hosted psychrometric states, and added click/tap-to-copy across web and mobile.
-- Synthesized tactile UI sounds: replaced the 14 sound clips with shorter damped keycap taps, detents, chimes, and low double-knock errors synced across web and mobile.
-- Updated repository docs, landing page copy, phone showcase screenshot, and Cloudflare privacy policy.
+- Turning Aurora Glow off now leaves a plain dot-grid and static composer border; turning it on restores the tab-colored canvas glow, rim, and Enter light.
+- Dragging blocks, graphs, or psychrometric charts keeps the canvas camera steady; clearing lines over a pinned graph hides empty-canvas starters; the graph shows a top drag handle; and editing a block puts Cancel in its own pill with a dashed `Editing` placeholder.
+- Cleaner wire routing from blocks below a target, line-letter badges on value and slider blocks, click-to-insert on output/readout ports, click-to-pin on wires, and hover highlights for connected blocks and wires.
+- Steps fixes: parser spans on chained postfixes and bare calls (`3!!`, `5!%`, `sin 2a`), Exact fractions and rounding in step answers, subscripted logs, lazy conditional branches (`piece`, `if`), multi-wire port spreading, Tab focus, and click/tap-to-copy on web and mobile.
+- Replaced the 14 UI sound clips with shorter damped taps, detents, chimes, and double-knock errors across web and mobile.
+- Updated repository docs, landing page copy, phone screenshot, and privacy policy.
 
 ## [0.2.3-alpha] - 2026-11-21
 
-- Desktop Liquid Glass overhaul: a floating left sidebar fuses the live sheet outliner (sent calculations rise directly above the composer, click to edit, hover to highlight on the canvas), the composer, and the collapsible keypad/function deck beside a full-bleed 2D spatial canvas.
-- Liquid Glass chrome on desktop (Modern Dark and Light): floating capsule top bar, circular empty-state bell-curve medallion, sculpted squircle keycaps, glowing Enter, and 4 full rows of function tiles with no clipping.
-- Unified Escape dismissal and focus return for File, Modes and Appearance popovers, desktop toast clearance above the composer, immediate graph redraw when toggling cumulative probability shading, and stable graph sizing during point drags.
-- Redesigned public landing page with a centered hero, browser-framed desktop showcase, and structured capability cards.
+- Desktop sidebar layout: sent lines stack above the composer on the left, keypad underneath, canvas beside them.
+- Desktop Modern look refresh: floating top bar, updated empty-state mark, rounded keycaps, and unclipped 4-row function deck.
+- Pressing Escape now closes File, Modes, and Appearance popovers and returns focus. Fixed toast overlap, shading redraws, and graph sizing during point drags.
+- Shorter landing page at `slopculator.com`.
 
 ## [0.2.2-alpha] - 2026-11-21
 
@@ -99,7 +99,10 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.1-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...HEAD
+[0.2.4-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.3-alpha...v0.2.4-alpha
+[0.2.3-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.2-alpha...v0.2.3-alpha
+[0.2.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.1-alpha...v0.2.2-alpha
 [0.2.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.0-alpha...v0.2.1-alpha
 [0.2.0-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.2-alpha...v0.2.0-alpha
 [0.1.2-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.1.1-alpha...v0.1.2-alpha

@@ -1,161 +1,124 @@
-# Using the app
+# Using Slopculator
 
-Everything here applies on a computer and on a phone, except where it says otherwise. [Functions](functions.md) lists what you can type, and the [guide](guide.md) has worked examples.
+Everything below works on desktop and phones except where noted. See [Functions](functions.md) for the full function list and [Guide](guide.md) for worked examples.
 
-## Lines and the canvas
+## Typing and the canvas
 
-Type one calculation in the composer and press Enter to send it.
+Type an expression in the composer and press Enter.
 
-- On desktop, sent lines rise into the **Sheet** list in the left sidebar and appear as wired blocks on the 2D canvas beside it. Click any line in the sidebar or on the canvas to edit it in the composer; hover a sidebar line to highlight its block on the canvas.
-- On phones and narrow windows (`≤ 760 px`), blocks stack vertically in a single Cascade column with wires running down the left gutter.
-- `a = 3` defines a variable and creates a slider block. `f(x) = x^2` defines a function you can call, and the graph draws it.
-- `ans` is the answer of the line above. With **Line letters** on, line 1 is also `A`, line 2 is `B`, and later lines can use them.
-- Anything with an `x` is drawn on the graph: `y = 2x + 1`, `x = 3`, `x^2 + y^2 = 16`, `y > x^2`.
-- Start a line with `#` to make a heading.
-- Pasting several lines creates several lines as one undoable step.
-- `y1 ~ m x1 + b` is a regression: it fits `m` and `b` to the lists `x1` and `y1` and draws the fit. With a table headed `x` and `y`, write `y ~ mx + b`.
-- Lines copied from Desmos or typed in TI notation mostly work as written. [functions.md](functions.md#written-the-way-other-calculators-take-it) lists what is read.
+- On desktop, sent lines stack in the left sidebar and appear as connected blocks on the canvas. Click a line in either place to edit it; hover a sidebar line to highlight its block.
+- On phones and narrow windows (`<= 760 px`), blocks stack in a single column with connecting wires in the left gutter.
+- `a = 3` defines a variable with a slider. `f(x) = x^2` defines a reusable function and plots it.
+- `ans` refers to the line above. With **Line letters** on (Modes), line 1 is `A`, line 2 is `B`, and so on.
+- Anything with `x` plots automatically: `y = 2x + 1`, `x = 3`, `x^2 + y^2 = 16`, `y > x^2`.
+- Start a line with `#` to add a heading.
+- Pasting multiple lines adds them as one undoable step.
+- `y1 ~ m x1 + b` fits a regression to lists `x1` and `y1`, plots the curve, and defines `m` and `b`. For a table with `x` and `y` columns, write `y ~ mx + b`.
+- Lines copied from Desmos or written in TI syntax mostly work as-is (see [functions.md](functions.md#other-calculator-syntax)).
 
-Write math the way you would on paper. `2x`, `3(4 + 5)`, `sin 30`, `√16`, `|x|`, `5!` and `x²` all work. Brackets close themselves, and typing the closing bracket steps over it. Select text and type `(` to wrap it.
+Write math naturally: `2x`, `3(4 + 5)`, `sin 30`, `√16`, `|x|`, `5!`, and `x²` all parse as written. Brackets auto-close, and selecting text then typing `(` wraps it.
 
-## Help while you type
+## Typing hints and inline fixes
 
-- Type the start of a function name and matches appear. Tab finishes the name.
-- Inside a call, the line underneath shows the function's inputs, including for functions you defined. Tab moves to the next input.
-- A line you haven't finished, like `2*` or `normalcdf(`, shows a grey "Unfinished" note and no red error. The error shows only if you leave the line that way.
-- A line can't start with `×`, `÷` or `^`. Type `*100` and the line offers **Use ans × 100**. Enter takes the offer.
-
-## When a line looks wrong
-
-The app points out lines that are wrong or that may not mean what you intended, and offers a fix you can click. From the keyboard, Tab goes from the line to its fix, and Ctrl+Enter applies it when there is only one.
+- Typing a function name shows completions; press Tab to accept.
+- Inside a call, the strip below shows parameter slots. Press Tab to step to the next slot.
+- Incomplete lines like `2*` or `normalcdf(` show a grey "Unfinished" note instead of a red error until you leave the line.
+- Starting a line with `*`, `/`, or `^` offers to continue from `ans` (press Enter to accept).
+- When a line has a typo or ambiguity, click the suggested fix (or press Tab then Enter; Ctrl+Enter applies a single fix):
 
 | You type | What happens |
 | --- | --- |
-| `normcdf(1)` | "Did you mean normalcdf?" with a one-click fix. Only close spellings are suggested, so `mi` never becomes `min`. |
-| `-3^2` or `1/2x` | The answer stands, with a **Check this** note and a rewrite that says which reading you get. As in Desmos, a product written without a sign stays under a `/`: `1/2x` is 1/(2x) and `4/3πr^3` is 4/(3πr³). Write `1/2*x` or `4/3*πr^3` for the other reading. |
-| `2 3` | Read as 2 × 3, with both readings offered: **Use 2 * 3** or **Use 23**. `1 000 000` is a million. |
-| `tax * 2` | "tax isn't defined. Define it on its own line, like tax = 5". |
-| `1,250` | Read as two numbers, with **Use 1250** offered. |
-| `5 mi to km` | Worked out as `convert(5, "mi", "km")`. `72 F to C` and `5 mi in km` work too. |
-| `5 ft + 3 in` | "Put both in one unit", with **Use 5 + convert(3, "in", "ft")**. |
-| `3 m + 2 s` | Says that a length and a time can't be added. |
-| `percentile(0.95)` | Offers **Use invNorm(0.95)**, the normal percentile. `percentile(list, p)` is the percentile of a list. |
+| `normcdf(1)` | Suggests `normalcdf` (only close spellings match) |
+| `-3^2` or `1/2x` | Keeps the answer with a **Check this** toggle for the alternate grouping (`1/2x` parses as `1/(2x)` like Desmos; write `1/2*x` for `(1/2)x`) |
+| `2 3` | Evaluates as `2 × 3` and offers `2 * 3` or `23` (`1 000 000` reads as a million) |
+| `tax * 2` | Tells you `tax` is undefined and shows how to define it |
+| `1,250` | Offers `1250` |
+| `5 mi to km` | Evaluates as `convert(5, "mi", "km")` (`72 F to C` and `5 mi in km` work too) |
+| `5 ft + 3 in` | Offers `5 + convert(3, "in", "ft")` |
+| `3 m + 2 s` | Reports that length and time cannot be added |
+| `percentile(0.95)` | Offers `invNorm(0.95)` for a normal percentile (`percentile(list, p)` is for lists) |
 
-## Percent
+## Percents
 
-`80 + 15%` is 92, which is 80 plus 15% of 80, and `80 − 15%` is 68. A chain goes left to right, so `80 + 15% + 10%` is 101.2. The line says what it did: "15% of 80 added".
+`80 + 15%` is `92` (adds 15% of 80) and `80 − 15%` is `68`. Chains run left to right (`80 + 15% + 10% = 101.2`). Multiplication and division treat `%` as `/ 100` (`80 × 15% = 12`).
 
-Multiplying and dividing treat a percent as a number, so `80 × 15%` is 12 and `15%` on its own is 0.15.
-
-To make `%` mean "divide by 100" everywhere, so that `80 + 15%` is 80.15, set **80 + 15% =** to 80.15 in Modes. Each sheet keeps its own choice.
+To make `%` always mean `/ 100` (`80 + 15% = 80.15`), set **Adding a percent** to **As a number** in Modes. Each sheet saves its own choice.
 
 ## Answers
 
-- Click an answer to copy it as plain text.
-- **Dec** and **Exact** switch between decimals and exact forms such as 3/8, √3/2 and π/6.
-- **Round** sets the decimal places for every answer and for copying, from Auto to 15.
-- **Percent** shows probabilities as percents.
-- A huge answer shows as 3.97698764 × 10¹⁹⁹⁷. Set **Huge answers** to Every digit in Modes to see them all in a box that scrolls. Copying always takes every digit.
+- Click any answer to copy it as plain text.
+- **Answers** (in Modes) switches between **Decimal** and **Exact** (`3/8`, `√3/2`, `π/6`).
+- **Round** sets decimal places for display and copying (Auto through 15).
+- **Percent probabilities** displays probabilities as percentages.
+- Huge numbers display in scientific notation by default; switch **Huge answers** to **Every digit** in Modes to scroll every digit. Copying always includes every digit.
 
-## Sheets, undo and history
+## Sheets, undo, and history
 
-Your work saves as you type. Once a sheet has a name (File → Save), every edit goes into it, so opening another sheet never loses anything. File also has New sheet, Open, Duplicate, Rename, and Export and Import, which move a sheet as a JSON file. If you pick a name another sheet has, the app asks before replacing it.
+Work saves automatically in your browser. Once you name a sheet (**File -> Save**), edits save straight into it. **File** also handles New, Open, Duplicate, Rename, Copy sheet as text, Export/Import JSON, and Graph PNG/SVG export (plus Share as text on touch devices).
 
-**Undo** (Ctrl+Z) reaches back as far as you like. Typing comes back a word at a time. A moved or deleted line, a clear, a one-click fix, a slider drag, New sheet, Open and Import are each one step. Ctrl+Shift+Z redoes. After a clear, the message's Undo button does the same thing and stays for 10 seconds.
+- **Undo / Redo** (`Ctrl+Z` / `Ctrl+Shift+Z`) covers typing, moves, deletes, fixes, slider drags, clears, and sheet switches. Clearing a sheet also shows a 10-second Undo button.
+- **History** (`Ctrl+Alt+Y`) keeps every finished calculation with full precision across clears and reloads.
 
-**History** (Ctrl+Alt+Y) keeps every finished line and its full-precision answer through edits, clears and restarts.
+## Find and the keypad
 
-## Finding a function
+Press `Ctrl+K` (`⌘K` on Mac) or click **Find** to search functions by name or what they do (like "percentile", "area between", or "miles to km"), run commands, or insert examples. Picking a function highlights the keypad tab where it lives.
 
-Find (Ctrl+K, or the Find button) searches function names, the words on their keys, and the words people use for them. "percentile" finds invNorm, "area between" finds normalcdf, and "miles to km" finds convert. It takes whole phrases too: "chance of exactly 4" finds binompdf.
+The keypad sits below the composer with **123** and five category tabs: **Math**, **Stats**, **Chance**, **Matrix**, and **HVAC**.
 
-Choosing a function puts it in your line with the caret inside the brackets. The keypad tab that holds it glows for a moment, so you know where it lives. Find also runs commands, such as changing the theme or opening an example.
+- Clicking a tab swaps the number pad for that category's tiles and builders without covering the canvas. Click **123**, the active tab, a tile, or press Esc to return.
+- On desktop, hovering a key or tile shows a short hint above the keypad.
+- Matrix tiles (`2 × 2`, `3 × 3`) insert empty cells; press comma or Enter to advance. Larger matrices, shapes, vectors, calculus, distributions, and HVAC tools also have builders at the top of their tabs.
+- Hold `←` or `→` to repeat caret movement; hold `⌫` to clear the line. **AC** clears the sheet.
+- Click **Keypad** in the desktop top bar to hide or show the keypad.
 
-## The keypad
+## Graphing
 
-The keypad sits directly under the composer (inside the floating left sidebar on desktop, or docked at the bottom on phones). Above the number pad is a deck bar with **123** and five category tabs: **Math**, **Stats**, **Chance**, **Matrix**, and **HVAC**.
+Any plotted expression creates a graph block on the canvas. On desktop, drag its top bar to move it and its bottom-right corner to resize it.
 
-- Clicking a category tab swaps the number pad in place for that category's function tiles and guided builders, keeping the canvas in view. Click **123**, the active tab, a tile, or press Esc to return to the number pad.
-- On desktop, hovering a key or tile shows what it does in a hint strip above the keypad.
-- Clicking a tile inserts the function into the composer with grey input slots (such as `binompdf(n, p, k)`), which clear as you type.
-- The 2 × 2 and 3 × 3 matrix tiles insert a grid of empty cells; type a number, then comma or Enter to move to the next cell. Guided builders for matrices, shapes, vectors, calculus, distributions, and HVAC open from the top card on their tabs.
-- Hold `←` or `→` to keep moving the caret. Hold `⌫` to clear the current line. **AC** clears the sheet (with a 10-second Undo toast), and **ENTER** lives on the right end of the composer bar.
+- Drag to pan, scroll to zoom, Shift+drag to box-zoom, and hover to trace.
+- Zeros, extrema, y-intercepts, and intersections show dots; hover to snap and click to pin coordinates.
+- Dragging a slider updates wired curves and blocks live, showing values along the wires. Whole-number sliders step by 1 from 0 to twice their value.
+- Graph toolbar buttons zoom, Fit, square axes (`1:1`), reset Home, and export PNG.
+- Keyboard controls when the graph has focus: arrows pan, `+`/`−` zoom, `F` fits, `S` squares axes, `0` resets, `P` saves PNG, `C` copies PNG, `[` and `]` step through marked points, Enter pins, Delete clears pins.
 
-**Keypad** in the desktop top bar hides or shows the keypad, and the choice is remembered.
+## Phone and narrow windows
 
-## The graph
+Below `760 px`, the layout switches to a single column above the docked composer and keypad.
 
-When a sheet plots something, the graph appears as a block on the canvas. On desktop, drag the graph's top strip to move it and drag its bottom-right corner to resize it.
-
-Drag inside the plot to pan, scroll to zoom, and hover to trace a curve. Shift+drag zooms into a selection box. The toolbar in the top-right corner of the graph block zooms, fits every curve, squares the axes (`1:1`), resets to home, and exports a PNG.
-
-Each plotted expression block carries its curve color along its left edge. Zeros, extrema, y-intercepts and intersections are marked with dots; hover near a dot to snap the readout and click to pin the label.
-
-A slider block moves every curve and dependent block wired to that variable in real time, showing values along the wires while you drag. A slider for a whole number steps by 1 and runs from 0 to twice the number.
-
-With keyboard focus in the graph, arrow keys pan, `+` and `−` zoom, `F` fits, `S` squares the axes, `0` resets, `P` saves a PNG, `C` copies the image, `[` and `]` step through marked points, Enter pins one, and Delete clears pins.
-
-## The top bar
-
-On desktop, the top bar holds **Deg | Rad**, canvas zoom controls (`− 100% + Fit all`), **Find** (`Ctrl+K` / `⌘K`), **File**, **History**, **Keypad**, **Modes** (Exact, Sample SD, Round, Percent, Line letters, Complex, Graph, Huge answers, and adding a percent), **Appearance** (the sliders icon), and **?** (all shortcuts).
-
-## On a phone or a narrow window
-
-Under 760 px wide, the app switches to a single vertical Cascade canvas with the composer and keypad docked below it.
-
-- Blocks stack in order with dependent blocks indented and wired down the left gutter; graphs and figures appear inline in the column.
-- The deck bar holds **123**, the five category tabs, **ABC** (to toggle the system keyboard on touch devices), and **AC**.
-- The top bar shows **Deg | Rad**, **Modes** (which includes both modes and Appearance), **Find**, **File**, and **History**. Below 390 px, **Find** becomes a magnifier icon.
-- Long-press a block for its menu. **File → Reorder lines** adds `↑` and `↓` buttons until you tap **Done**.
-- **File → Share as text** shares the sheet through the browser's share sheet where supported.
-- Adding the page to your home screen opens it full screen.
+- The deck bar adds **ABC** (to toggle the phone keyboard) and **AC**.
+- The top bar holds **Deg | Rad**, **Modes** (which includes Appearance), **Find**, **File**, and **History**.
+- Long-press a block for its menu, including **Reorder lines** (adds `↑`/`↓` buttons until you tap **Done**).
+- Add the page to your phone's home screen to open it full screen.
 
 ## Keyboard shortcuts
 
-Everything works without a mouse. Each area is one Tab stop: the top bar, the line tools, your line, the keypad and the graph. Arrow keys move inside an area, and Esc brings you back to your line.
+Every area is one Tab stop (top bar, line tools, composer, keypad, graph), with arrow keys inside and Esc returning to the composer. On Mac, read `Ctrl` as `⌘` and `Ctrl+Alt` as `Ctrl+Option`.
 
-On a Mac, read Ctrl as ⌘ and Ctrl+Alt as Ctrl+Option. The app shows shortcuts the Mac way there.
-
-| Keys | Do |
+| Keys | Action |
 | --- | --- |
-| Enter, ↑/↓ | New line, move between lines |
-| Alt+↑/↓ | Move the line itself |
-| Alt+Shift+↑/↓ | Duplicate the line above or below |
-| Ctrl+Shift+Backspace | Delete the line |
-| Ctrl+Alt+Backspace | Clear every line |
+| Enter, ↑ / ↓ | New line, move between lines |
+| Alt+↑ / ↓ | Reorder line |
+| Alt+Shift+↑ / ↓ | Duplicate line above or below |
+| Ctrl+Shift+Backspace | Delete line |
+| Ctrl+Alt+Backspace | Clear sheet |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
-| Ctrl+K (or Ctrl+/) | Find functions, commands, themes, keypad tabs and examples |
-| Ctrl+Alt+K / G | Jump into the keypad / graph; press again to come back |
-| Ctrl+Alt+Shift+K / G | Show or hide the keypad / graph |
-| Ctrl+Alt+1…5 | Open a keypad tab: Math, Stats, Chance, Matrix, HVAC |
-| Ctrl+Alt+← / → | Turn the open tab's pages |
+| Ctrl+K (or Ctrl+/) | Find functions, commands, examples |
+| Ctrl+Alt+K / G | Jump to keypad / graph (again to return) |
+| Ctrl+Alt+Shift+K / G | Show or hide keypad / graph |
+| Ctrl+Alt+1...5 | Open keypad tab (Math, Stats, Chance, Matrix, HVAC) |
+| Ctrl+Alt+← / → | Switch pages in the open tab |
 | Ctrl+Alt+N | Add a normal curve |
-| Ctrl+S / Ctrl+Alt+O | Save the sheet / open one |
+| Ctrl+S / Ctrl+Alt+O | Save / open sheet |
 | Ctrl+Alt+Shift+N | New sheet |
 | Ctrl+Alt+Y | History |
-| Ctrl+Alt+D / E / M / P / L | Deg or Rad, Exact, Sample SD, Percent, Line letters |
+| Ctrl+Alt+D / E / M / P / L | Deg/Rad, Exact, Sample SD, Percent, Line letters |
 | Ctrl+Alt+T | Next theme |
-| Ctrl+Alt+H | Every shortcut |
+| Ctrl+Alt+H | Shortcuts list |
 
-## Looks and themes
+## Looks and accessibility
 
-**Appearance** (the sliders icon beside Modes on desktop, or inside the Modes sheet on phones) switches between two looks: **Modern** (frosted Liquid Glass sidebar and canvas blocks) and **Retro** (lab hardware with green-bar paper and ruled keycaps).
+Open **Appearance** (sliders icon on desktop, or inside Modes on phones) to switch between **Modern** and **Retro**, pick System/Light/Dark, enable Pure black (OLED) or High contrast, choose an accent color, adjust Aurora/Keyboard Glow, set Motion (Full, Reduced, Off), or toggle key sounds.
 
-A live preview at the top of Appearance reflects your choices as you change them:
+There is also a hidden color theme unlocked with the classic code on the number pad arrows followed by B A.
 
-- **Mode:** System (follows your OS), Light, or Dark.
-- **Pure black when dark:** switches Dark to true OLED black.
-- **High contrast:** black and white with explicit outlines on every control.
-- **Color:** sets the accent for the caret, active states, Enter, and operators.
-- **Aurora Glow** and **Keyboard Glow** (Modern): ambient deck-colored lighting on the canvas, composer rim, and keypad.
-- **Motion:** Full, Reduced, or Off.
-- **Key sounds:** toggles the recorded key clicks and feedback sounds.
-
-There is one more set of colors, and it isn't in the menu until you've earned it. The code is older than this calculator. Enter it the calculator's way: the number pad's arrows, then B A.
-
-## Accessibility
-
-- Screen readers hear each line's answer after you pause typing, and copies, deletes and errors as they happen. They hear what the line shows, not the parser's wording.
-- Each line is labeled by its number and letter, and the graph describes what it shows and how to move it.
-- Focus is always visible. Reduce Motion in your system settings turns off the animations.
-- High contrast marks errors with a symbol as well as a color.
+Screen readers announce answers after a typing pause, label every line and graph, respect system Reduce Motion, and pair High contrast errors with symbols.
