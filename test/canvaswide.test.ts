@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EXAMPLE_GRAPH, FLOW, GRAPH_BLOCK, type Rect, type Wire } from '../src/ui/canvas';
 import {
   COMPOSER_MAX_W, composerSpan, dragGraph, dragTo, FRAME_PAD, FRAME_TOP, GRAPH_MIN, GRAPH_SIZE, isSidewaysPhone, isWideCanvas, KEYS_ROOM, NARROW_QUERY, needsFreshFlow,
-  viewRects, wideFreeArea, wideFreeAreas, wideHomeView, wideLayout, wideWireRoutes, WIRE_IN_STEP, WIRE_MARGIN, type WideBlock,
+  viewRects, wideFreeArea, wideFreeAreas, wideHomeView, wideLayout, wideWireRoute, wideWireRoutes, WIRE_IN_STEP, WIRE_MARGIN, type WideBlock,
 } from '../src/ui/canvaswide';
 
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -132,5 +132,17 @@ describe('wires into one block from above', () => {
     const wires = [{ from: 'a', to: 'r', name: 'a' }, { from: 'b', to: 'r', name: 'b' }];
     const ends = wideWireRoutes(wires, rects, null, () => false).map((w) => w.to);
     expect(new Set(ends.map((p) => `${p.x},${p.y}`)).size).toBe(2);
+  });
+  it('spreads several wires entering the same open step across distinct ports', () => {
+    const rects = new Map<string, Rect>([
+      ['a', { x: 0, y: 0, w: 120, h: 48 }],
+      ['c', { x: 0, y: 80, w: 120, h: 48 }],
+      ['r', { x: 300, y: 0, w: 220, h: 64 }],
+    ]);
+    const step: Rect = { x: 300, y: 120, w: 110, h: 48 };
+    const wires = [{ from: 'a', to: 'r', name: 'a' }, { from: 'c', to: 'r', name: 'c' }];
+    const p0 = wideWireRoute(wires[0], wires, rects, null, () => false, { to: step, inSlot: { index: 0, count: 2 } })!;
+    const p1 = wideWireRoute(wires[1], wires, rects, null, () => false, { to: step, inSlot: { index: 1, count: 2 } })!;
+    expect(p0.at(-1)!.y).not.toBe(p1.at(-1)!.y);
   });
 });

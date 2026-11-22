@@ -163,3 +163,10 @@ export function portTagName(name: string, kind: PortKind | null, port: string): 
   if (kind === 'fit') return port === R2_PORT ? 'R²' : port;
   return `${name}.${port === 'r2' ? 'r²' : port}`;
 }
+
+/** The runnable expression that reads a block's port, for inserting when a port dot is clicked. */
+export function portExpr(name: string, kind: PortKind | null, port: string): string {
+  if (kind === 'list') return { n: `len(${name})`, mean: `mean(${name})`, s: `stdev(${name})`, median: `median(${name})` }[port] ?? name;
+  if (kind === 'fit') return port === R2_PORT ? '' : port;
+  return name ? `${name}.${port}` : '';
+}

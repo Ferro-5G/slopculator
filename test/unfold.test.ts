@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cleanSettings, evaluateDocument, type RowInput } from '../src/engine/document';
 import { formatValue } from '../src/engine/format';
 import { cleanBody, type DocRow } from '../src/ui/document';
-import { canUnfold, changedSteps, NO_VALUE, shortError, stepAnswer, stepDeltas, stepsReached, TRAY, trayLayout, unfoldSteps, type Unfolded } from '../src/ui/unfold';
+import { canUnfold, changedSteps, NO_VALUE, shortError, stepAnswer, stepCopyText, stepDeltas, stepsReached, TRAY, trayLayout, unfoldSteps, type Unfolded } from '../src/ui/unfold';
 import { readError } from '../src/engine/errors';
 import { formatChange } from '../src/ui/wiretags';
 
@@ -123,6 +123,56 @@ describe('unfoldSteps', () => {
     const u = unfold('a = 2', 'r = \\frac{a+1}{2}');
     expect(brief(u)).toEqual([['0', 'a+1', '3']]);
     expect(u.steps[0].span).toBeNull();
+  });
+  it('handles chained postfixes and bare-arg calls without crashing on missing spans', () => {
+    expect(brief(unfold('3!!'))).toEqual([['0', '3!', '6']]);
+    expect(brief(unfold('5!% + 1'))).toEqual([['0.0', '5!', '120'], ['0', '5!%', '1.2']]);
+    expect(brief(unfold('sin -(2 + 3)'))).toEqual([['0.0', '2 + 3', '5'], ['0', '-(2 + 3)', '−5']]);
+    expect(brief(unfold('a = 15', 'sin 2a'))).toEqual([['0', '2a', '30']]);
+  });
+  it('unfolds subscripted logs, piecewise, truth relations, conversions, and non-binder sums', () => {
+    expect(brief(unfold('log_2(2*4 + 8)'))).toEqual([['0.0', '2*4', '8'], ['0', '2*4 + 8', '16']]);
+    const pw = unfold('a = 2', '{a > 0: 2a + 1, 3a}');
+    expect(pw.steps.map((s) => [s.text, stepAnswer(s, { places: null, exact: false, percent: false })])).toEqual([
+      ['a > 0', 'true'],
+      ['2a', '4'],
+      ['2a + 1', '5'],
+    ]);
+    expect(brief(unfold('3^2 + 4^2 = 5^2'))).toEqual([['0.0', '3^2', '9'], ['0.1', '4^2', '16'], ['0', '3^2 + 4^2', '25'], ['1', '5^2', '25']]);
+    expect(brief(unfold('(2*3 + 1) mi to km'))).toEqual([['0.0', '2*3', '6'], ['0', '2*3 + 1', '7']]);
+    expect(brief(unfold('sum({1+2, 3+4})'))).toEqual([['0.0', '1+2', '3'], ['0.1', '3+4', '7'], ['0', '{1+2, 3+4}', '{3, 7}']]);
+  });
+  it('preserves lazy branch evaluation in piecewise and if() so untaken branches never fail', () => {
+    const pw = unfold('{1 > 0: 2 + 3, 1 / 0}');
+    expect(pw.failure).toBeNull();
+    expect(pw.steps.map((s) => [s.text, stepAnswer(s, { places: null, exact: false, percent: false })])).toEqual([
+      ['1 > 0', 'true'],
+      ['2 + 3', '5'],
+    ]);
+    const iff = unfold('if(1 > 0, 2 + 3, 1 / 0)');
+    expect(iff.failure).toBeNull();
+    expect(iff.steps.map((s) => [s.text, stepAnswer(s, { places: null, exact: false, percent: false })])).toEqual([
+      ['1 > 0', 'true'],
+      ['2 + 3', '5'],
+    ]);
+    const fallback = unfold('{1 < 0: 1 / 0, 2 + 3}');
+    expect(fallback.failure).toBeNull();
+    expect(fallback.steps.map((s) => [s.text, stepAnswer(s, { places: null, exact: false, percent: false })])).toEqual([
+      ['1 < 0', 'false'],
+      ['2 + 3', '5'],
+    ]);
+  });
+  it('respects Exact mode and fixed decimal places in stepAnswer and stepCopyText', () => {
+    const u = unfold('1/3 + 1/6');
+    expect(u.steps.map((s) => stepAnswer(s, { places: null, exact: true, percent: false }))).toEqual(['1/3', '1/6']);
+    expect(u.steps.map((s) => stepAnswer(s, { places: 2, exact: false, percent: false }))).toEqual(['0.33', '0.17']);
+    expect(u.steps.map((s) => stepCopyText(s, { places: null, exact: true, percent: false }))).toEqual(['1/3', '1/6']);
+  });
+  it('keeps Steps available for failing lines whose x/y only lives inside a binder', () => {
+    const text = 'r = solve(x^2 = -1, x) + 1';
+    const rows = lines(text);
+    const results = evaluateDocument(rows, settings);
+    expect(canUnfold(text, results[0])).toBe(true);
   });
   it('has nothing for a line with one operation, only leaves, or no single value', () => {
     const none = (...texts: string[]) => {

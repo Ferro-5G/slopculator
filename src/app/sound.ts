@@ -5,7 +5,7 @@ export type Cue = SoundCue;
 let ctx: AudioContext | null = null;
 let out: GainNode | null = null;
 let enabled = true;
-const VOLUME = 0.35;
+const VOLUME = 0.28;
 const cache = new Map<string, AudioBuffer>();
 const last = new Map<Cue, { variant: number; at: number }>();
 

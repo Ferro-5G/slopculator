@@ -304,6 +304,7 @@
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 2;
   width: 0;
   height: 0;
   padding: 0;
@@ -319,6 +320,7 @@
 .canvas-ui .cv-wide > .rows > .blk-graph,
 .canvas-ui .cv-wide > .rows > .blk-example-graph {
   position: absolute;
+  z-index: 2;
 }
 
 /* ---------- blocks ---------- */
@@ -358,9 +360,15 @@
   background: var(--cv-block);
 }
 .canvas-ui .rows > .row.blk.dragging {
-  z-index: 5;
+  z-index: 7;
   cursor: grabbing;
   border-color: var(--cv-accent);
+}
+.canvas-ui .rows > .row.blk.cv-peer,
+.canvas-ui .rows > .blk-graph.cv-peer,
+.canvas-ui .rows > .blk-example-graph.cv-peer,
+.canvas-ui .rows > .blk-psych.cv-peer {
+  border-color: color-mix(in srgb, var(--cv-accent) 52%, var(--cv-edge));
 }
 .canvas-ui .rows > .row.blk-blank {
   display: none !important;
@@ -379,12 +387,23 @@
   display: none;
 }
 .canvas-ui .rows > .row.blk .gutter .idx.letter {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   position: absolute;
-  left: 0;
-  top: -10px;
-  font: 500 11px var(--sans);
-  color: var(--ink-3);
+  left: -1px;
+  top: -21px;
+  height: 17px;
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge-2);
+  font: 600 10.5px/1 var(--sans);
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  z-index: 2;
+  pointer-events: none;
 }
 /* A line that draws keeps its show-or-hide chip as the rail down its left edge, in its curve's color. */
 .canvas-ui .rows > .row.blk .gutter .chip {
@@ -448,6 +467,14 @@
   min-width: 210px;
 }
 .canvas-ui .rows > .row.blk-value .gutter {
+  display: none;
+}
+.canvas-ui .rows > .row.blk-value .gutter:has(.idx.letter) {
+  display: block;
+  width: 0;
+  pointer-events: none;
+}
+.canvas-ui .rows > .row.blk-value .gutter .chip {
   display: none;
 }
 .canvas-ui .rows > .row.blk-value .line {
@@ -562,6 +589,14 @@
 .canvas-ui .rows > .row.blk-slider .gutter {
   display: none;
 }
+.canvas-ui .rows > .row.blk-slider .gutter:has(.idx.letter) {
+  display: block;
+  width: 0;
+  pointer-events: none;
+}
+.canvas-ui .rows > .row.blk-slider .gutter .chip {
+  display: none;
+}
 .canvas-ui input.slider {
   -webkit-appearance: none;
   appearance: none;
@@ -621,10 +656,19 @@
 /* The editing ghost: where a block waits while it's in the composer. */
 .canvas-ui .blk-ghost {
   position: absolute;
+  display: grid;
+  place-items: center;
   border-radius: var(--cv-radius);
-  border: 1.5px dashed color-mix(in srgb, var(--cv-accent) 70%, transparent);
-  box-shadow: 0 0 0 2px var(--cv-accent), 0 0 0 7px var(--cv-accent-soft);
+  border: 1.5px dashed color-mix(in srgb, var(--cv-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--cv-accent) 6%, transparent);
+  box-shadow: none;
   pointer-events: none;
+}
+.canvas-ui .blk-ghost::after {
+  content: 'Editing';
+  font: 500 12.5px/1 var(--sans);
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--cv-accent) 72%, var(--ink-3));
 }
 .canvas-ui .cv-narrow .blk-ghost {
   display: none;
@@ -781,11 +825,33 @@
 .canvas-ui .blk-grip {
   position: absolute;
   left: 0;
-  right: 160px;
+  right: 175px;
   top: 0;
-  height: 16px;
+  height: 24px;
   cursor: grab;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canvas-ui .blk-grip::after {
+  content: '';
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink-3) 34%, transparent);
+  transition: background-color 0.14s ease, width 0.14s ease;
+}
+.canvas-ui .rows > .blk-graph:hover .blk-grip::after,
+.canvas-ui .blk-grip:hover::after {
+  width: 44px;
+  background: color-mix(in srgb, var(--ink-2) 60%, transparent);
+}
+.canvas-ui .rows > .blk-graph.dragging .blk-grip {
+  cursor: grabbing;
+}
+.canvas-ui .rows > .blk-graph.dragging .blk-grip::after {
+  background: var(--cv-accent);
 }
 .canvas-ui .blk-resize {
   position: absolute;
@@ -811,7 +877,7 @@
   height: 1px;
   overflow: visible;
   pointer-events: none;
-  z-index: 3;
+  z-index: 4;
 }
 .canvas-ui .cv-wires path.w {
   fill: none;
@@ -827,25 +893,43 @@
 }
 .canvas-ui .cv-wires circle.port-out {
   fill: var(--cv-wire);
+  pointer-events: all;
+  cursor: pointer;
 }
 .canvas-ui .cv-wires circle.port-in {
   fill: var(--bg);
   stroke: var(--cv-wire);
   stroke-width: 1.5;
+  pointer-events: all;
+  cursor: pointer;
+}
+.canvas-ui .cv-wires circle.port-free {
+  pointer-events: all;
+  cursor: pointer;
+}
+.canvas-ui .cv-wires circle.port-out:hover,
+.canvas-ui .cv-wires circle.port-free:hover {
+  fill: var(--cv-accent);
+  stroke: color-mix(in srgb, var(--cv-accent) 36%, transparent);
+  stroke-width: 5;
+}
+.canvas-ui .cv-wires circle.port-in:hover {
+  stroke: var(--cv-accent);
+  stroke-width: 2.2;
 }
 
 /* A wire lights while a drag runs down it, dims while a drag or a pointed-at wire leaves it out. */
 .canvas-ui .cv-wires path.w,
 .canvas-ui .cv-wires circle {
-  transition: stroke 0.2s, fill 0.2s, opacity 0.25s;
+  transition: stroke 0.2s, fill 0.2s, opacity 0.25s, stroke-width 0.14s;
 }
-.canvas-ui .cv-wires path.w:is(.lit, .focus) {
+.canvas-ui .cv-wires path.w:is(.lit, .focus, .rel) {
   stroke: var(--cv-accent);
 }
-.canvas-ui .cv-wires circle.port-out:is(.lit, .focus) {
+.canvas-ui .cv-wires circle.port-out:is(.lit, .focus, .rel) {
   fill: var(--cv-accent);
 }
-.canvas-ui .cv-wires circle.port-in:is(.lit, .focus) {
+.canvas-ui .cv-wires circle.port-in:is(.lit, .focus, .rel) {
   stroke: var(--cv-accent);
 }
 .canvas-ui .cv-wires :is(path, circle).dim {
@@ -856,6 +940,7 @@
   stroke: transparent;
   stroke-width: 12;
   pointer-events: stroke;
+  cursor: pointer;
 }
 /* After a failing step, a wire carries nothing: dashed coral. */
 .canvas-ui .cv-wires path.w.err {
@@ -878,7 +963,7 @@
   height: 1px;
   margin: 0;
   overflow: visible;
-  z-index: 4;
+  z-index: 6;
   pointer-events: none;
 }
 .canvas-ui .cv-tag {
@@ -1041,7 +1126,7 @@
   border: 1px solid var(--rule);
   border-radius: var(--cv-radius);
   background: color-mix(in srgb, var(--cv-block) 34%, transparent);
-  z-index: 1;
+  z-index: auto;
 }
 .canvas-ui .cv-tree {
   display: none;
@@ -1049,18 +1134,21 @@
 .canvas-ui .cv-step {
   position: absolute;
   width: max-content;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: var(--bg);
   border: 1px solid var(--cv-edge);
   border-radius: 10px;
   padding: 6px 12px 7px;
-  cursor: default;
+  cursor: pointer;
   white-space: nowrap;
   transition: opacity 0.25s, border-color 0.25s;
-  z-index: 2;
+  z-index: 3;
 }
 .canvas-ui .cv-step:hover,
 .canvas-ui .cv-step:focus-visible {
-  border-color: color-mix(in srgb, var(--cv-edge-2) 60%, var(--ink-3));
+  border-color: color-mix(in srgb, var(--cv-accent) 48%, var(--cv-edge-2));
   outline: none;
 }
 .canvas-ui .cv-step .sm {
@@ -1103,8 +1191,9 @@
 }
 .canvas-ui .cv-step.bad.full {
   white-space: normal;
+  overflow: visible;
   max-width: 260px;
-  z-index: 3;
+  z-index: 5;
 }
 .canvas-ui .cv-step.void .v {
   color: var(--ink-3);
@@ -1584,21 +1673,16 @@
   background: color-mix(in srgb, var(--cv-accent) 30%, var(--cv-edge-2));
 }
 .canvas-ui .composer[data-state='ok']::before {
-  background: color-mix(in srgb, var(--cv-accent) 22%, var(--cv-edge-2));
+  background: color-mix(in srgb, var(--cv-accent) 44%, var(--cv-edge-2));
 }
-.canvas-ui .composer[data-state='ok']::after {
+/* With Aurora Glow off, the composer keeps a clean static accent border; Aurora Glow (:root[data-glow]) turns on the
+   conic light rim and radial halo. */
+:root[data-glow] .canvas-ui .composer[data-state='ok']::after {
   opacity: 1;
-}
-.canvas-ui .composer[data-state='ok'] .composer-halo {
-  opacity: 0.3;
-}
-/* Reaching an answer: a quick sheen sweeps the rim (DURATIONS.auroraSheen), then the light makes one slow lap and
-   rests (DURATIONS.auroraDrift, CURVES.auroraDrift in src/ui/motiontokens.ts). It never spins on its own. */
-.canvas-ui .composer[data-state='ok'] {
-  animation: cv-orbit 9s cubic-bezier(0.45, 0, 0.55, 1) 0.7s 1 both;
-}
-.canvas-ui .composer[data-state='ok']::after {
   animation: cv-sheen 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+:root[data-glow] .canvas-ui .composer[data-state='ok'] {
+  animation: cv-orbit 9s cubic-bezier(0.45, 0, 0.55, 1) 0.7s 1 both;
 }
 @keyframes cv-sheen {
   from {
@@ -2055,8 +2139,19 @@
   }
   .canvas-ui .composer-cancel {
     height: 36px;
-    padding: 0 8px;
-    font-size: 13px;
+    padding: 0 11px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .canvas-ui .composer-cancel:hover {
+    background: color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+  /* While editing on desktop, the live answer already sits on the highlighted sidebar row directly above the composer,
+     so hiding the inline result gives the expression full width and keeps it clear of Cancel and Update. */
+  .canvas-ui .composer.editing .composer-slot > .row:not(.has-error) .out {
+    display: none;
   }
   .canvas-ui .deck-bar {
     gap: 4px;
@@ -2727,6 +2822,8 @@
   .canvas-ui .cv-narrow .cv-step {
     position: relative;
     width: auto;
+    max-width: calc(100% - var(--depth, 0) * 20px - 22px);
+    min-width: 0;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -2736,6 +2833,9 @@
   }
   .canvas-ui .cv-narrow .cv-step .sm {
     font-size: 15.5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .canvas-ui .cv-narrow .cv-step .sv {
     margin-top: 0;
@@ -3891,21 +3991,10 @@ dialog.examples-dialog .sc-lines {
   --lg-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.24), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
   --lg-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.28);
 
-  /* Rich midnight obsidian canvas with subtle studio cobalt-violet atmosphere on Dark; OLED stays pure black. */
+  /* Clean obsidian dark canvas at rest; Aurora Glow adds the deck-reactive atmosphere only when toggled on. */
   &[data-theme='ink'] .canvas-ui .tape.cv-viewport {
     background-color: #06070c;
-    --cv-dot: rgba(190, 210, 255, 0.14);
-  }
-  &[data-theme='ink'] .canvas-ui .tape.cv-viewport::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(56% 52% at 18% 8%, rgba(56, 110, 235, 0.18), transparent 72%),
-      radial-gradient(48% 50% at 86% 36%, rgba(124, 92, 240, 0.13), transparent 72%),
-      radial-gradient(55% 42% at 50% 100%, rgba(30, 58, 138, 0.1), transparent 70%);
+    --cv-dot: rgba(190, 210, 255, 0.13);
   }
   &[data-theme='oled'] .canvas-ui .tape.cv-viewport {
     --cv-dot: rgba(190, 210, 255, 0.12);
@@ -4070,7 +4159,7 @@ dialog.examples-dialog .sc-lines {
   }
   & .canvas-ui .composer-enter {
     background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 84%, #ffffff), var(--cv-accent));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 0 22px color-mix(in srgb, var(--cv-accent) 52%, transparent), 0 4px 12px rgba(0, 0, 0, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 3px 10px rgba(0, 0, 0, 0.34);
   }
   & .canvas-ui .composer-enter:hover {
     background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 76%, #ffffff), color-mix(in srgb, var(--cv-accent) 92%, #ffffff));
@@ -4246,16 +4335,6 @@ dialog.examples-dialog .sc-lines {
   & .canvas-ui .tape.cv-viewport {
     background-color: #f3f5f9;
     --cv-dot: rgba(15, 23, 42, 0.11);
-  }
-  & .canvas-ui .tape.cv-viewport::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(56% 48% at 16% 6%, rgba(59, 130, 246, 0.1), transparent 72%),
-      radial-gradient(48% 50% at 88% 36%, rgba(139, 92, 246, 0.08), transparent 72%);
   }
   & #app.canvas-ui > .modebar {
     background: linear-gradient(180deg, rgba(243, 245, 249, 0.8) 0%, rgba(243, 245, 249, 0.28) 65%, transparent 100%);

@@ -12,7 +12,8 @@ import {
   wideLayout, wideWireRoute, ZOOM_STEP, type WideBlock, type WideScreen,
 } from '../ui/canvaswide';
 import { CASCADE_PHONE, cascadeColumn, cascadeGaps, cascadeWires, heldLit, heldTraces, type CascadeBlock, type CascadeOptions } from '../ui/cascade';
-import type { RowResult } from '../engine/document';
+import { lineDefines, type RowResult } from '../engine/document';
+import { portExpr, rowPorts } from '../ui/ports';
 import { sheetNames } from '../ui/typeset';
 import { beginDrag, dragHeld, focusedWire, focusWire, hasTag, initTags, keepTags, placeTags, releaseDrag, stateOf, syncTags, tagArrived, tagDrag, tagLayer, tagRun } from './wiretags';
 import { drawNarrowTree, initUnfold, openLines, stepRect, syncUnfold, type OpenLine } from './unfold';
@@ -30,9 +31,10 @@ import { slotInfo } from '../ui/linestate';
 import { setDragListener } from './edits';
 import { motionNow } from './feedback';
 import { app, deskRail, exampleGraph, exampleGraphPane, graph, graphGrip, graphPane, graphResize, listEl, tape, modeBar } from './layout';
+import { insertText } from './lineeditor';
 import { syncRail } from './rail';
 import { narrow, kb } from './platform';
-import { setHostedCheck, views } from './rowviews';
+import { focusRow, setHostedCheck, views } from './rowviews';
 import { openLineMenu } from './rows';
 import { doc, results, rowIndex, saveSoon } from './sheet';
 import { play } from './sound';
@@ -65,6 +67,10 @@ let hostedIds = new Set<string>();
 let hosts = new Map<string, string>();
 /** Each readout port's height, in world units (wide) or in the column (narrow), by `row.port`. */
 let portYs = new Map<string, number>();
+/** A wire whose value tag was pinned by clicking it, or null. */
+let pinnedWire: string | null = null;
+/** The canvas block currently hovered on desktop, for highlighting its connected wires and peers. */
+let hoveredBlock: string | null = null;
 
 let blockSizes: ResizeObserver | null = null;
 const watched = new WeakSet<Element>();
@@ -213,7 +219,7 @@ export function layoutCanvas(): void {
   hosts = psychHosts([...hostedIds].map((id) => ({ id })));
   if (psychBlock.isConnected && !watched.has(psychBlock)) { watched.add(psychBlock); blockSizes?.observe(psychBlock); }
   figureIds = syncFigures(cid, wide(), hostedIds);
-  trayRoom = syncUnfold(listEl, cid, wide(), tagDrag(), sheetNames(doc.rows, results, doc.settings.lineNames));
+  trayRoom = syncUnfold(listEl, cid, wide(), tagDrag(), sheetNames(doc.rows, results, doc.settings.lineNames), hostedIds);
   if (wide()) layoutWide(cid); else layoutNarrow(cid);
   measurePorts();
   drawWires();
@@ -471,12 +477,65 @@ function allSteps(): { id: string; r: Rect }[] {
 }
 
 /** A wide wire's route (wideWireRoute), round every block and every open line's steps, into a step when `toStep`. */
-function routed(w: Wire, opts: { minRun?: number; toStep?: string; to?: Rect; outY?: number } = {}): Point[] | null {
+function routed(w: Wire, opts: { minRun?: number; toStep?: string; to?: Rect; outY?: number; inSlot?: { index: number; count: number } } = {}): Point[] | null {
   const isEx = (id: string) => id === EXAMPLE_GRAPH || isExampleRow(doc.rows[rowIndex(id)] ?? {});
   const extra = allSteps().filter((s) => s.id !== opts.toStep).map((s) => s.r);
   // The strip between an open line and its tray is where its steps rise into it: other wires keep out.
   for (const [id, t] of trayRects) { const l = rects.get(id); if (l && id !== w.from) extra.push({ x: t.x, y: l.y + l.h + 2, w: Math.max(t.w, l.w), h: BELOW_GAP - 4 }); }
-  return wideWireRoute(w, wires, rects, frameRect, isEx, { editingId, minRun: opts.minRun, extra, to: opts.to, outY: opts.outY, hosts });
+  return wideWireRoute(w, wires, rects, frameRect, isEx, { editingId, minRun: opts.minRun, extra, to: opts.to, outY: opts.outY, inSlot: opts.inSlot, hosts });
+}
+
+/** Runnable reference token for a block or one of its readout ports, inserted when clicking its output dot. */
+function refForPort(rowId: string, port?: string): string {
+  const k = rowIndex(rowId);
+  const row = k >= 0 ? doc.rows[k] : undefined;
+  const r = k >= 0 ? results[k] : undefined;
+  const name = r?.defines ?? r?.slider?.name ?? (row?.kind === 'expr' ? lineDefines(row.text) : null) ?? (doc.settings.lineNames ? r?.lineName : null) ?? '';
+  if (port && row) return portExpr(name, rowPorts(row, r)?.kind ?? null, port) || name;
+  return name;
+}
+
+/** Inserts a block's variable or readout port reference into the composer and focuses it. */
+function insertPortRef(rowId: string, port?: string): void {
+  const ref = refForPort(rowId, port);
+  if (!ref) { flashBlock(rowId); return; }
+  focusRow(composerRowId());
+  insertText(ref);
+  play('toggle');
+  flashBlock(rowId);
+}
+
+/** Appends a native SVG tooltip title to a port or wire element. */
+function svgTitle(el: SVGElement, text: string): void {
+  if (!text) return;
+  const t = document.createElementNS(NS, 'title');
+  t.textContent = text;
+  el.append(t);
+}
+
+/** Highlights wires and neighbor blocks connected to the hovered block or focused wire, without re-laying out. */
+function syncPeerGlow(): void {
+  const fk = focusedWire();
+  const peers = new Set<string>();
+  const activeFrom = hoveredBlock;
+  if (fk) {
+    const w = wires.find((x) => wireKey(x) === fk);
+    if (w) { peers.add(hosts.get(w.from) ?? w.from); peers.add(hosts.get(w.to) ?? w.to); }
+  } else if (activeFrom) {
+    for (const w of wires) {
+      const from = hosts.get(w.from) ?? w.from, to = hosts.get(w.to) ?? w.to;
+      if (from === activeFrom) peers.add(to);
+      if (to === activeFrom) peers.add(from);
+    }
+  }
+  for (const el of svg.querySelectorAll<SVGElement>('path.w, circle.port-out, circle.port-in')) {
+    const f = el.dataset.from, t = el.dataset.to;
+    el.classList.toggle('rel', !fk && !!activeFrom && (f === activeFrom || t === activeFrom));
+  }
+  for (const [id, v] of views) v.el.classList.toggle('cv-peer', peers.has(id));
+  graphPane.classList.toggle('cv-peer', peers.has(GRAPH_BLOCK));
+  exampleGraphPane.classList.toggle('cv-peer', peers.has(EXAMPLE_GRAPH));
+  psychBlock.classList.toggle('cv-peer', peers.has(PSYCH_BLOCK));
 }
 
 /** A wire's path and its two ports. `state` is lit, dim, focus or plain; err dashes it coral (after a failing step). */
@@ -495,6 +554,32 @@ function wireEls(d: string, from: Point, to: Point, cls: string[]): SVGElement[]
   inn.setAttribute('r', '3.5');
   inn.classList.add('port-in', ...cls);
   return [p, out, inn];
+}
+
+/** Tags a wire's path, ports, and hit stroke with metadata so delegated handlers on `svg` work across redraws. */
+function bindWireNodes(w: Wire, key: string, d: string, els: SVGElement[], hits: SVGElement[]): void {
+  const [p, out, inn] = els;
+  const fromHost = hosts.get(w.from) ?? w.from, toHost = hosts.get(w.to) ?? w.to;
+  for (const el of els) {
+    el.dataset.from = fromHost;
+    el.dataset.to = toHost;
+    el.dataset.row = w.from;
+    el.dataset.key = key;
+    if (w.fromPort) el.dataset.port = w.fromPort;
+  }
+  const outRef = refForPort(w.from, w.fromPort);
+  svgTitle(out, outRef ? `Click to insert ${outRef}` : 'Output');
+  svgTitle(inn, w.name ? `Click to inspect ${w.name}` : 'Connected to graph');
+  const hit = document.createElementNS(NS, 'path');
+  hit.setAttribute('d', d);
+  hit.classList.add('hit');
+  hit.dataset.from = fromHost;
+  hit.dataset.to = toHost;
+  hit.dataset.row = w.from;
+  hit.dataset.key = key;
+  hits.push(hit);
+  p.dataset.from = fromHost;
+  p.dataset.to = toHost;
 }
 
 /** An open line's tree on a wide canvas: each step into the step that reads it, and the top steps up into the line. */
@@ -526,20 +611,50 @@ function drawWires(): void {
   paths.clear();
   const animate = motion() && drawnWires.size + (lift ? 0 : 1) > 0;
   const open = isWide ? openLines() : new Map<string, OpenLine>();
+  // Count incoming wires per open step so several wires into one step spread cleanly along its edge.
+  const stepIncoming = new Map<string, Wire[]>();
+  if (isWide) {
+    for (const w of wires) {
+      if (w.from === editingId || w.to === editingId || !w.name) continue;
+      const o = open.get(w.to);
+      if (!o || !trayRects.has(w.to)) continue;
+      for (const sid of openLineEnds(o.u, w.name).steps) {
+        const sk = `${w.to}/${sid}`;
+        const list = stepIncoming.get(sk) ?? [];
+        list.push(w);
+        stepIncoming.set(sk, list);
+      }
+    }
+    for (const list of stepIncoming.values()) list.sort((p, q) => (rects.get(p.from)?.y ?? 0) - (rects.get(q.from)?.y ?? 0));
+  }
   for (const w of wires) {
     const a = rects.get(w.from), b = rects.get(w.to);
     if (!a || !b || w.from === editingId || w.to === editingId) continue;
     const key = wireKey(w);
     const state = stateOf(key);
     const o = open.get(w.to), tray = trayRects.get(w.to);
+    const outY = w.fromPort ? portYs.get(`${w.from}.${w.fromPort}`) : undefined;
     if (o && tray && w.name) {
       // Into an open line: to each step that reads the name itself, and to the line only if it reads it itself.
       const ends = openLineEnds(o.u, w.name);
+      let firstPts: Point[] | null = null;
       for (const sid of ends.steps) {
         const sr = stepRect(o, sid, tray);
         if (!sr) continue;
-        const pts = routed(w, { toStep: `${w.to}/${sid}`, to: sr });
-        if (pts) kids.push(...wireEls(roundedPath(pts), pts[0], pts[pts.length - 1], [state]));
+        const sk = `${w.to}/${sid}`;
+        const group = stepIncoming.get(sk) ?? [w];
+        const pts = routed(w, { toStep: sk, to: sr, outY, inSlot: { index: Math.max(0, group.indexOf(w)), count: group.length } });
+        if (!pts) continue;
+        const sd = roundedPath(pts);
+        const els = wireEls(sd, pts[0], pts[pts.length - 1], [state]);
+        bindWireNodes(w, key, sd, els, hits);
+        if (!firstPts) {
+          firstPts = pts;
+          paths.set(key, els[0] as SVGPathElement);
+          tagged.push([key, pts]);
+          now.add(key);
+        }
+        kids.push(...els);
       }
       if (!ends.line) continue;
     }
@@ -550,22 +665,14 @@ function drawWires(): void {
       d = roundedPath(r.points, 6); from = r.points[0]; to = r.points[r.points.length - 1];
       tagged.push([key, r.points]);
     } else {
-      const pts = routed(w, { minRun: tagRun(key), outY: w.fromPort ? portYs.get(`${w.from}.${w.fromPort}`) : undefined });
+      const pts = routed(w, { minRun: tagRun(key), outY });
       if (!pts) continue;
       d = roundedPath(pts); from = pts[0]; to = pts[pts.length - 1];
       tagged.push([key, pts]);
-      // A wide stroke under the wire, so pointing at a wire shows its tag.
-      const hit = document.createElementNS(NS, 'path');
-      hit.setAttribute('d', d);
-      hit.classList.add('hit');
-      hit.addEventListener('mouseenter', () => focusWire(key));
-      hit.addEventListener('mouseleave', () => { if (focusedWire() === key) focusWire(null); });
-      hits.push(hit);
     }
     const els = wireEls(d, from, to, [state]);
     const p = els[0] as SVGPathElement;
-    p.dataset.from = w.from;
-    p.dataset.to = w.to;
+    bindWireNodes(w, key, d, els, hits);
     if (animate && !drawnWires.has(key) && drawnWires.size > 0) p.classList.add('draw-in');
     paths.set(key, p);
     now.add(key);
@@ -575,22 +682,30 @@ function drawWires(): void {
     const line = rects.get(id), tray = trayRects.get(id);
     if (line && tray) kids.push(...trayWires(o, line, tray));
   }
-  // A port no wire leaves from: a small hollow dot on the block's edge, so it reads as there to be used.
+  // A port no wire leaves from: a small hollow dot on the block's edge; clicking it inserts that readout into the composer.
   const usedPorts = new Set(wires.filter((w) => w.fromPort && now.has(wireKey(w))).map((w) => `${w.from}.${w.fromPort}`));
   for (const [key, y] of portYs) {
     if (usedPorts.has(key)) continue;
-    const r = rects.get(key.slice(0, key.indexOf('.')));
+    const sep = key.indexOf('.');
+    const rowId = key.slice(0, sep), port = key.slice(sep + 1);
+    const r = rects.get(rowId);
     if (!r) continue;
     const dot = document.createElementNS(NS, 'circle');
     dot.setAttribute('cx', String(isWide ? r.x + r.w : r.x));
     dot.setAttribute('cy', String(y));
     dot.setAttribute('r', '2.8');
     dot.classList.add('port-free');
+    dot.dataset.row = rowId;
+    dot.dataset.port = port;
+    const ref = refForPort(rowId, port);
+    svgTitle(dot, ref ? `Click to insert ${ref}` : port);
     kids.push(dot);
   }
   // A pulse in flight keeps running over the redrawn wires (a slider drag redraws them on every step).
   const flying = [...svg.querySelectorAll('path.pulse')];
   svg.replaceChildren(...hits, ...kids, ...flying);
+  if (pinnedWire && !now.has(pinnedWire)) pinnedWire = null;
+  syncPeerGlow();
   for (const p of svg.querySelectorAll<SVGPathElement>('path.draw-in')) {
     const len = p.getTotalLength();
     p.style.strokeDasharray = `${len}`;
@@ -695,13 +810,17 @@ function emptyCanvas(): HTMLElement {
       h('span', { class: 'cv-empty-dot' }, '·'),
       h('span', {}, 'Drag blocks to arrange'),
       h('span', { class: 'cv-empty-dot' }, '·'),
-      h('span', {}, 'Scroll to zoom'),
+      h('span', {}, kb('Ctrl+Scroll'), ' to zoom'),
     ));
   return emptyEl;
 }
-/** Shows the empty canvas while the sheet has no lines and nothing is typed; fades it out otherwise. */
+/** Shows the empty canvas while the sheet has no blocks, graphs, or active edit; fades it out otherwise. */
 function syncEmpty(): void {
-  const empty = !editingId && doc.rows.every((r) => r.kind === 'expr' && !r.text.trim());
+  const empty = !editingId
+    && !graphPane.isConnected
+    && !exampleGraphPane.isConnected
+    && !psychBlock.isConnected
+    && doc.rows.every((r) => r.kind === 'expr' && !r.text.trim());
   if (!empty && !emptyEl) return;
   const el = emptyCanvas();
   if (el.parentElement !== tape) tape.append(el);
@@ -846,7 +965,7 @@ export function initCanvas(): void {
 
   // Wheel: pan; with Ctrl or ⌘ (and a trackpad's pinch), zoom about the pointer. The graph takes its own wheel.
   tape.addEventListener('wheel', (e) => {
-    if (!wide() || e.defaultPrevented) return;
+    if (!wide() || !rects.size || e.defaultPrevented) return;
     e.preventDefault();
     const r = tape.getBoundingClientRect();
     autoView = false;
@@ -893,6 +1012,7 @@ export function initCanvas(): void {
       if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
       if (!moved && onResult) try { block.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
       moved = true;
+      autoView = false;
       block.classList.add('dragging');
       row.at = dragTo(at0, dx, dy);
       block.style.left = `${row.at.x}px`;
@@ -945,9 +1065,71 @@ export function initCanvas(): void {
     openLineMenu(row, e.clientX, e.clientY);
   });
 
+  // Delegated wire and port interaction on `svg` so redrawing wires mid-hover never drops a click.
+  svg.addEventListener('pointerover', (e) => {
+    const el = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-out, circle.port-in');
+    const key = el?.dataset.key;
+    if (key) focusWire(key);
+  });
+  svg.addEventListener('pointerout', (e) => {
+    const from = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-out, circle.port-in');
+    const to = (e.relatedTarget as Element | null)?.closest<SVGElement>('path.hit, circle.port-out, circle.port-in');
+    const key = from?.dataset.key;
+    if (key && to?.dataset.key !== key && focusedWire() === key && pinnedWire !== key) focusWire(null);
+  });
+  svg.addEventListener('pointerdown', (e) => {
+    const el = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-out, circle.port-in, circle.port-free');
+    if (el) e.stopPropagation();
+  });
+  svg.addEventListener('click', (e) => {
+    const el = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-out, circle.port-in, circle.port-free');
+    if (!el) return;
+    e.stopPropagation();
+    if (el.classList.contains('port-out') || el.classList.contains('port-free')) {
+      if (el.dataset.row) insertPortRef(el.dataset.row, el.dataset.port);
+      return;
+    }
+    const key = el.dataset.key;
+    if (!key) return;
+    pinnedWire = pinnedWire === key ? null : key;
+    focusWire(pinnedWire);
+    if (el.dataset.from) flashBlock(el.dataset.from);
+    play('toggle');
+  });
+  svg.addEventListener('dblclick', (e) => {
+    const el = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-in');
+    const rowId = el?.dataset.row;
+    if (!rowId) return;
+    e.stopPropagation();
+    if (doc.rows[rowIndex(rowId)]?.kind === 'expr') editLine(rowId);
+  });
+
+  // Hovering a canvas block softly highlights its connected wires and direct peers.
+  const blockIdFor = (el: Element | null): string | null => {
+    const b = el?.closest<HTMLElement>('.row.blk, .blk-graph, .blk-example-graph, .blk-psych');
+    if (!b) return null;
+    if (b === graphPane) return GRAPH_BLOCK;
+    if (b === exampleGraphPane) return EXAMPLE_GRAPH;
+    if (b === psychBlock) return PSYCH_BLOCK;
+    return [...views].find(([, v]) => v.el === b)?.[0] ?? null;
+  };
+  listEl.addEventListener('mouseover', (e) => {
+    if (!wide()) return;
+    const id = blockIdFor(e.target as Element);
+    if (id !== hoveredBlock) { hoveredBlock = id; syncPeerGlow(); }
+  });
+  listEl.addEventListener('mouseleave', () => {
+    if (hoveredBlock) { hoveredBlock = null; syncPeerGlow(); }
+  });
+
   tape.addEventListener('pointerdown', (e) => {
     const t = e.target as Element;
     if (e.button !== 0 || (t !== tape && t !== listEl && t !== svg && !t.closest('svg.cv-wires'))) return;
+    if (pinnedWire) { pinnedWire = null; focusWire(null); }
+    if (!rects.size) {
+      if (editingId) finishEdit();
+      return;
+    }
     const start = { x: e.clientX, y: e.clientY, dx: view.dx, dy: view.dy };
     let moved = false;
     try { tape.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track */ }
@@ -983,6 +1165,7 @@ export function initCanvas(): void {
     const g0 = { x: laid.x, y: laid.y, w: laid.w, h: laid.h }, start = { x: e.clientX, y: e.clientY };
     graphPane.classList.add('dragging');
     const move = (m: PointerEvent) => {
+      autoView = false;
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
       const g = dragGraph(g0, dx, dy, resize);
       doc.ui.graphBlock = g;
@@ -1020,6 +1203,7 @@ export function initCanvas(): void {
       const dx = (m.clientX - start.x) / view.scale, dy = (m.clientY - start.y) / view.scale;
       if (!moved && Math.hypot(dx, dy) * view.scale < DRAG_SLOP) return;
       moved = true;
+      autoView = false;
       psychBlock.classList.add('dragging');
       const at = dragTo(at0, dx, dy);
       doc.ui.psychAt = at;

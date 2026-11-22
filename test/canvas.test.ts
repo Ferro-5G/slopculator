@@ -241,6 +241,16 @@ describe('routeWire', () => {
     const inner = (r: Rect) => ({ x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h - 2 });
     expect(hits(pts, inner(a)) || hits(pts, inner(b))).toBe(false);
   });
+  it('routes a curve below-left of the graph out its right edge into the graph foot instead of detouring behind a slider', () => {
+    const slider = { x: 90, y: 380, w: 315, h: 50 };
+    const curve = { x: 100, y: 520, w: 170, h: 48 };
+    const graph = { x: 420, y: 60, w: 450, h: 340 };
+    const pts = routeWire(curve, graph, [slider]);
+    expect(hits(pts, slider)).toBe(false);
+    expect(pts[0].x).toBe(curve.x + curve.w);
+    expect(pts.at(-1)!.y).toBe(graph.y + graph.h);
+    expect(Math.min(...pts.map((p) => p.x))).toBeGreaterThanOrEqual(curve.x + curve.w);
+  });
 });
 
 describe('fitsAsIs', () => {

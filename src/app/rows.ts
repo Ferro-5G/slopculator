@@ -419,6 +419,7 @@ export function syncRowTabStops(): void {
   for (const [id, v] of views) {
     const on = id === activeId;
     v.el.querySelectorAll<HTMLElement>('input, button, select').forEach((el) => {
+      if (el.classList.contains('cv-steps')) { el.tabIndex = 0; return; }
       const mouseOnly = el.classList.contains('del') || el.classList.contains('result') || el.classList.contains('chip') || el.classList.contains('add-col');
       el.tabIndex = on && !mouseOnly ? 0 : -1;
     });

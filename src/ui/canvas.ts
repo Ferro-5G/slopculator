@@ -462,8 +462,8 @@ export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { 
   const midY = (r: Rect) => r.y + Math.min(r.h / 2, 26);
   // A wire from a readout's port (outY) leaves from the port, on the block's right edge, and nowhere else.
   const port = opts.outY !== undefined;
-  const outR = { x: a.x + a.w, y: opts.outY ?? midY(a) }, outB = { x: a.x + 28, y: a.y + a.h };
-  const inL = { x: b.x, y: opts.inY ?? midY(b) }, inT = { x: opts.inX ?? b.x + 28, y: b.y };
+  const outR = { x: a.x + a.w, y: opts.outY ?? midY(a) }, outB = { x: a.x + 28, y: a.y + a.h }, outT = { x: a.x + 28, y: a.y };
+  const inL = { x: b.x, y: opts.inY ?? midY(b) }, inT = { x: opts.inX ?? b.x + 28, y: b.y }, inB = { x: opts.inX ?? b.x + 28, y: b.y + b.h };
   const right = a.x + a.w, left = b.x;
   const ys = new Set<number>([a.y - gap, a.y + a.h + gap, b.y - gap, b.y + b.h + gap]);
   const xs = new Set<number>([right + gap, left - gap, Math.min(a.x, b.x) - gap - 8]);
@@ -474,8 +474,21 @@ export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { 
   if (left > right) {
     // Across: out of the right edge, down a lane between them, into the left edge.
     const mids = new Set([Math.round((right + left) / 2) + lane, ...[...xs].filter((x) => x > right && x < left)]);
+    for (const o of obstacles) {
+      if (o.x + o.w > right && o.x + o.w < left && left - (o.x + o.w) >= 10) mids.add(Math.round((o.x + o.w + left) / 2));
+    }
     for (const lx of mids) cands.push([outR, { x: lx, y: outR.y }, { x: lx, y: inL.y }, inL]);
     if (inT.y > outR.y) cands.push([outR, { x: inT.x, y: outR.y }, inT]);
+  }
+  if (a.y > b.y + b.h) {
+    // Up into the foot of b when a sits below it (e.g. a curve below a graph): exit right and turn cleanly up.
+    if (inB.x > outR.x) cands.push([outR, { x: inB.x, y: outR.y }, inB]);
+    if (!port) {
+      const sx = Math.max(a.x, b.x) + 28 + lane;
+      if (sx <= Math.min(a.x + a.w, b.x + b.w) - 28) cands.push([{ x: sx, y: a.y }, { x: sx, y: b.y + b.h }]);
+      const mids = new Set([Math.round((b.y + b.h + a.y) / 2) + lane, ...[...ys].filter((y) => y > b.y + b.h && y < a.y)]);
+      for (const ly of mids) cands.push([outT, { x: outT.x, y: ly }, { x: inB.x, y: ly }, inB]);
+    }
   }
   if (b.y > a.y + a.h && !port) {
     // Straight down, out of the foot into the top, where the two overlap: a block stepped right under what it reads.

@@ -294,15 +294,16 @@ class Parser {
   }
 
   parsePostfix(): Node {
+    const from = this.i;
     let a = this.parsePrimary();
     for (;;) {
       const t = this.peek();
       if (t.type === 'op' && (t.value === '!' || t.value === '%' || t.value === '°')) {
         this.i++;
-        a = { k: 'post', op: t.value as '!' | '%' | '°', a };
+        a = this.mark({ k: 'post', op: t.value as '!' | '%' | '°', a }, from);
       } else if (t.type === 'op' && t.value === 'ᵀ') {
         this.i++;
-        a = { k: 'call', name: 'transpose', args: [a], pos: t.pos };
+        a = this.mark({ k: 'call', name: 'transpose', args: [a], pos: t.pos }, from);
       } else if (t.type === 'op' && t.value === '.') {
         // P.x is the point's x, and d.cdf(1) is cdf(d, 1): the part's name is a function of what it hangs off.
         this.i++;
@@ -310,11 +311,11 @@ class Parser {
         if (part.type !== 'ident') throw new CalcError(unexpectedText('.'), t.pos);
         const name = part.value === 'x' || part.value === 'y' || part.value === 'z' ? `_${part.value}` : part.value;
         const rest = this.isOp('(') ? (this.i++, this.parseList(')', `${part.value}(`)) : [];
-        a = { k: 'call', name, args: [a, ...rest], pos: part.pos, dot: true };
+        a = this.mark({ k: 'call', name, args: [a, ...rest], pos: part.pos, dot: true }, from);
       } else if (t.type === 'op' && t.value === '[' && t.glued && (a.k === 'id' || a.k === 'call')) {
         // L[2] is the second item of L. A number against a bracket, 2[3, 4], still multiplies.
         this.i++;
-        a = { k: 'call', name: '_item', args: [a, ...this.parseItems(']', '"["')], pos: t.pos };
+        a = this.mark({ k: 'call', name: '_item', args: [a, ...this.parseItems(']', '"["')], pos: t.pos }, from);
       } else return a;
     }
   }
@@ -457,16 +458,17 @@ class Parser {
 
   /** Argument of a function written without parentheses: "sin 2x" is sin(2x), "sin x cos x" is sin(x)·cos(x). */
   private parseBareArg(): Node {
+    const from = this.i;
     // sin -30 is sin(−30): a minus right after a function name can only be the input's sign.
     if (this.isOp('-')) {
       this.i++;
-      return { k: 'un', op: '-', a: this.parseBareArg() };
+      return this.mark({ k: 'un', op: '-', a: this.parseBareArg() }, from);
     }
     let a = this.parsePower();
     while (this.startsImplicit()) {
       const t = this.peek();
       if (t.type === 'ident' && PREFIX_FUNCS.has(t.value)) break;
-      a = { k: 'bin', op: '*', a, b: this.parsePower() };
+      a = this.mark({ k: 'bin', op: '*', a, b: this.parsePower() }, from);
     }
     return a;
   }

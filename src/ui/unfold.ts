@@ -12,8 +12,7 @@ import { Lru } from '../engine/memo';
 import { inParens, type Node, type Spanned } from '../engine/parser';
 import type { Precise } from '../engine/precise';
 import type { Value } from '../engine/values';
-import { namesIn } from '../engine/ast';
-import { formatValue, type DisplayOpts } from '../engine/format';
+import { formatValue, plainValue, type DisplayOpts } from '../engine/format';
 import { namesRead, sheetDefiners, type CanvasRow, type Point, type Rect, type Size } from './canvas';
 import { formatChange, tagNumber } from './wiretags';
 
@@ -54,6 +53,8 @@ export interface UnfoldStep {
   inputs: string[];
   value?: Value;
   precise?: Precise;
+  /** True when the step is a comparison or logic test (a > 0), whose numeric 1/0 shows as true/false. */
+  truth?: boolean;
   /** Its error, read through readError, never by its wording. */
   error?: { text: string; form: ErrorForm };
   status: StepStatus;
@@ -98,9 +99,11 @@ function lineShape(text: string): Shape | null {
       const read = parseLineSpanned(text);
       const n = read.tree;
       const lhs = n.k === 'rel' ? n.items[0] : null;
-      // r = … works out its right side; f(x) = …, y = … and a < b aren't worked out as one value.
+      // r = … works out its right side; truth comparisons (3² + 4² = 5², 2·3 > 5) work out their sides;
+      // f(x) = …, y = …, and regressions (~) aren't worked out as one value.
       if (n.k !== 'rel') hit = { read, root: n };
       else if (n.ops.length === 1 && n.ops[0] === '=' && lhs?.k === 'id' && lineDefines(text) === lhs.name) hit = { read, root: n.items[1] };
+      else if (!n.ops.includes('~') && !(n.ops.length === 1 && n.ops[0] === '=' && (lhs?.k === 'call' || (lhs?.k === 'id' && (lhs.name === 'x' || lhs.name === 'y'))))) hit = { read, root: n };
     } catch {
       // A line that doesn't parse has no steps.
     }
@@ -116,8 +119,8 @@ function lineShape(text: string): Shape | null {
 function isLeaf(n: Node, read: Spanned): boolean {
   switch (n.k) {
     case 'num': case 'str': case 'id': return true;
-    case 'un': return isLeaf(n.a, read);
-    case 'post': return n.op !== '!' && (n.a.k === 'num' || (n.a.k === 'un' && n.a.a.k === 'num'));
+    case 'un': return !read.spanOf(n) || isLeaf(n.a, read);
+    case 'post': return !read.spanOf(n) || (n.op !== '!' && (n.a.k === 'num' || (n.a.k === 'un' && n.a.a.k === 'num')));
     case 'list': case 'point': case 'vec': case 'bracket': return n.items.every((c) => isLeaf(c, read));
     default: return !read.spanOf(n);
   }
@@ -125,10 +128,52 @@ function isLeaf(n: Node, read: Spanned): boolean {
 
 const family = (op: string): string | null => (op === '+' || op === '-' ? '+' : op === '*' ? '*' : null);
 
+/** Internal call names whose arguments are ordinary value expressions (no bound variable). */
+const OPEN_INTERNAL = new Set(['_and', '_or', '_xor', '_item', '_span', '_x', '_y', '_z']);
+/** Builtin calls whose argument at `bindIdx` names a local variable bound inside `exprIdx`. */
+const BINDER_ARGS: Record<string, { bind: number; expr: number }> = {
+  sum: { bind: 1, expr: 0 },
+  prod: { bind: 1, expr: 0 },
+  integral: { bind: 1, expr: 0 },
+  riemann: { bind: 1, expr: 0 },
+  deriv: { bind: 1, expr: 0 },
+  deriv2: { bind: 1, expr: 0 },
+  tangent: { bind: 1, expr: 0 },
+  solve: { bind: 1, expr: 0 },
+  seq: { bind: 1, expr: 0 },
+  _each: { bind: 1, expr: 0 },
+};
+
+/** Whether a tree references x or y outside a binder (a curve rather than solve(x^2 = -1, x)). */
+function hasFreeGraphVar(n: Node, bound: ReadonlySet<string> = new Set()): boolean {
+  switch (n.k) {
+    case 'id': return (n.name === 'x' || n.name === 'y') && !bound.has(n.name);
+    case 'num': case 'str': return false;
+    case 'un': case 'post': case 'abs': return hasFreeGraphVar(n.a, bound);
+    case 'bin': return hasFreeGraphVar(n.a, bound) || hasFreeGraphVar(n.b, bound);
+    case 'list': case 'point': case 'vec': case 'bracket': case 'rel': return n.items.some((c) => hasFreeGraphVar(c, bound));
+    case 'piece': return n.branches.some((b) => (b.cond ? hasFreeGraphVar(b.cond, bound) : false) || (b.val ? hasFreeGraphVar(b.val, bound) : false));
+    case 'call': {
+      const b = BINDER_ARGS[n.name];
+      if (b && n.args[b.bind]?.k === 'id' && (n.name !== 'sum' && n.name !== 'prod' || n.args.length === 4)) {
+        const inner = new Set(bound);
+        inner.add((n.args[b.bind] as Extract<Node, { k: 'id' }>).name);
+        return n.args.some((arg, i) => (i === b.bind ? false : hasFreeGraphVar(arg, i === b.expr ? inner : bound)));
+      }
+      if (n.name === '_with' && n.args.length >= 2) {
+        const inner = new Set(bound);
+        for (const a of n.args.slice(1)) if (a.k === 'rel' && a.items[0]?.k === 'id') inner.add(a.items[0].name);
+        return hasFreeGraphVar(n.args[0], inner) || n.args.slice(1).some((a) => (a.k === 'rel' && a.items[1] ? hasFreeGraphVar(a.items[1], bound) : false));
+      }
+      return (n.base ? hasFreeGraphVar(n.base, bound) : false) || n.args.some((a) => hasFreeGraphVar(a, bound));
+    }
+  }
+}
+
 /**
  * The parts a step reads. A chain of + and −, or of ×, is one step (4ac, b² − 4ac + d) unless a part of it was put in
- * its own parentheses. A call to a function that binds a name or reads its inputs as written (sum, integral, solve,
- * convert) keeps its inputs, since they mean nothing on their own; so do piecewise and with clauses.
+ * its own parentheses. Calls that bind a variable keep their bound body opaque while still exposing ordinary bounds,
+ * conditions, or conversion inputs.
  */
 function partsOf(n: Node, isDefined: (name: string) => boolean): Node[] {
   switch (n.k) {
@@ -138,19 +183,36 @@ function partsOf(n: Node, isDefined: (name: string) => boolean): Node[] {
       return [...flat(n.a), ...flat(n.b)];
     }
     case 'un': case 'post': case 'abs': return [n.a];
-    case 'call': return n.base || n.name.startsWith('_') || (BUILTINS[n.name]?.lazy && !isDefined(n.name)) ? [] : n.args;
+    case 'rel': return n.items;
+    case 'piece': return n.branches.flatMap((b) => [b.cond, b.val].filter((x): x is Node => !!x));
+    case 'call': {
+      if (n.name.startsWith('_')) return OPEN_INTERNAL.has(n.name) ? n.args : [];
+      if (BUILTINS[n.name]?.lazy && !isDefined(n.name)) {
+        if (n.name === 'convert') return n.args.slice(0, 1);
+        if (n.name === 'if') return n.args;
+        if (n.name === 'sum' || n.name === 'prod') {
+          return n.args.length === 4 && n.args[1]?.k === 'id' ? n.args.slice(2) : n.args;
+        }
+        if (n.name === 'integral' || n.name === 'riemann') return n.args.length >= 4 ? n.args.slice(2, 4) : [];
+        if (n.name === 'deriv' || n.name === 'deriv2' || n.name === 'tangent') return n.args.length >= 3 ? n.args.slice(2) : [];
+        return [];
+      }
+      return n.args;
+    }
     case 'list': case 'point': case 'vec': case 'bracket': return n.items;
     default: return [];
   }
 }
 
-/** Whether a line has steps to show: a value line (or one that fails) with more than one operation. */
-export function canUnfold(text: string, result?: RowResult): boolean {
-  // A slider, a table, and a line with neither a value nor an error (a curve, a function) have no working to show.
-  if (result && (result.slider || result.table || (result.value === undefined && !result.error))) return false;
+/** Whether a line has steps to show: a value or truth line (or one that fails) with more than one operation. */
+export function canUnfold(text: string, result?: RowResult, defined?: ReadonlySet<string>): boolean {
+  // A slider, a table, and a line with neither a value, truth nor an error (a curve, a function) have no working to show.
+  if (result && (result.slider || result.table || (result.value === undefined && result.truth === undefined && !result.error))) return false;
   const shape = lineShape(text);
-  if (!shape || isLeaf(shape.root, shape.read) || (result?.value === undefined && namesIn(shape.root).some((m) => m === 'x' || m === 'y'))) return false;
-  return partsOf(shape.root, () => false).some((p) => !isLeaf(p, shape.read));
+  if (!shape || isLeaf(shape.root, shape.read)) return false;
+  if (result?.value === undefined && result?.truth === undefined && (result?.graph.length || hasFreeGraphVar(shape.root))) return false;
+  const isDef = defined ? (name: string) => defined.has(name) : () => false;
+  return partsOf(shape.root, isDef).some((p) => !isLeaf(p, shape.read));
 }
 
 const failed = (r: PartResult): r is { error: string } => 'error' in r;
@@ -173,27 +235,54 @@ export function unfoldSteps(text: string, scope: UnfoldScope): Unfolded | null {
 
   const steps: (UnfoldStep & { node: Node })[] = [];
   const outline: string[] = [];
+  const evalCond = (cond: Node): PartResult => evaluateParts(rows, scope.settings, index, [cond])[0];
+  /**
+   * The children of `n` that actually execute: for piecewise and lazy `if`, evaluate conditions lazily so untaken
+   * branches (like `1/0` in `{1 > 0: 2+3, 1/0}`) are never evaluated or reported as failures.
+   */
+  const activeParts = (n: Node): Node[] => {
+    if (n.k === 'piece') {
+      const out: Node[] = [];
+      for (const b of n.branches) {
+        if (!b.cond) { if (b.val) out.push(b.val); break; }
+        out.push(b.cond);
+        const r = evalCond(b.cond);
+        if (failed(r)) break;
+        if (typeof r.value === 'number' && r.value !== 0) { if (b.val) out.push(b.val); break; }
+      }
+      return out;
+    }
+    if (n.k === 'call' && n.name === 'if' && !isDefined('if') && n.args.length >= 2) {
+      const [cond, yes, no] = n.args;
+      const r = evalCond(cond);
+      if (failed(r)) return [cond];
+      return typeof r.value === 'number' && r.value !== 0 ? [cond, yes] : no ? [cond, no] : [cond];
+    }
+    return partsOf(n, isDefined);
+  };
   /** The names a part reads itself: its leaves', or all of an opaque call's. */
-  const inputsOf = (n: Node): string[] => {
-    const parts = partsOf(n, isDefined);
+  const inputsOf = (n: Node, parts: readonly Node[]): string[] => {
     if (!parts.length) return namesRead(n, isDefined);
     return [...new Set(parts.filter((p) => isLeaf(p, read)).flatMap((p) => namesRead(p, isDefined)))];
   };
   const walk = (n: Node, id: string, depth: number, parent: string | null): string[] => {
     if (isLeaf(n, read)) return [];
     const span = read.spanOf(n)!;
-    const step = { id, node: n, text: read.text.slice(span[0], span[1]).trim(), span: sameText ? span : null, depth, height: 0, parent, reads: [] as string[], names: namesRead(n, isDefined), inputs: inputsOf(n), status: 'ok' as StepStatus };
+    const parts = activeParts(n);
+    const step = { id, node: n, text: read.text.slice(span[0], span[1]).trim(), span: sameText ? span : null, depth, height: 0, parent, reads: [] as string[], names: namesRead(n, isDefined), inputs: inputsOf(n, parts), status: 'ok' as StepStatus };
     outline.push(id);
-    partsOf(n, isDefined).forEach((c, k) => step.reads.push(...walk(c, `${id}.${k}`, depth + 1, id)));
+    parts.forEach((c, k) => step.reads.push(...walk(c, `${id}.${k}`, depth + 1, id)));
     steps.push(step);
     return [id];
   };
-  const reads = partsOf(root, isDefined).flatMap((c, k) => walk(c, String(k), 1, null));
+  const rootParts = activeParts(root);
+  const reads = rootParts.flatMap((c, k) => walk(c, String(k), 1, null));
   if (!steps.length) return null;
 
   const worked = evaluateParts(rows, scope.settings, index, [...steps.map((s) => s.node), root]);
   const byId = new Map(steps.map((s) => [s.id, s]));
   const bad = (ids: string[]) => ids.some((id) => byId.get(id)!.status !== 'ok');
+  const isTruthNode = (n: Node) => n.k === 'rel' || (n.k === 'call' && (n.name === '_and' || n.name === '_or' || n.name === '_xor'));
   steps.forEach((s, k) => {
     const r = worked[k];
     s.height = s.reads.length ? 1 + Math.max(...s.reads.map((id) => byId.get(id)!.height)) : 0;
@@ -203,12 +292,13 @@ export function unfoldSteps(text: string, scope: UnfoldScope): Unfolded | null {
     } else {
       s.value = r.value;
       if (r.precise) s.precise = r.precise;
+      if (isTruthNode(s.node) && typeof r.value === 'number') s.truth = true;
     }
   });
   const own = worked[steps.length];
   const line: Unfolded['line'] = failed(own)
-    ? { reads, inputs: inputsOf(root), error: { text: own.error, form: readError(own.error) }, status: bad(reads) ? 'after' : 'fails' }
-    : { reads, inputs: inputsOf(root), value: own.value, ...(own.precise ? { precise: own.precise } : {}), status: 'ok' };
+    ? { reads, inputs: inputsOf(root, rootParts), error: { text: own.error, form: readError(own.error) }, status: bad(reads) ? 'after' : 'fails' }
+    : { reads, inputs: inputsOf(root, rootParts), value: own.value, ...(own.precise ? { precise: own.precise } : {}), status: 'ok' };
   const byName = new Map<string, string[]>();
   for (const s of steps) for (const name of s.names) byName.set(name, [...(byName.get(name) ?? []), s.id]);
   return {
@@ -246,14 +336,28 @@ export function changedSteps(before: Unfolded | null, after: Unfolded): Set<stri
 }
 
 /**
- * What a step shows for its answer: a number at STEP_SIG significant figures, another value as the line would show it,
- * the error's short form where the line goes wrong (its full text shows on hover, focus or a tap), and NO_VALUE after.
+ * What a step shows for its answer: exact/formatted form when Exact mode, fixed places, full digits, or an overflowed
+ * BigInt exact value applies; otherwise a number at STEP_SIG significant figures; another value as the line would show
+ * it; the error's short form where the line goes wrong; and NO_VALUE after.
  */
 export function stepAnswer(s: UnfoldStep, display: DisplayOpts): string {
   if (s.status === 'after') return NO_VALUE;
   if (s.error) return shortError(s.error.form, s.error.text);
-  if (typeof s.value === 'number') return tagNumber(s.value, STEP_SIG);
+  if (s.truth && typeof s.value === 'number') return s.value ? 'true' : 'false';
+  if (typeof s.value === 'number') {
+    if ((display.exact && s.precise) || (!Number.isFinite(s.value) && s.precise) || display.places !== null || display.fullDigits) {
+      return formatValue(s.value, display, false, s.precise);
+    }
+    return tagNumber(s.value, STEP_SIG);
+  }
   return s.value === undefined ? '' : formatValue(s.value, display, false, s.precise);
+}
+
+/** Plain clipboard text for an ok step, shared by web and native front ends; null for failing or empty steps. */
+export function stepCopyText(s: UnfoldStep, display: DisplayOpts): string | null {
+  if (s.status !== 'ok' || s.value === undefined) return null;
+  if (s.truth && typeof s.value === 'number') return s.value ? 'true' : 'false';
+  return plainValue(s.value, display, false, s.precise);
 }
 
 /**

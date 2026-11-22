@@ -344,6 +344,8 @@ export interface RouteOptions {
   extra?: readonly Rect[];
   /** A box to end in other than the wire's own block (a step of the line it feeds), and that block stays in the way. */
   to?: Rect;
+  /** When several wires enter the same step box, this wire's index and total count so their ports spread apart. */
+  inSlot?: { index: number; count: number };
   /** Where a wire from a readout's port leaves its block's right edge (the port's height, in world units). */
   outY?: number;
   /** Rows drawn inside another block (a moist-air state in the psychrometric chart), by the block they're in. */
@@ -353,7 +355,7 @@ export interface RouteOptions {
 /**
  * One wire's route, round every block (and round the example's frame, unless it belongs to the example). Several
  * wires into one block arrive at their own heights down its left edge, in the order their sources sit; a wire ending
- * in a step comes in at the step's middle.
+ * in a step comes in at the step's middle (or spread evenly when several enter the same step).
  */
 export function wideWireRoute(w: Wire, wires: readonly Wire[], rects: ReadonlyMap<string, Rect>, frame: Rect | null, isExample: (id: string) => boolean, o: RouteOptions = {}): Point[] | null {
   const editingId = o.editingId ?? null;
@@ -367,13 +369,14 @@ export function wideWireRoute(w: Wire, wires: readonly Wire[], rects: ReadonlyMa
   if (frame && !isExample(w.from) && !isExample(w.to)) obstacles.push(frame);
   // Wires into the block (or any row inside it), each at its own height, in the order their sources sit.
   const into = o.to ? [w] : wires.filter((x) => host(x.to) === host(w.to) && rects.has(x.from) && x.from !== editingId && host(x.from) !== host(x.to)).sort((p, q) => rects.get(p.from)!.y - rects.get(q.from)!.y);
-  const i = into.findIndex((x) => x === w || (x.from === w.from && x.to === w.to && x.fromPort === w.fromPort));
-  const many = into.length > 1;
+  const count = o.to ? (o.inSlot?.count ?? 1) : into.length;
+  const i = o.to ? (o.inSlot?.index ?? 0) : into.findIndex((x) => x === w || (x.from === w.from && x.to === w.to && x.fromPort === w.fromPort));
+  const many = count > 1;
   return routeWire(a, b, obstacles, {
-    inY: many ? Math.min(b.y + b.h - 16, b.y + 26 + i * WIRE_IN_STEP) : undefined,
+    inY: many ? (o.to ? Math.round(b.y + (b.h * (i + 1)) / (count + 1)) : Math.min(b.y + b.h - 16, b.y + 26 + i * WIRE_IN_STEP)) : undefined,
     // Into its top too: several wires arrive at their own places along it, so two never draw (or tag) as one.
     inX: many ? Math.min(b.x + b.w - 16, b.x + 28 + i * WIRE_IN_STEP) : undefined,
-    lane: many ? Math.round((i - (into.length - 1) / 2) * 8) : 0,
+    lane: many ? Math.round((i - (count - 1) / 2) * 8) : 0,
     minRun: o.minRun,
     // A tag on a run down needs its height and a little room: 24 px and 16.
     minDrop: o.minRun ? 40 : 0,

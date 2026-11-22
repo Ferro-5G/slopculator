@@ -1,13 +1,13 @@
 // Unfold, drawn: a line's steps (src/ui/unfold.ts works them out). A Steps button on a block opens them: on a wide
 // canvas, a dashed tray under the line with the steps in columns, wired into each other and up into the line; on a
 // narrow one, an indented tree under the block. During a drag only the steps that changed light, with their change.
-import type { Rect, Size } from '../ui/canvas';
+import { sheetDefiners, type Rect, type Size } from '../ui/canvas';
 import { typeset, type SheetNames } from '../ui/typeset';
-import { canUnfold, changedSteps, stepAnswer, stepDeltas, stepsReached, trayLayout, unfoldSteps, UNFOLD_LABEL, type TrayLayout, type Unfolded } from '../ui/unfold';
+import { canUnfold, changedSteps, stepAnswer, stepCopyText, stepDeltas, stepsReached, trayLayout, unfoldSteps, UNFOLD_LABEL, type TrayLayout, type Unfolded } from '../ui/unfold';
 import type { DragSession } from '../ui/wiretags';
 import type { Row } from './docmodel';
 import { h } from './dom';
-import { motionNow } from './feedback';
+import { copy, motionNow } from './feedback';
 import { mathNode } from './mathdom';
 import { views } from './rowviews';
 import { doc, opts, results, saveSoon } from './sheet';
@@ -109,7 +109,17 @@ function stepEl(o: OpenLine, sid: string, i: number): HTMLElement {
   el.addEventListener('mouseleave', () => { if (document.activeElement !== el) show(false); });
   el.addEventListener('focus', () => show(true));
   el.addEventListener('blur', () => show(false));
-  el.addEventListener('click', (e) => { e.stopPropagation(); show(!el!.classList.contains('full') || document.activeElement === el); });
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const s = o.u.steps.find((x) => x.id === sid);
+    if (!s) return;
+    const text = stepCopyText(s, opts());
+    if (text !== null) {
+      copy(text, el!);
+      return;
+    }
+    show(!el!.classList.contains('full'));
+  });
   el.addEventListener('pointerdown', (e) => e.stopPropagation());
   el.addEventListener('keydown', (e) => {
     const ids = o.tray.classList.contains('narrow') ? o.u.outline : o.u.steps.map((s) => s.id);
@@ -130,21 +140,23 @@ function paintStep(o: OpenLine, sid: string): void {
   const v = el.querySelector<HTMLElement>('.v')!;
   v.textContent = el.classList.contains('full') && s.error && s.status === 'fails' ? s.error.text : stepAnswer(s, opts());
   v.classList.toggle('eq', s.status === 'ok');
-  el.title = s.error && s.status === 'fails' ? s.error.text : '';
+  el.title = s.error && s.status === 'fails' ? s.error.text : s.status === 'ok' ? 'Click to copy' : '';
 }
 
 /**
  * Brings each line's Steps button and open tray (kept in `host`) up to date. Runs before the canvas is laid out;
  * returns the room each open tray needs under its line on a wide canvas.
  */
-export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean, drag: DragSession | null, sheetNames: SheetNames): Map<string, Size> {
+export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean, drag: DragSession | null, sheetNames: SheetNames, hosted: ReadonlySet<string> = new Set()): Map<string, Size> {
   const room = new Map<string, Size>();
   const seen = new Set<string>();
+  const defined = new Set(sheetDefiners(doc.rows, results, { lineNames: doc.settings.lineNames }).keys());
+  const look = doc.ui.look ?? 'modern';
   doc.rows.forEach((row, k) => {
     const v = views.get(row.id);
     if (!v || row.kind !== 'expr') return;
     const r = results[k];
-    const can = row.id !== composerId && canUnfold(row.text, r);
+    const can = row.id !== composerId && !hosted.has(row.id) && canUnfold(row.text, r, defined);
     const b = can || buttons.has(row.id) ? button(row, v.el) : null;
     if (b) {
       b.hidden = !can;
@@ -180,10 +192,11 @@ export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean,
     for (const [i, sid] of ids.entries()) {
       const s = u.steps.find((x) => x.id === sid)!;
       const el = stepEl(o, sid, i);
-      if (o.texts.get(sid) !== s.text) {
-        const boxes = typeset(s.text, { stack: true, names: sheetNames });
+      const textKey = `${look}\n${s.text}`;
+      if (o.texts.get(sid) !== textKey) {
+        const boxes = typeset(s.text, { stack: look !== 'retro', names: sheetNames });
         el.querySelector('.sm')!.replaceChildren(boxes ? mathNode(boxes) : s.text);
-        o.texts.set(sid, s.text);
+        o.texts.set(sid, textKey);
       }
       paintStep(o, sid);
       el.querySelector('.d')!.textContent = moved.get(sid) ?? '';

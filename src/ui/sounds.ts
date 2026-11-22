@@ -1,6 +1,6 @@
-// The app's sounds are short recordings: key clicks, a switch, a chime. scripts/make-sounds.mjs cuts them from two
-// public-domain packs into src/assets/sounds/, one file per cue and variant: tick.wav, tick-1.wav, tick-2.wav.
-// Keys come in variants, takes of the same sound, so fast typing doesn't repeat one sample like a machine gun.
+// The app's sounds are short tactile micro-sounds synthesized offline by scripts/make-sounds.mjs into
+// src/assets/sounds/, one file per cue and variant: tick.wav, tick-1.wav, tick-2.wav.
+// Keys come in subtle variants so fast typing never repeats one sample like a machine gun.
 
 export type SoundCue = 'tick' | 'fn' | 'enter' | 'copy' | 'error' | 'clear' | 'toggle' | 'detent' | 'done';
 
@@ -10,7 +10,7 @@ export const VARIANTS: Record<SoundCue, number> = {
 
 /** How long each cue's longest variant plays, in ms, rounded up. A player that reuses voices waits this long. */
 const MS: Record<SoundCue, number> = {
-  tick: 40, fn: 92, enter: 72, copy: 124, error: 142, clear: 60, toggle: 61, detent: 12, done: 72,
+  tick: 20, fn: 24, enter: 40, copy: 90, error: 86, clear: 56, toggle: 28, detent: 14, done: 100,
 };
 
 export function cueMs(cue: SoundCue): number {
