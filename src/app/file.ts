@@ -1,6 +1,6 @@
 import { downloadBlob, fileDate, fileStem } from './download';
 import { showPrivacy } from './privacydialog';
-import { copyName, isEmptyLine, linesLabel, SAVED_SHEETS_FAILED, sheetAsText as sheetText, sheetLineCount, withSheetView } from '../ui/document';
+import { copyName, hasSheetRows, isEmptyLine, linesLabel, SAVED_SHEETS_FAILED, sheetAsText as sheetText, sheetLineCount, withSheetView } from '../ui/document';
 import { setSound, play } from './sound';
 import { showHelp, COMMANDS } from './commands';
 import { syncers } from './controls';
@@ -14,12 +14,13 @@ import { openHistoryDialog } from './historydialog';
 import { graph, modeBar } from './layout';
 import { placePopover, dialogShell, cancelButton, closePopovers, arrowsMove, addPopover } from './overlay';
 import { type SavedSheet, loadSessions, store, sheetExists, writeSheet, removeSession, KEYS } from './persistence';
-import { coarse, kb } from './platform';
+import { coarse, kb, narrow } from './platform';
 import { rebuildRows } from './rows';
 import { focusRow, focusLine } from './rowviews';
 import { currentSheet, doc, saveSoon, autosaveSheet, setDoc, setCurrentSheetName, opts, results, sheetChanged, sheetFromAnotherTab, storedNameIsOurs, recompute } from './sheet';
 import { applyUI } from './shell';
-import { applyTheme, syncAppearanceSlots } from './theme';
+import { openModeSheet } from './settings';
+import { applyTheme, setAppear, syncAppearanceSlots } from './theme';
 import { hideToast, showToast } from './toast';
 
 const menuBtn = h('button', { type: 'button', class: 'menu-btn', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, 'File');
@@ -58,6 +59,7 @@ export function buildMenu(): void {
       h('div', { class: 'menu-row file-row', role: 'group', 'aria-label': 'Sheet file' }, h('span', { 'aria-hidden': 'true' }, 'Sheet file'),
         h('div', { class: 'menu-btns' }, small('Export', 'Export the sheet', '.json', exportJSON), small('Import', 'Import a sheet', '.json', importJSON))),
       h('hr'),
+      item('Themes & appearance…', '', () => (narrow.matches ? openModeSheet('appear') : setAppear(true, true))),
       item('Start with an example…', '', openExamples),
       item('Privacy', '', showPrivacy),
     );
@@ -145,9 +147,10 @@ const sheetTitle = h('button', { type: 'button', class: 'sheet-title', title: 'N
  * has a name. The downloaded file has no home page, so there the logo stays a picture.
  */
 const homeHref = document.querySelector<HTMLMetaElement>('meta[name="slopculator-home"]')?.content;
+const standaloneApp = matchMedia('(display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone;
 const brandName = h('span', { class: 'brand-name' }, 'Slopculator');
 const wordmark = () => h('span', { class: 'wordmark', 'aria-hidden': 'true' }, 'SLOPCULATOR');
-const brandHome = homeHref
+const brandHome = homeHref && !standaloneApp
   ? h('a', { class: 'brand-home', href: homeHref, 'aria-label': 'Slopculator home', title: 'Slopculator home' }, appMark(), wordmark(), brandName)
   : null;
 function setCurrentSheet(name: string | null, persist = true): void {
@@ -279,9 +282,15 @@ export function importJSON(): void {
     const f = input.files?.[0];
     if (!f) return;
     try {
+      const parsed: unknown = JSON.parse(await f.text());
+      // Checked before anything changes: another kind of JSON would otherwise replace the sheet with a blank one.
+      if (!hasSheetRows(parsed)) {
+        showToast(`Couldn't read ${f.name}: it isn't a Slopculator sheet`);
+        return;
+      }
       // The file isn't the named sheet that was open, so saving afterward mustn't write over that one.
       if (!leaveSheet()) return;
-      replaceDoc(normalizeDoc(JSON.parse(await f.text())), null, `Loaded ${f.name}`);
+      replaceDoc(normalizeDoc(parsed), null, `Loaded ${f.name}`);
     } catch (e) {
       showToast(`Couldn't read ${f.name}: ${e instanceof Error ? e.message : e}`);
     }

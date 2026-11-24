@@ -4,6 +4,16 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.2.6-alpha] - 2026-11-23
+
+- Phone web app refresh: added a web app manifest and Apple touch icon for Home Screen installs, fixed standalone iOS top-bar blur and bottom safe-area height, matched the mobile machined matte keypad and frosted menus, centered `Deg | Rad`, kept `123` toggling the keypad cleanly, and prevented touch hover states from sticking.
+- Added `Themes & appearance…` to the phone `File` menu and a `Themes` shortcut in the `Modes` header, fixed wide phone sliders wrapping cleanly onto two rows, kept phone value blocks without Steps on one line, fixed phone scroll resetting to the top, and stopped the bottom edge fade from clipping the example graph at rest.
+- Common math mistake warnings now surface directly in the canvas composer and on blocks as tappable `!` badges across web and mobile, with one-tap fixes (`-3^2` -> `(-3)^2`, `9^1/2` -> `9^(1/2)`, `2^3^2` -> `(2^3)^2`, `1/2x` -> `(1/2)x`) and one-tap `Switch to Deg` / `Switch to Rad` angle switches (including negative angles like `sin(-30)`).
+- Reloading while the input showed `Update r` no longer leaves `r` defined twice. The unsent update returns to the input.
+- Importing a JSON file that isn't a Slopculator sheet now says so and leaves the open sheet alone, instead of replacing it with a blank one.
+- On a phone held sideways, the number keys no longer collapse to nothing.
+- The Data List Builder keeps `2 + 3` as one item, won't insert a list that doesn't parse, and still shows its stats when a function named `datalist` exists.
+
 ## [0.2.5-alpha] - 2026-11-22
 
 - The graph block now has a full-width top drag bar and an `Auto` button to send it back to automatic layout. Small clicks no longer pin a block by accident, dragging follows the pointer 1:1 and snaps on drop, `Reset layout` in the top bar resets every moved block, and `Reset position` in a line's menu resets one block.
@@ -107,7 +117,8 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.5-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.6-alpha...HEAD
+[0.2.6-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.5-alpha...v0.2.6-alpha
 [0.2.5-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...v0.2.5-alpha
 [0.2.4-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.3-alpha...v0.2.4-alpha
 [0.2.3-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.2-alpha...v0.2.3-alpha

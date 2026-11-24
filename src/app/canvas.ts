@@ -239,9 +239,32 @@ function overlays(): Rect[] {
   return [];
 }
 
+function syncNarrowScrollEdges(): void {
+  if (wide()) {
+    listEl.classList.remove('fade-top', 'fade-bottom');
+    return;
+  }
+  const top = listEl.scrollTop > 4;
+  let bottom = false;
+  if (listEl.clientHeight > 0 && listEl.scrollHeight - listEl.clientHeight > 4) {
+    // Only show the bottom fade when a real block extends below the visible canvas, not just empty padding or overlays.
+    const viewBottom = listEl.getBoundingClientRect().bottom;
+    for (let i = listEl.children.length - 1; i >= 0; i--) {
+      const el = listEl.children[i];
+      if (el instanceof HTMLElement && !el.hidden && el.offsetHeight > 0 && getComputedStyle(el).position !== 'absolute') {
+        bottom = el.getBoundingClientRect().bottom > viewBottom + 4;
+        break;
+      }
+    }
+  }
+  listEl.classList.toggle('fade-top', top);
+  listEl.classList.toggle('fade-bottom', bottom);
+}
+
 function layoutWide(cid: string): void {
   tape.classList.add('cv-wide');
   tape.classList.remove('cv-narrow');
+  listEl.classList.remove('fade-top', 'fade-bottom');
   // The column's widths, steps and gaps (cascadeColumnLayout) don't carry over to the world.
   for (const el of [...[...views.values()].map((v) => v.el), psychBlock, exampleGraphPane, graphPane]) Object.assign(el.style, { marginLeft: '', marginTop: '' });
   for (const el of [...[...views.values()].map((v) => v.el), psychBlock, exampleGraphPane]) el.style.width = '';
@@ -422,10 +445,11 @@ function layoutNarrow(cid: string): void {
     }
     return [[id, { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }] as const];
   }));
-  frameExample(8, 34);
+  frameExample(8, tape.clientHeight > 0 && tape.clientHeight < 340 ? 28 : 34);
   syncNodeControls();
   syncMobileSelection();
   applyView();
+  syncNarrowScrollEdges();
 }
 
 /** The column's Cascade options: its margin (the list's left padding) and the width between it and the right padding. */
@@ -814,6 +838,11 @@ function settleLift(): void {
   const el = views.get(l.id)?.el;
   const r = rects.get(l.id);
   if (!el || !r || !el.isConnected) return;
+  if (!wide()) {
+    const target = el.offsetTop + el.offsetHeight - listEl.clientHeight + 18;
+    if (target > listEl.scrollTop) listEl.scrollTo({ top: target, behavior: motion() ? 'smooth' : 'auto' });
+    syncNarrowScrollEdges();
+  }
   if (wide() && !autoView) {
     const a = freeArea();
     const sx = r.x * view.scale + view.dx, sy = r.y * view.scale + view.dy;
@@ -1152,7 +1181,11 @@ export function initCanvas(): void {
     if (pending) return;
     pending = requestAnimationFrame(() => { pending = 0; layoutCanvas(); });
   });
-  new ResizeObserver(() => { if (wide()) layoutCanvas(); }).observe(tape);
+  new ResizeObserver(() => {
+    if (wide()) layoutCanvas();
+    else syncNarrowScrollEdges();
+  }).observe(tape);
+  listEl.addEventListener('scroll', syncNarrowScrollEdges, { passive: true });
   narrow.addEventListener('change', () => { autoView = true; layoutCanvas(); });
 
   // Wheel: pan; with Ctrl or ⌘ (and a trackpad's pinch), zoom about the pointer. The graph takes its own wheel.

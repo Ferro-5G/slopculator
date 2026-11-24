@@ -12,13 +12,14 @@ import { h } from './dom';
 import { addRow, dragEnds, pushStep, setEnterHandler, setLineText } from './edits';
 import { motionNow, pulse } from './feedback';
 import { slotForEnd } from '../ui/slots';
-import { slotInfo } from '../ui/linestate';
+import { slotInfo, shownWarning } from '../ui/linestate';
 import { keyButton } from './keypad';
 import { composerDock } from './layout';
-import { kb } from './platform';
+import { kb, narrow } from './platform';
 import { views, focusRow, setFocusGuard } from './rowviews';
 import { setTypingPauseListener } from './rows';
 import { doc, opts, rowIndex, results, screen, renderNow, setEvalRows } from './sheet';
+import { keypadOn, setKeypad } from './shell';
 import { ti, closeThumb } from './thumb';
 import { CURVES, DURATIONS } from '../ui/motiontokens';
 
@@ -64,7 +65,10 @@ export function stirAurora(): void {
 export function draftId(): string {
   const last = doc.rows[doc.rows.length - 1];
   if (draftRow && last?.id === draftRow) return draftRow;
-  if (last?.kind === 'expr' && isEmptyLine(last)) {
+  // A last line that would change the line defining its name is an update that was never sent (the sheet was saved
+  // while it was being typed, then reloaded). Kept as a block it would define the name twice; the phone app already
+  // treats the last line as the draft, so it goes back in the composer here too.
+  if (last?.kind === 'expr' && (isEmptyLine(last) || composerIntent(last.text.trim(), doc.rows, null, last.id).kind === 'update')) {
     draftRow = last.id;
     return draftRow;
   }
@@ -164,7 +168,9 @@ export function syncComposer(): void {
   composerBox.dataset.state = state;
   composerBox.classList.toggle('lit', composerGlows(state));
   // An error only once typing pauses, short and whole on the row (composerError).
-  composerBox.classList.toggle('shows-error', !!composerError(text, r, { calm, typing: !!v?.el.classList.contains('typing') }));
+  const typingNow = !!v?.el.classList.contains('typing');
+  composerBox.classList.toggle('shows-error', !!composerError(text, r, { calm, typing: typingNow }));
+  composerBox.classList.toggle('has-warn', !!shownWarning(r, typingNow));
   // No answer on the right for a bare number or a name set to one: it would only say what was typed.
   composerBox.classList.toggle('no-answer', composerAnswer(text, r, opts()) === null);
   // A figure line's table (the unit circle's, the tangent's) takes no room at all: it would wrap the line.
@@ -237,6 +243,9 @@ export function initComposer(): void {
       e.preventDefault();
       cancelEdit();
     }
+  });
+  composerBox.addEventListener('pointerdown', () => {
+    if (narrow.matches && !keypadOn() && !doc.ui.sysKeyboard) setKeypad(true);
   });
   // A click on the composer's empty part puts the caret back in its line.
   composerBox.addEventListener('mousedown', (e) => {

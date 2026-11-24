@@ -394,6 +394,7 @@
   left: 9px;
   top: 11px;
   bottom: 11px;
+  height: auto;
   width: 4px;
   padding: 0;
   margin: 0;
@@ -781,10 +782,12 @@
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
-.canvas-ui .example-clear:hover {
-  color: var(--ink);
-  border-color: var(--cv-edge-2);
-  background: var(--cv-raised);
+@media (hover: hover) and (pointer: fine) {
+  .canvas-ui .example-clear:hover {
+    color: var(--ink);
+    border-color: var(--cv-edge-2);
+    background: var(--cv-raised);
+  }
 }
 
 /* ---------- the graph block ---------- */
@@ -1637,9 +1640,11 @@
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.canvas-ui .deck-pad:hover:not(.lit) {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .canvas-ui .deck-pad:hover:not(.lit) {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
 }
 .canvas-ui .deck-bar .deck-pad.lit,
 .canvas-ui .deck-bar .deck-pad.ti-close.lit {
@@ -1698,9 +1703,16 @@
   overflow: visible;
   color: inherit;
 }
-.canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+@media (hover: hover) and (pointer: fine) {
+  .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+    color: var(--ink);
+    background: var(--cv-raised);
+  }
+}
+.canvas-ui .composer-tabs .key.ti-tab:active:not(.lit) {
   color: var(--ink);
   background: var(--cv-raised);
+  transform: scale(0.96);
 }
 .canvas-ui .composer-tabs .key.ti-tab.lit {
   background: var(--tab);
@@ -1774,6 +1786,9 @@
 }
 .canvas-ui .composer:focus-within::before {
   background: color-mix(in srgb, var(--cv-accent) 42%, var(--cv-edge-2));
+}
+.canvas-ui .composer.has-warn::before {
+  background: color-mix(in srgb, var(--warn) 62%, var(--cv-edge-2));
 }
 .canvas-ui .composer::after {
   background: conic-gradient(from var(--cv-ang), transparent 0deg, var(--cv-sky) 30deg, var(--cv-accent) 70deg, var(--cv-iris) 110deg, transparent 150deg, transparent 360deg);
@@ -1922,6 +1937,78 @@
   border: 1px solid var(--cv-edge-2);
   box-shadow: 0 10px 28px rgb(0 0 0 / 0.36);
 }
+/* Common-math-mistake warnings float cleanly above the composer so the input row never squishes beside ENTER. */
+.canvas-ui .composer-slot > .row .warn-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 34px);
+  z-index: 43;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warn) 11%, var(--cv-raised));
+  border: 1px solid color-mix(in srgb, var(--warn) 42%, var(--cv-edge-2));
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.34);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+.canvas-ui .warn-line .warn-ico {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: var(--warn);
+  font: 700 11.5px/1 var(--sans);
+}
+.canvas-ui .warn-line .warn-text {
+  flex: 1 1 160px;
+  color: var(--ink);
+  font: 500 12.5px/1.35 var(--sans);
+  cursor: pointer;
+}
+.canvas-ui .warn-line .fix {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--warn) 48%, transparent);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
+  font: 600 12px/1.2 var(--mono);
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+.canvas-ui .warn-line .fix:active {
+  transform: scale(0.96);
+}
+@media (hover: hover) and (pointer: fine) {
+  .canvas-ui .warn-line .fix:hover {
+    background: color-mix(in srgb, var(--warn) 28%, transparent);
+  }
+}
+.canvas-ui .warn-dot {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  width: 19px;
+  height: 19px;
+  font-size: 12px;
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+.canvas-ui .warn-dot:active {
+  transform: scale(0.92);
+}
+.canvas-ui .rows > .row.blk .warn-line {
+  margin-top: 8px;
+  padding: 8px 0 2px;
+  border-top: 1px solid color-mix(in srgb, var(--warn) 24%, var(--cv-edge));
+  align-items: center;
+  gap: 6px 8px;
+}
 .canvas-ui .composer-slot > .row .line {
   flex-wrap: nowrap;
 }
@@ -1977,8 +2064,10 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 8px color-mix(in srgb, var(--cv-accent) 30%, transparent);
   transition: background-color 0.12s ease, transform 0.08s ease;
 }
-.canvas-ui .composer-enter:hover {
-  background: color-mix(in srgb, var(--cv-accent) 88%, white);
+@media (hover: hover) and (pointer: fine) {
+  .canvas-ui .composer-enter:hover {
+    background: color-mix(in srgb, var(--cv-accent) 88%, white);
+  }
 }
 .canvas-ui .composer-enter:active {
   transform: scale(0.97);
@@ -2192,9 +2281,12 @@
   margin: 0;
   pointer-events: none;
 }
-/* Lift an active toast clear of key-hint or autocomplete pills so they never stack on top of each other. */
+/* Lift an active toast clear of key-hint, autocomplete, or warning banners so they never stack on top of each other. */
 #app.canvas-ui:has(.composer-dock .key-hint:not(:empty), .composer-slot .hint-line:not([hidden])) > .toast.show {
   transform: translate(-50%, -56px);
+}
+#app.canvas-ui:has(.composer-slot .row.active:not(.typing) .warn-line:not([hidden]), .composer-slot .row.active .warn-line.now:not([hidden])) > .toast.show {
+  transform: translate(-50%, -82px);
 }
 .canvas-ui .composer-dock .key-hint {
   height: auto;
@@ -2385,25 +2477,70 @@
     position: relative;
     height: 100%;
     overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     /* Cascade sets each block's gap above it, its step right and its width (src/app/canvas.ts). */
     gap: 0;
-    padding: 46px 12px 24px var(--cv-gutter);
+    padding: 36px 12px 10px var(--cv-gutter);
     transform: none !important;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.32) 12px, #000 36px, #000 calc(100% - 38px), rgb(0 0 0 / 0.32) calc(100% - 12px), transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.32) 12px, #000 36px, #000 calc(100% - 38px), rgb(0 0 0 / 0.32) calc(100% - 12px), transparent 100%);
+  }
+  /* Only feather an edge when real blocks extend past it; keep the fade tight to the edge so visible cards and the
+     example graph never get sliced off at rest. */
+  .canvas-ui .cv-narrow > .rows.fade-top {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 100%);
+  }
+  .canvas-ui .cv-narrow > .rows.fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
+  }
+  .canvas-ui .cv-narrow > .rows.fade-top.fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value {
+    padding: 8px 13px 9px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 8px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line > * {
+    align-self: baseline;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line > .out {
+    margin-left: auto;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value .tex,
+  .canvas-ui .cv-narrow > .rows > .row.blk-value .expr {
+    font-size: 15.5px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value .out,
   .canvas-ui .cv-narrow > .rows > .row.blk-value .out .result {
-    font-size: 25px;
+    font-size: 19px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure) > .cv-steps {
+    top: 8px;
+    right: 11px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):has(> .cv-steps:not([hidden])) .line > .src {
+    margin-right: 74px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk.cv-selected .warn-line:not([hidden]) {
+    display: flex;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-curve .gutter {
     left: 11px;
   }
   .canvas-ui .cv-narrow > .rows:not(.has-example) {
-    padding-top: 20px;
+    padding-top: 14px;
   }
   /* A pill as wide as its line, no wider than the column. */
   .canvas-ui .cv-narrow > .rows > .row.blk {
@@ -2411,13 +2548,27 @@
     width: max-content;
     flex: none;
   }
-  /* A slider gives way by its track (src/ui/cascade.ts caps it at sliderMax of the column), never by its label. */
+  /* A slider gives way by its track (src/ui/cascade.ts caps it at sliderMax of the column), never by its label.
+     When a slider's value or limits grow wide (e.g. a = -2000000), the track wraps onto a full second row instead of colliding. */
   .canvas-ui .cv-narrow > .rows > .row.blk-slider,
   .canvas-ui .cv-narrow > .rows > .row.blk-slider .extra {
     min-width: 0;
   }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .body {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
   .canvas-ui .cv-narrow > .rows > .row.blk-slider .line {
     flex: none;
+    max-width: 100%;
+    padding-right: 0.4ch;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .extra {
+    flex: 1 1 110px;
+    min-width: min(110px, 100%);
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider .slider-row {
+    gap: 8px;
   }
   /* Sized from its content, so the pill's own width is its line's. */
   .canvas-ui .cv-narrow > .rows > .row.blk > .body {
@@ -2436,7 +2587,7 @@
   .canvas-ui .cv-narrow > .rows > .blk-example-graph {
     position: relative;
     flex: none;
-    height: 170px;
+    height: clamp(114px, 19dvh, 162px);
     width: auto;
   }
   .canvas-ui .composer-dock {
@@ -2445,7 +2596,7 @@
     bottom: auto;
     transform: none;
     width: auto;
-    padding: 4px 10px 5px;
+    padding: 4px max(10px, env(safe-area-inset-right, 0px)) 5px max(10px, env(safe-area-inset-left, 0px));
   }
   .canvas-ui .composer-head:not(:has(.reorder-done:not([hidden]))) {
     display: none;
@@ -2498,9 +2649,10 @@
   #app.canvas-ui:has(.mobile-actions:not([hidden])) > .toast.show {
     transform: translate(-50%, -44px);
   }
-  .canvas-ui .composer-slot > .row .hint-line {
+  .canvas-ui .composer-slot > .row .hint-line,
+  .canvas-ui .composer-slot > .row .warn-line {
     top: auto;
-    bottom: calc(100% + 14px);
+    bottom: calc(100% + 10px);
   }
   .canvas-ui .deck-bar {
     padding: 5px 0 6px;
@@ -2529,9 +2681,10 @@
     font: 600 12px/1 var(--sans);
     cursor: pointer;
   }
-  .canvas-ui .deck-kb:hover:not(.lit) {
+  .canvas-ui .deck-kb:active:not(.lit) {
     color: var(--ink);
     background: var(--cv-raised);
+    transform: scale(0.96);
   }
   .canvas-ui .deck-kb.lit {
     background: var(--cv-accent);
@@ -2555,8 +2708,18 @@
     font: 600 13px/1 var(--sans);
     color: var(--cv-ac);
   }
-  .canvas-ui .keypad .deck-bar .key.deck-ac:hover {
-    background: color-mix(in srgb, var(--cv-ac) 12%, transparent);
+  .canvas-ui .keypad .deck-bar .key.deck-ac:active {
+    background: color-mix(in srgb, var(--cv-ac) 16%, transparent);
+    transform: scale(0.96);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .canvas-ui .deck-kb:hover:not(.lit) {
+      color: var(--ink);
+      background: var(--cv-raised);
+    }
+    .canvas-ui .keypad .deck-bar .key.deck-ac:hover {
+      background: color-mix(in srgb, var(--cv-ac) 12%, transparent);
+    }
   }
   /* Tight enough that all five categories fit beside 123 and AC on a 390 px phone, as on iOS. */
   .canvas-ui .composer-tabs {
@@ -2570,35 +2733,35 @@
     font-size: 12.5px;
   }
   .canvas-ui .composer {
-    min-height: 58px;
-    padding: 6px 6px 6px 16px;
+    min-height: 52px;
+    padding: 5px 5px 5px 15px;
   }
   .canvas-ui .composer-slot > .row .tex,
   .canvas-ui .composer-slot > .row .expr,
   .canvas-ui .composer-slot > .row .slots {
-    font-size: 23px;
-    line-height: 30px;
+    font-size: 22px;
+    line-height: 28px;
   }
   .canvas-ui .composer-slot > .row .expr::placeholder {
-    font-size: 18px;
+    font-size: 17px;
   }
   .canvas-ui .composer-enter {
-    height: 44px;
-    padding: 0 18px;
+    height: 40px;
+    padding: 0 16px;
   }
   .canvas-ui .main > .left .keypad {
     position: relative;
     right: auto;
     bottom: auto;
     width: auto;
-    padding: 0 8px 12px;
+    padding: 0 max(8px, env(safe-area-inset-right, 0px)) max(10px, calc(env(safe-area-inset-bottom, 0px) - 10px)) max(8px, env(safe-area-inset-left, 0px));
     border: 0;
     border-top: 1px solid var(--cv-edge);
     border-radius: 0;
     background: var(--bg);
   }
   .canvas-ui .main > .left .keypad.bar-only {
-    padding: 0 8px 4px;
+    padding: 0 max(8px, env(safe-area-inset-right, 0px)) max(4px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
   }
   .canvas-ui .main > .left .keypad.bar-only .deck-bar {
     margin-bottom: 0;
@@ -2767,11 +2930,43 @@
   flex-basis: 100%;
 }
 
-/* The bar's menus open over the composer and the keys. */
+/* The bar's menus open over the composer, toast and the keys. */
 @media (--phone) {
   .canvas-ui .modebar {
     position: relative;
     z-index: 30;
+  }
+  .canvas-ui .modebar:has(.menu:not([hidden])) {
+    z-index: 60;
+  }
+  .canvas-ui .modebar .menu {
+    z-index: 60;
+    min-width: 244px;
+    max-width: calc(100vw - 24px);
+    padding: 6px;
+  }
+  .canvas-ui .modebar .menu button {
+    min-height: 38px;
+    padding: 7px 12px;
+    font-size: 14px;
+  }
+  .canvas-ui .modebar .menu hr {
+    margin: 4px 6px;
+  }
+  .canvas-ui .modebar .menu .menu-btns button {
+    min-height: 32px;
+    padding: 4px 12px;
+  }
+}
+
+/* In a short window both looks stretch .pad to the keypad's height with flex: 1. The pad sits inside .pad-stage, so the
+   stage has to pass that height on, or the pad collapses and the number keys come out zero pixels tall. */
+@media (max-width: 760px) and (max-height: 460px), (max-height: 460px) and (pointer: coarse) {
+  .canvas-ui .keypad .pad-stage {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -2785,6 +2980,7 @@
   .canvas-ui .main > .left > .modebar {
     grid-column: 1;
     grid-row: 1;
+    padding-right: 10px;
   }
   .canvas-ui .main > .left > .tape {
     grid-column: 1;
@@ -2793,6 +2989,8 @@
   .canvas-ui .main > .left .composer-dock {
     grid-column: 1;
     grid-row: 3;
+    padding-right: 10px;
+    padding-bottom: max(5px, env(safe-area-inset-bottom, 0px));
   }
   .canvas-ui .main > .left .keypad {
     grid-column: 2;
@@ -2800,9 +2998,10 @@
     align-self: stretch;
     border-top: 0;
     border-left: 1px solid var(--cv-edge);
+    padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) 8px;
   }
   .canvas-ui {
-    --pad-h: calc(100dvh - 24px);
+    --pad-h: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
   .canvas-ui .keypad .ti-rows {
     flex: 1 0 0;
@@ -2843,10 +3042,15 @@
     align-items: center;
     gap: 6px;
     box-sizing: border-box;
-    height: 50px;
-    padding: 0 12px;
+    height: calc(50px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--rule);
     background: var(--bg);
+  }
+  #app.canvas-ui .left > .modebar :is(.modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history):active,
+  .canvas-ui .example-clear:active {
+    transform: scale(0.96);
+    background: var(--cv-raised);
   }
   #app.canvas-ui .left > .modebar .brand { order: 0; min-width: 0; gap: 0; flex: none; }
   #app.canvas-ui .left > .modebar .spacer { order: 1; flex: 1; }
@@ -2879,16 +3083,21 @@
   }
   #app.canvas-ui .left > .modebar .desk-modes .seg {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     padding: 2px;
   }
   #app.canvas-ui .left > .modebar .desk-modes .seg button {
-    height: 27px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 0;
     padding: 0 10px;
     border: 0;
     border-radius: 7px;
     background: none;
     font-size: 14px;
+    line-height: 1;
     color: var(--ink-2);
   }
   #app.canvas-ui .left > .modebar .desk-modes .seg button[aria-pressed='true'] {
@@ -2934,10 +3143,15 @@
   }
   #app.canvas-ui .left > .modebar .head-pill .head-find,
   #app.canvas-ui .left > .modebar .head-pill .menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: auto;
     height: 33px;
+    min-height: 0;
     padding: 0 11px;
     font-size: 14px;
+    line-height: 1;
     color: var(--ink-2);
     background: var(--cv-block);
     border: 1px solid var(--cv-edge);
@@ -2961,6 +3175,61 @@
   }
   #app.canvas-ui .left > .modebar .head-find .gl {
     display: inline !important;
+  }
+}
+
+/* Shorter phone viewports (such as iOS Safari with the bottom URL bar up): trim vertical chrome so the canvas and example graph stay in view. */
+@media (max-width: 760px) and (max-height: 760px) and (min-height: 461px) {
+  #app.canvas-ui .left > .modebar {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+  }
+  .canvas-ui .cv-narrow > .rows {
+    padding: 32px 12px 8px var(--cv-gutter);
+  }
+  .canvas-ui .cv-narrow > .rows:not(.has-example) {
+    padding-top: 12px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk {
+    padding: 7px 14px 7px 20px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk .gutter {
+    top: 8px;
+    bottom: 8px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-slider {
+    padding: 5px 14px 5px 16px;
+  }
+  .canvas-ui .cv-narrow .example-clear {
+    top: 5px;
+    right: 10px;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .canvas-ui .cv-narrow > .rows > .blk-example-graph {
+    height: clamp(108px, 17dvh, 144px);
+  }
+  .canvas-ui .composer-dock {
+    padding-top: 2px;
+    padding-bottom: 3px;
+  }
+  .canvas-ui .composer {
+    min-height: 48px;
+    padding: 4px 5px 4px 14px;
+  }
+  .canvas-ui .composer-slot > .row .line {
+    min-height: 36px;
+  }
+  .canvas-ui .composer-enter {
+    height: 38px;
+    padding: 0 15px;
+  }
+  .canvas-ui .deck-bar {
+    padding: 3px 0 4px;
+    margin-bottom: 4px;
+  }
+  .canvas-ui .main > .left .keypad {
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -4200,6 +4469,11 @@ dialog.examples-dialog .sc-lines {
   --lg-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.28);
 
   /* Clean obsidian dark canvas at rest; Aurora Glow adds the deck-reactive atmosphere only when toggled on. */
+  &[data-theme='ink'],
+  &[data-theme='ink'] body,
+  &[data-theme='ink'] .canvas-ui .main > .left {
+    background-color: #06070c;
+  }
   &[data-theme='ink'] .canvas-ui .tape.cv-viewport {
     background-color: #06070c;
     --cv-dot: rgba(190, 210, 255, 0.13);
@@ -4365,12 +4639,19 @@ dialog.examples-dialog .sc-lines {
     background: rgba(5, 7, 12, 0.78);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 6px 20px rgba(0, 0, 0, 0.36);
   }
+  /* Stay calm and neutral while empty or mid-typing (matches mobile Composer.tsx); accent lights once the line works out. */
+  & .canvas-ui .composer[data-state='idle']:not(.editing)::before,
+  & .canvas-ui .composer[data-state='typing']:not(.editing, .has-warn)::before {
+    background: rgba(255, 255, 255, 0.13);
+  }
   & .canvas-ui .composer-enter {
     background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 84%, #ffffff), var(--cv-accent));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 3px 10px rgba(0, 0, 0, 0.34);
   }
-  & .canvas-ui .composer-enter:hover {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 76%, #ffffff), color-mix(in srgb, var(--cv-accent) 92%, #ffffff));
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .composer-enter:hover {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 76%, #ffffff), color-mix(in srgb, var(--cv-accent) 92%, #ffffff));
+    }
   }
   /* The desktop keypad is physically fused beneath the composer inside the Liquid Glass sidebar. */
   & .canvas-ui .main > .left .keypad {
@@ -4397,9 +4678,11 @@ dialog.examples-dialog .sc-lines {
     background: transparent;
     color: rgba(241, 245, 249, 0.78);
   }
-  & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
   }
   & .canvas-ui .composer-tabs .key.ti-tab.lit,
   & .canvas-ui .composer-tabs .key.ti-tab.lit:hover {
@@ -4412,36 +4695,38 @@ dialog.examples-dialog .sc-lines {
     border-radius: 13px;
   }
   & .canvas-ui .main > .left .keypad .pad .key.num {
-    background-color: rgba(34, 38, 48, 0.94);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 0 rgba(0, 0, 0, 0.85), 0 4px 10px rgba(0, 0, 0, 0.35);
+    background-color: rgba(42, 47, 60, 0.96);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.17), inset 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 2px 0 rgba(0, 0, 0, 0.85), 0 4px 10px rgba(0, 0, 0, 0.35);
     color: #ffffff;
   }
-  & .canvas-ui .main > .left .keypad .pad .key.num:hover {
-    background-color: rgba(44, 49, 62, 0.96);
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) {
+    background-color: rgba(17, 20, 29, 0.94);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(255, 255, 255, 0.05), 0 2px 0 rgba(0, 0, 0, 0.85), 0 3px 8px rgba(0, 0, 0, 0.32);
   }
-  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) {
-    background-color: rgba(19, 22, 30, 0.92);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 0.5px rgba(255, 255, 255, 0.05), 0 2px 0 rgba(0, 0, 0, 0.85), 0 3px 8px rgba(0, 0, 0, 0.32);
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act) .kl {
+    color: rgba(248, 250, 252, 0.88);
   }
-  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) .kl {
-    color: rgba(248, 250, 252, 0.92);
-  }
-  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit):hover {
-    background-color: rgba(28, 32, 44, 0.95);
-  }
-  & .canvas-ui .main > .left .keypad .pad .key.op {
-    background-color: rgba(22, 31, 52, 0.94);
+  & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
+    background-color: rgba(22, 33, 58, 0.96);
     box-shadow: inset 0 1px 0 rgba(140, 188, 255, 0.22), inset 0 0 0 0.5px rgba(120, 170, 255, 0.14), 0 2px 0 rgba(0, 0, 0, 0.85), 0 4px 10px rgba(0, 0, 0, 0.35);
-  }
-  & .canvas-ui .main > .left .keypad .pad .key.op:hover {
-    background-color: rgba(30, 42, 70, 0.96);
   }
   & .canvas-ui .ti-grid .ti-tile {
     background-color: rgba(24, 28, 38, 0.92);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 0 rgba(0, 0, 0, 0.85);
   }
-  & .canvas-ui .ti-grid .ti-tile:hover {
-    background-color: rgba(36, 42, 58, 0.95);
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .main > .left .keypad .pad .key.num:hover {
+      background-color: rgba(52, 58, 74, 0.98);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op):hover {
+      background-color: rgba(26, 30, 42, 0.96);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']):hover {
+      background-color: rgba(30, 44, 76, 0.98);
+    }
+    & .canvas-ui .ti-grid .ti-tile:hover {
+      background-color: rgba(36, 42, 58, 0.95);
+    }
   }
   & .canvas-ui .rows > .blk-graph,
   & .canvas-ui .rows > .blk-example-graph,
@@ -4453,23 +4738,24 @@ dialog.examples-dialog .sc-lines {
     box-shadow: var(--lg-rim), var(--lg-shadow);
   }
   & .menu {
-    background: var(--lg-fill-strong);
-    backdrop-filter: blur(36px) saturate(210%);
-    -webkit-backdrop-filter: blur(36px) saturate(210%);
-    border: 0;
-    border-radius: 18px;
-    box-shadow: var(--lg-rim), 0 22px 60px rgba(0, 0, 0, 0.6);
+    background: rgba(16, 20, 30, 0.96);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.72);
+    z-index: 60;
   }
   & dialog.mx,
   & dialog.examples-dialog,
   & dialog.palette,
   & dialog.help,
   & dialog.history-dialog {
-    background: var(--lg-fill-strong);
-    backdrop-filter: blur(36px) saturate(210%);
-    -webkit-backdrop-filter: blur(36px) saturate(210%);
-    border: 0;
-    box-shadow: var(--lg-rim), 0 26px 70px rgba(0, 0, 0, 0.65);
+    background: rgba(16, 20, 30, 0.96);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.72);
   }
   & .menu .seg button[aria-pressed='true'] {
     background: rgba(255, 255, 255, 0.16);
@@ -4477,19 +4763,109 @@ dialog.examples-dialog .sc-lines {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 1px 3px rgba(0, 0, 0, 0.26);
   }
   @media (--phone) {
+    /* Match the native iOS canvas UI: continuous dot grid behind a transparent top bar with floating Liquid-Glass-style
+       capsules, warm slate glass blocks, a floating composer island, and machined matte keycaps on a recessed bed.
+       Backdrop blur lives only on the individual top-bar pills (never on .modebar or .menu-wrap), so there is no
+       WebKit header haze and no nested-backdrop-filter glitch on popovers. */
+    & .canvas-ui .main > .left {
+      background-image: radial-gradient(var(--cv-dot) 1.2px, transparent 1.4px);
+      background-size: 22px 22px;
+    }
+    &[data-theme='ink'] .canvas-ui .main > .left {
+      --cv-dot: rgba(190, 210, 255, 0.14);
+      background-color: #06070c;
+    }
+    &[data-theme='oled'] .canvas-ui .main > .left {
+      --cv-dot: rgba(190, 210, 255, 0.13);
+      background-color: #000000;
+    }
+    & .canvas-ui .main > .left > :is(.tape, .composer-dock, .keypad) {
+      position: relative;
+      z-index: 1;
+    }
+    & .canvas-ui .tape.cv-viewport,
+    &[data-theme='ink'] .canvas-ui .tape.cv-viewport,
+    &[data-theme='oled'] .canvas-ui .tape.cv-viewport,
+    & .canvas-ui .composer-dock {
+      background-color: transparent;
+      background-image: none;
+    }
+    /* Keep .modebar sticky and solid-opaque with zero backdrop-filter on phone: iOS 26/27 WebKit samples y=0 for a
+       sticky/fixed opaque header and otherwise paints a progressive system blur across the top bar. */
     & #app.canvas-ui .left > .modebar {
-      padding: 0 12px;
-      background: color-mix(in srgb, var(--bg) 76%, transparent);
-      backdrop-filter: blur(22px) saturate(180%);
-      -webkit-backdrop-filter: blur(22px) saturate(180%);
-      border-bottom-color: color-mix(in srgb, var(--rule) 55%, transparent);
+      position: sticky;
+      top: 0;
+      width: 100%;
+      background: var(--bg);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-bottom: 0;
+    }
+    & #app.canvas-ui .left > .modebar::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      height: 12px;
+      pointer-events: none;
+      background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
+    }
+    &[data-theme='ink'] #app.canvas-ui .left > .modebar {
+      background: #06070c;
+    }
+    &[data-theme='ink'] #app.canvas-ui .left > .modebar::after {
+      background: linear-gradient(180deg, #06070c 0%, transparent 100%);
+    }
+    &[data-theme='oled'] #app.canvas-ui .left > .modebar {
+      background: #000000;
+    }
+    &[data-theme='oled'] #app.canvas-ui .left > .modebar::after {
+      background: linear-gradient(180deg, #000000 0%, transparent 100%);
+    }
+    @media (display-mode: standalone) {
+      & #app.canvas-ui .left > .modebar {
+        height: calc(54px + env(safe-area-inset-top, 0px));
+        padding-top: calc(env(safe-area-inset-top, 0px) + 4px);
+      }
+    }
+    /* With zero backdrop-filter on .modebar or its pills, .menu and .mode-sheet use real frosted glass on iOS WebKit. */
+    & .menu {
+      background: rgba(20, 24, 36, 0.76);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.22), 0 22px 60px rgba(0, 0, 0, 0.68);
+    }
+    &[data-theme='oled'] .menu {
+      background: rgba(14, 15, 20, 0.8);
+    }
+    & .mode-sheet {
+      background: rgba(18, 22, 32, 0.84);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.18), 0 -12px 44px rgba(0, 0, 0, 0.56);
+    }
+    &[data-theme='oled'] .mode-sheet {
+      background: rgba(12, 13, 18, 0.88);
     }
     & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
-      height: 33px;
+      height: 34px;
       border-radius: 999px;
-      background: var(--lg-fill);
+      background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
       border: 0;
-      box-shadow: var(--lg-rim);
+      color: rgba(248, 250, 252, 0.94);
+      box-shadow:
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
+        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
+        0 4px 12px rgba(0, 0, 0, 0.34);
+    }
+    & #app.canvas-ui .left > .modebar .head-pill .head-history {
+      width: 34px;
+      min-width: 34px;
     }
     & #app.canvas-ui .left > .modebar .desk-modes .seg {
       padding: 2px;
@@ -4500,37 +4876,115 @@ dialog.examples-dialog .sc-lines {
       left: 2px;
       width: calc(50% - 2px);
       border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.16) 100%);
+      box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.42), 0 2px 6px rgba(0, 0, 0, 0.28);
     }
     & #app.canvas-ui .left > .modebar .desk-modes .seg button {
-      height: 27px;
+      height: 100%;
+      min-height: 0;
       border-radius: 999px;
     }
-    & #app.canvas-ui .left > .modebar .brand-home .mark {
-      width: 33px;
-      height: 33px;
+    & #app.canvas-ui .left > .modebar .brand .mark {
+      width: 34px;
+      height: 34px;
       border-radius: 999px;
-      background: var(--lg-fill);
+      background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
       border: 0;
-      box-shadow: var(--lg-rim);
+      box-shadow:
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
+        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08),
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
+        0 4px 12px rgba(0, 0, 0, 0.34);
+    }
+    @media (max-width: 375px) {
+      & #app.canvas-ui .left > .modebar {
+        gap: 4px;
+        padding-left: max(8px, env(safe-area-inset-left, 0px));
+        padding-right: max(8px, env(safe-area-inset-right, 0px));
+      }
+      & #app.canvas-ui .left > .modebar .head-pill {
+        gap: 4px;
+      }
+      & #app.canvas-ui .left > .modebar :is(.modes .more, .head-pill .head-find, .head-pill .menu-btn) {
+        padding: 0 8px;
+      }
+    }
+    &[data-theme='ink'] .canvas-ui .rows > .row.blk {
+      background: rgba(24, 27, 36, 0.74);
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 4px 14px rgba(0, 0, 0, 0.28);
     }
     & .canvas-ui .composer {
-      min-height: 58px;
-      padding: 6px 6px 6px 16px;
+      min-height: 54px;
+      padding: 5px 5px 5px 16px;
+      background: rgba(20, 23, 32, 0.86);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.3);
     }
     & .canvas-ui .composer-enter {
-      height: 44px;
+      height: 42px;
+      min-width: 78px;
       padding: 0 18px;
-      border-radius: 14px;
+      border-radius: 13px;
+      background: var(--cv-accent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 16px color-mix(in srgb, var(--cv-accent) 48%, transparent);
+    }
+    @media (max-width: 760px) and (max-height: 760px) and (min-height: 461px) {
+      & .canvas-ui .composer {
+        min-height: 48px;
+        padding: 4px 5px 4px 14px;
+      }
+      & .canvas-ui .composer-enter {
+        height: 38px;
+        min-width: 72px;
+        padding: 0 15px;
+      }
     }
     & .canvas-ui .main > .left .keypad {
       border-radius: 0;
-      background: var(--bg);
+      background: #06070b;
+      border-top: 1px solid rgba(255, 255, 255, 0.09);
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       box-shadow: none;
     }
-    & .canvas-ui .main > .left .keypad .pad .key.op {
-      background-color: var(--key-op);
+    &[data-theme='oled'] .canvas-ui .main > .left .keypad {
+      background: #000000;
+      border-top-color: rgba(255, 255, 255, 0.11);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.num {
+      border-radius: 16px;
+      background-color: #2b2d34;
+      color: #f4f3ef;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 2px 0 #020305, 0 3px 6px rgba(0, 0, 0, 0.42);
+    }
+    &[data-theme='oled'] .canvas-ui .main > .left .keypad .pad .key.num {
+      background-color: #323237;
+      color: #fafafa;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 2px 0 #0a0a0c, 0 3px 6px rgba(0, 0, 0, 0.42);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) {
+      border-radius: 13px;
+      background-color: #181a20;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #020305, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+    }
+    &[data-theme='oled'] .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) {
+      background-color: #1c1c1f;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #0a0a0c, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+    }
+    /* Match iOS Keycap.tsx: operators use the same dark matte cap with bright cobalt-blue glyphs, not blue boxes. */
+    & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
+      background-color: #181a20;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #020305, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+      color: var(--accent);
+    }
+    &[data-theme='oled'] .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
+      background-color: #1c1c1f;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #0a0a0c, 0 2.5px 4px rgba(0, 0, 0, 0.36);
+    }
+    &:not([data-motion='off']) .canvas-ui .main > .left .keypad .pad .key:active {
+      transform: translateY(1.5px) scale(0.97);
     }
   }
 }
@@ -4540,6 +4994,11 @@ dialog.examples-dialog .sc-lines {
   --lg-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.98), inset 0 -0.5px 0.5px rgba(15, 23, 42, 0.05), inset 0 0 0 0.5px rgba(15, 23, 42, 0.09);
   --lg-shadow: 0 8px 26px rgba(15, 23, 42, 0.09), 0 2px 6px rgba(15, 23, 42, 0.05);
 
+  &,
+  & body,
+  & .canvas-ui .main > .left {
+    background-color: #f3f5f9;
+  }
   & .canvas-ui .tape.cv-viewport {
     background-color: #f3f5f9;
     --cv-dot: rgba(15, 23, 42, 0.11);
@@ -4616,6 +5075,10 @@ dialog.examples-dialog .sc-lines {
     background: rgba(255, 255, 255, 0.92);
     box-shadow: inset 0 1px 0 #ffffff, 0 4px 16px rgba(15, 23, 42, 0.07);
   }
+  & .canvas-ui .composer[data-state='idle']:not(.editing)::before,
+  & .canvas-ui .composer[data-state='typing']:not(.editing, .has-warn)::before {
+    background: rgba(15, 23, 42, 0.12);
+  }
   & .canvas-ui .main > .left .keypad {
     border-top-color: rgba(15, 23, 42, 0.08);
     background: rgba(241, 245, 249, 0.5);
@@ -4632,26 +5095,28 @@ dialog.examples-dialog .sc-lines {
   & .canvas-ui .composer-tabs .key.ti-tab:not(.lit) {
     color: #475569;
   }
-  & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
-    background: rgba(15, 23, 42, 0.06);
-    color: #0f172a;
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .composer-tabs .key.ti-tab:hover:not(.lit) {
+      background: rgba(15, 23, 42, 0.06);
+      color: #0f172a;
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.num:hover {
+      background-color: #ffffff;
+    }
   }
   & .canvas-ui .main > .left .keypad .pad .key.num {
     background-color: rgba(255, 255, 255, 0.96);
     box-shadow: inset 0 1px 0 #ffffff, 0 1.5px 0 rgba(15, 23, 42, 0.12), 0 2px 5px rgba(15, 23, 42, 0.06);
     color: #0f172a;
   }
-  & .canvas-ui .main > .left .keypad .pad .key.num:hover {
-    background-color: #ffffff;
-  }
-  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) {
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) {
     background-color: rgba(235, 238, 246, 0.92);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 1.5px 0 rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.04);
   }
-  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .edit) .kl {
+  & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act) .kl {
     color: #1e293b;
   }
-  & .canvas-ui .main > .left .keypad .pad .key.op {
+  & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
     background-color: rgba(230, 239, 255, 0.95);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1.5px 0 rgba(37, 99, 235, 0.18), 0 2px 5px rgba(37, 99, 235, 0.06);
   }
@@ -4665,10 +5130,88 @@ dialog.examples-dialog .sc-lines {
     background: rgba(255, 255, 255, 0.82);
     border-color: rgba(255, 255, 255, 0.9);
   }
+  & .menu {
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.16);
+  }
+  & dialog.mx,
+  & dialog.examples-dialog,
+  & dialog.palette,
+  & dialog.help,
+  & dialog.history-dialog {
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+  }
   & .menu .seg button[aria-pressed='true'] {
     background: #ffffff;
     color: #0f172a;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+  }
+  @media (--phone) {
+    & .canvas-ui .main > .left {
+      --cv-dot: rgba(15, 23, 42, 0.11);
+      background-color: #f3f5f9;
+    }
+    & .canvas-ui .tape.cv-viewport,
+    & .canvas-ui .composer-dock {
+      background-color: transparent;
+      background-image: none;
+    }
+    & #app.canvas-ui .left > .modebar {
+      background: #f3f5f9;
+      border-bottom: 0;
+    }
+    & #app.canvas-ui .left > .modebar::after {
+      background: linear-gradient(180deg, #f3f5f9 0%, transparent 100%);
+    }
+    & .menu {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.96), 0 18px 46px rgba(15, 23, 42, 0.18);
+    }
+    & .mode-sheet {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.98), 0 -12px 40px rgba(15, 23, 42, 0.16);
+    }
+    & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history, .brand .mark) {
+      background: linear-gradient(180deg, #ffffff 0%, #eef1f7 100%) #f6f8fc;
+      color: #0f172a;
+      box-shadow:
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.98),
+        inset 0 0 0 0.5px rgba(15, 23, 42, 0.1),
+        0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+    & #app.canvas-ui .left > .modebar .desk-modes .seg::before {
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12), 0 0 0 0.5px rgba(15, 23, 42, 0.08);
+    }
+    & .canvas-ui .composer {
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: inset 0 1px 0 #ffffff, 0 6px 18px rgba(30, 45, 90, 0.08);
+    }
+    & .canvas-ui .main > .left .keypad {
+      background: #e3e4e9;
+      border-top-color: rgba(15, 23, 42, 0.09);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.num {
+      background-color: #ffffff;
+      color: #17171a;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96), 0 2px 0 rgba(23, 23, 26, 0.14), 0 3px 5px rgba(23, 23, 26, 0.08);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) {
+      background-color: #d1d3da;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 0 rgba(23, 23, 26, 0.11), 0 2px 3px rgba(23, 23, 26, 0.06);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
+      background-color: #d1d3da;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 2px 0 rgba(23, 23, 26, 0.11), 0 2px 3px rgba(23, 23, 26, 0.06);
+      color: var(--accent);
+    }
   }
 }
 
@@ -4781,9 +5324,11 @@ dialog.examples-dialog .sc-lines {
     border-color: rgba(255, 255, 255, 0.11);
     box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.2), inset 0 -0.5px 0 rgba(255, 255, 255, 0.06), 0 10px 28px rgba(0, 0, 0, 0.42);
   }
-  & .canvas-ui .rows > .row.blk:hover {
-    background: rgba(26, 31, 46, 0.72);
-    border-color: rgba(255, 255, 255, 0.2);
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .rows > .row.blk:hover {
+      background: rgba(26, 31, 46, 0.72);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
   }
   & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.36);
@@ -4795,8 +5340,10 @@ dialog.examples-dialog .sc-lines {
     border-color: rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
   }
-  & .canvas-ui .rows > .row.blk:hover {
-    border-color: rgba(255, 255, 255, 0.17);
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .rows > .row.blk:hover {
+      border-color: rgba(255, 255, 255, 0.17);
+    }
   }
   & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.34);
@@ -4808,8 +5355,10 @@ dialog.examples-dialog .sc-lines {
     border-color: rgba(255, 255, 255, 0.92);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 4px 14px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.05);
   }
-  & .canvas-ui .rows > .row.blk:hover {
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 5px 16px rgba(32, 48, 96, 0.1), 0 0 0 0.5px rgba(23, 23, 26, 0.1);
+  @media (hover: hover) and (pointer: fine) {
+    & .canvas-ui .rows > .row.blk:hover {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 5px 16px rgba(32, 48, 96, 0.1), 0 0 0 0.5px rgba(23, 23, 26, 0.1);
+    }
   }
   & .canvas-ui .rows > .row.blk:not(.blk-slider, .blk-figure, .dragging):active {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.08);
@@ -4954,6 +5503,34 @@ dialog.examples-dialog .sc-lines {
     radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
     radial-gradient(46% 52% at 90% 54%, rgba(124, 92, 240, 0.786), transparent 72%);
   opacity: 0.14;
+}
+/* On phone, match iOS CanvasAtmosphere.tsx cloud positions (20% 16% and 86% 56% of the canvas area above the keypad). */
+@media (--phone) {
+  :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .tape.cv-viewport::before {
+    display: none;
+  }
+  :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .main > .left::before {
+    --au-a: var(--au-deck, var(--cv-accent));
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
+      radial-gradient(72% 38% at 86% 32%, rgba(167, 139, 250, 0.75), transparent 72%);
+    opacity: 0.28;
+    transition: --au-a 0.42s ease-out;
+  }
+  :root[data-look='modern'][data-glow][data-theme='oled'] .canvas-ui .main > .left::before {
+    opacity: 0.22;
+  }
+  :root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .main > .left::before {
+    background:
+      radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
+      radial-gradient(72% 38% at 86% 32%, rgba(124, 92, 240, 0.786), transparent 72%);
+    opacity: 0.19;
+  }
 }
 
 /* ---------- Keyboard Glow: the keys take the deck's color ----------

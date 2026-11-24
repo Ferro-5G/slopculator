@@ -388,9 +388,11 @@
   transition: background 0.12s, border-color 0.12s, transform 0.09s;
 }
 
-.ti-tile:hover {
-  background: color-mix(in srgb, var(--key-fn) 88%, var(--tab) 12%);
-  border-color: color-mix(in srgb, var(--tab) 48%, var(--rule-2));
+@media (hover: hover) and (pointer: fine) {
+  .ti-tile:hover {
+    background: color-mix(in srgb, var(--key-fn) 88%, var(--tab) 12%);
+    border-color: color-mix(in srgb, var(--tab) 48%, var(--rule-2));
+  }
 }
 
 .ti-tile:active {

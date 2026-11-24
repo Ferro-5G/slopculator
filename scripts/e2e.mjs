@@ -294,6 +294,29 @@ await check('canvas: typing a name that is already defined offers Update r, prev
   expect(JSON.stringify(l.map((x) => x.text)) === '["r = 6","A = πr^2"]', JSON.stringify(l));
 });
 
+await check('canvas: an unsent Update r survives a reload as the draft, not as a second definition of r', async (page) => {
+  await typeLine(page, 'r = 4');
+  await typeLine(page, 'A = πr^2');
+  await page.keyboard.type('r = 6');
+  await page.waitForFunction(() => document.querySelector('.composer-enter')?.textContent === 'Update r');
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('.composer-enter')?.textContent === 'Update r');
+  const after = await lines(page);
+  expect(!after.some((x) => x.error), `a line errs after the reload: ${JSON.stringify(after)}`);
+  expect(after.some((x) => x.text === 'A = πr^2' && Math.abs(x.value - 36 * Math.PI) < 1e-9), `no live preview after the reload: ${JSON.stringify(after)}`);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.querySelector('.composer-enter')?.textContent !== 'Update r');
+  const l = (await lines(page)).filter((x) => x.text);
+  expect(JSON.stringify(l.map((x) => x.text)) === '["r = 6","A = πr^2"]', JSON.stringify(l));
+});
+
+await check('phone on its side: the keypad keeps its number keys tall enough to tap', async (page) => {
+  const seven = await page.evaluate(() => ({ ...[...document.querySelectorAll('#keypad .key')].find((k) => k.textContent.trim() === '7')?.getBoundingClientRect().toJSON(), screen: innerHeight }));
+  expect(seven.height >= 40 && seven.bottom <= seven.screen, `the 7 key: ${JSON.stringify(seven)}`);
+  await page.locator('#keypad .key', { hasText: /^7$/ }).tap();
+  await page.waitForFunction(() => window.slopculator.lines().some((x) => x.text === '7'));
+}, { width: 640, height: 360 });
+
 await check('canvas: a name used by another line is wired to it and drawn lines to the graph; a slider drag pulses and lands on the right answers', async (page) => {
   await typeLine(page, 'a = 1');
   await typeLine(page, 'y = a(x - 1)^2 - 3');
@@ -4053,6 +4076,16 @@ await check('an imported line id with a quote in it still draws the graph', asyn
   const names = await page.evaluate(() => window.slopculator.graph.names().map((n) => n.text));
   expect(names.length === 1, `curves on the graph: ${JSON.stringify(names)}`);
   expect(await page.evaluate(() => window.slopculator.addLine('1+1').result) === '2', 'adding a line failed');
+});
+
+await check('importing JSON that is not a sheet leaves the sheet as it was', async (page) => {
+  await typeLine(page, 'a = 2');
+  await page.click('.menu-btn');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('.menu button', { hasText: 'Import' }).click()]);
+  await chooser.setFiles({ name: 'other.json', mimeType: 'application/json', buffer: Buffer.from('{}') });
+  await page.waitForFunction(() => /isn't a Slopculator sheet/.test(document.body.innerText));
+  const l = (await lines(page)).filter((x) => x.text);
+  expect(JSON.stringify(l.map((x) => x.text)) === '["a = 2"]', `the sheet changed: ${JSON.stringify(l)}`);
 });
 
 await check('a matrix too big to show draws its top-left corner and says so', async (page) => {

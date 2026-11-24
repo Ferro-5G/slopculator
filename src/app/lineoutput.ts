@@ -15,6 +15,7 @@ import { play } from './sound';
 import { typeset, assignsLiteral, BLOCK_LIST_MAX, type SheetNames } from '../ui/typeset';
 import type { Row } from './docmodel';
 import { h } from './dom';
+import { MODES, setMode } from './controls';
 import { dragEnds, dragLine, applyFix, nextLine } from './edits';
 import { copy } from './feedback';
 import { listEl } from './layout';
@@ -141,7 +142,21 @@ export function renderOut(v: RowView, r: RowResult, o: DisplayOpts): void {
   let longAnswer = false;
   const parts: (Node | string)[] = [];
   const check = r.warnings?.[0];
-  if (check) parts.push(h('span', { class: 'warn-dot', title: `Check this: ${check.message}`, role: 'img', 'aria-label': `Check this: ${check.message}` }, '!'));
+  if (check) {
+    const dot = h('button', { type: 'button', class: 'warn-dot', title: `Check this: ${check.message}`, 'aria-label': `Check this: ${check.message}` }, '!');
+    dot.addEventListener('pointerdown', (e) => e.stopPropagation());
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (v.el.classList.contains('blk')) {
+        const opened = v.el.classList.toggle('warn-open');
+        play('toggle');
+        if (opened) v.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (rowOf?.kind === 'expr') {
+        selectSpan(rowOf, check);
+      }
+    });
+    parts.push(dot);
+  }
   if (v.warn) renderWarning(v, rowOf, check);
   if (calm) {
     const caret = v.input?.selectionStart ?? 0;
@@ -230,19 +245,39 @@ export function lineFixes(v: RowView, shown = false): HTMLButtonElement[] {
 }
 function renderWarning(v: RowView, row: Row | undefined, warning: LineWarning | undefined): void {
   if (!warning || row?.kind !== 'expr') {
+    v.el.classList.remove('warn-open');
     v.warn!.replaceChildren();
     v.warn!.hidden = true;
     return;
   }
+  const ico = h('span', { class: 'warn-ico', 'aria-hidden': 'true' }, '!');
   const text = h('button', { type: 'button', class: 'warn-text', title: 'Show this in the line' }, warning.message);
-  text.addEventListener('click', () => selectSpan(row, warning));
+  text.addEventListener('pointerdown', (e) => e.stopPropagation());
+  text.addEventListener('click', (e) => { e.stopPropagation(); selectSpan(row, warning); });
   const fixButton = (fix: string) => {
     const btn = h('button', { type: 'button', class: 'fix', title: `Change the line to ${fix}` }, `Use ${fix.trim()}`);
-    btn.addEventListener('click', () => applyFix(row, fix, false));
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      v.el.classList.remove('warn-open');
+      applyFix(row, fix, false, v.el.classList.contains('active'));
+    });
     return btn;
   };
   const fixes = warningFixes(warning).map(fixButton);
-  v.warn!.replaceChildren(text, ...fixes);
+  if (warning.switchAngle) {
+    const toDeg = warning.switchAngle === 'deg';
+    const sw = h('button', { type: 'button', class: 'fix', title: toDeg ? 'Switch angle mode to Degrees' : 'Switch angle mode to Radians' }, toDeg ? 'Switch to Deg' : 'Switch to Rad');
+    sw.addEventListener('pointerdown', (e) => e.stopPropagation());
+    sw.addEventListener('click', (e) => {
+      e.stopPropagation();
+      v.el.classList.remove('warn-open');
+      play('toggle');
+      setMode(MODES.angle, toDeg);
+    });
+    fixes.push(sw);
+  }
+  v.warn!.replaceChildren(ico, text, ...fixes);
   v.warn!.hidden = false;
   v.warn!.classList.toggle('now', !!warning.instant);
 }

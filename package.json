@@ -1,6 +1,6 @@
 {
   "name": "slopculator",
-  "version": "0.2.5-alpha",
+  "version": "0.2.6-alpha",
   "license": "MIT",
   "private": true,
   "description": "Keyboard-first calculator and grapher for the web",

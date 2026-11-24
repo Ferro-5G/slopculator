@@ -80,8 +80,8 @@ function sharedColors(): Plugin {
 function siteHeaders(script: string): string {
   const hash = createHash('sha256').update(script).digest('base64');
   const csp = [
-    "default-src 'none'", `script-src 'sha256-${hash}'`, "style-src 'unsafe-inline'", 'font-src data:', 'img-src data:',
-    "connect-src 'none'", "base-uri 'none'", "form-action 'none'", "object-src 'none'", "frame-ancestors 'none'",
+    "default-src 'none'", `script-src 'sha256-${hash}'`, "style-src 'unsafe-inline'", 'font-src data:', "img-src data: 'self'",
+    "manifest-src 'self'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'", "object-src 'none'", "frame-ancestors 'none'",
   ].join('; ');
   const off = ['accelerometer', 'autoplay', 'camera', 'display-capture', 'encrypted-media', 'fullscreen', 'geolocation', 'gyroscope', 'hid',
     'idle-detection', 'magnetometer', 'microphone', 'midi', 'payment', 'picture-in-picture', 'publickey-credentials-get', 'screen-wake-lock',
@@ -135,11 +135,27 @@ function siteMeta(): Plugin {
     },
     transformIndexHtml(html) {
       if (!site) return html;
-      return html.replace('</head>', `    <link rel="canonical" href="${site}app" />\n    <meta name="slopculator-home" content="./" />\n    <meta property="og:url" content="${site}app" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
+      return html.replace('</head>', `    <link rel="canonical" href="${site}app" />\n    <link rel="manifest" href="./manifest.webmanifest" />\n    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />\n    <meta name="slopculator-home" content="./" />\n    <meta property="og:url" content="${site}app" />\n    <meta property="og:image" content="${site}preview.png" />\n  </head>`);
     },
     generateBundle() {
       if (!site) return;
       this.emitFile({ type: 'asset', fileName: 'preview.png', source: readFileSync(resolve('docs/images/modern.png')) });
+      this.emitFile({ type: 'asset', fileName: 'apple-touch-icon.png', source: readFileSync(resolve('assets/icon.png')) });
+      this.emitFile({
+        type: 'asset',
+        fileName: 'manifest.webmanifest',
+        source: JSON.stringify({
+          name: 'Slopculator',
+          short_name: 'Slopculator',
+          description: 'Free, open-source graphing calculator in your browser. Works offline.',
+          start_url: '/app',
+          scope: '/',
+          display: 'standalone',
+          background_color: '#06070c',
+          theme_color: '#06070c',
+          icons: [{ src: '/apple-touch-icon.png', sizes: '1024x1024', type: 'image/png', purpose: 'any' }],
+        }, null, 2) + '\n',
+      });
       const urls = [site, `${site}app`, `${site}privacy`].map((u) => `<url><loc>${u}</loc></url>`).join('');
       this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>\n` });
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: `User-agent: *\nAllow: /\nSitemap: ${site}sitemap.xml\n` });
@@ -157,7 +173,7 @@ function siteMeta(): Plugin {
       const version = (JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }).version;
       writeFileSync(resolve(outDir, 'index.html'), sitePage('index.html', {
         ...shared,
-        head: `<link rel="canonical" href="${site}" />\n    <meta property="og:url" content="${site}" />\n    <meta property="og:image" content="${site}preview.png" />`,
+        head: `<link rel="canonical" href="${site}" />\n    <link rel="manifest" href="./manifest.webmanifest" />\n    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />\n    <meta property="og:url" content="${site}" />\n    <meta property="og:image" content="${site}preview.png" />`,
         version: `v${version}`,
         desktop: dataUrl('site/app-desktop.webp', 'image/webp'),
         phone: dataUrl('site/app-phone.webp', 'image/webp'),

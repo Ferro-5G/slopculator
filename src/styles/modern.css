@@ -2849,11 +2849,12 @@ dialog.palette::backdrop {
   }
 }
 
-/* Phones that aren't tall (iPhone SE, mini): the keys a little shorter so a few lines still show. */
+/* Phones that aren't tall (or iOS Safari with its URL bar visible): keep every key at least 44 px while giving the canvas room. */
 @media (max-width: 760px) and (max-height: 760px), (max-height: 460px) and (pointer: coarse) {
   :root {
-    --bank-row: 46px;
-    --pad-row: 50px;
+    --bank-row: 44px;
+    --pad-row: 46px;
+    --kgap: 5px;
     --pad-h: calc(2 * var(--bank-row) + 4 * var(--pad-row) + 5 * var(--kgap));
   }
 }
@@ -3099,6 +3100,23 @@ dialog.palette::backdrop {
     color: var(--ink);
   }
 
+  .ms-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ms-jump {
+    border: 0;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+    border-radius: 999px;
+    height: 30px;
+    padding: 0 12px;
+    font: 600 13.5px/1 var(--sans);
+    color: var(--accent);
+  }
+
   .ms-done {
     border: 0;
     background: none;
@@ -3165,6 +3183,7 @@ dialog.palette::backdrop {
 
   .choice button {
     position: relative;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -3183,9 +3202,10 @@ dialog.palette::backdrop {
   }
 
   .choice .hint {
-    font: 400 12px/1.2 var(--mono);
+    font: 400 11.5px/1.25 var(--mono);
     color: var(--ink-3);
-    white-space: nowrap;
+    text-align: center;
+    white-space: normal;
   }
 
   .choice button[aria-checked='true'] {

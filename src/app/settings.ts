@@ -12,7 +12,7 @@ import { kb, narrow, isMac } from './platform';
 import { views, isLineField } from './rowviews';
 import { doc, activeId } from './sheet';
 import { setKeypad, keypadOn, setGraph, graphOn } from './shell';
-import { appearBody } from './theme';
+import { appearBody, setAppear } from './theme';
 import { PresenceMotion } from './motion';
 
 const roundSlider = h('input', { type: 'range', class: 'slider round-slider', min: '0', max: String(ROUND_SLIDER_MAX), step: '1', 'aria-label': 'Rounding', title: 'Rounding for every result and for copying' }) as HTMLInputElement;
@@ -216,18 +216,20 @@ const sheetRound = h('input', { type: 'range', class: 'ms-round', min: '0', max:
 const sheetRoundOut = h('output', { class: 'ms-round-out' });
 const modeSheetDone = h('button', { type: 'button', class: 'ms-done' }, 'Done');
 const msAppear = h('section', { class: 'ms-group ms-appear' }, h('h3', {}, 'Appearance'));
+const msJumpThemes = h('button', { type: 'button', class: 'ms-jump', onclick: () => { play('toggle'); msAppear.scrollIntoView({ block: 'start', behavior: motionNow() === 'full' ? 'smooth' : 'auto' }); } }, 'Themes');
+const msBody = h('div', { class: 'ms-body' },
+  ...(Object.keys(CHOICES) as (keyof typeof CHOICES)[]).map((id) => choice(CHOICES[id].title, CHOICES[id].a, CHOICES[id].b, MODES[id].on, (v) => setMode(MODES[id], v))),
+  h('section', { class: 'ms-group' }, h('h3', {}, 'Also'), h('div', { class: 'ms-list' },
+    ...(Object.keys(SWITCHES) as (keyof typeof SWITCHES)[]).map((id) => switchRow(SWITCHES[id].title, SWITCHES[id].hint, MODES[id].on, (v) => setMode(MODES[id], v))),
+  )),
+  h('section', { class: 'ms-group' }, h('h3', {}, 'Rounding', sheetRoundOut),
+    h('div', { class: 'ms-round-wrap' }, sheetRound, h('div', { class: 'ms-round-ends', 'aria-hidden': 'true' }, h('span', {}, 'Auto'), h('span', {}, String(ROUND_SLIDER_MAX - 1))))),
+  msAppear,
+);
 const modeSheet = h('div', { class: 'mode-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Modes', hidden: true },
   h('div', { class: 'ms-grab', 'aria-hidden': 'true' }),
-  h('header', {}, h('h2', {}, 'Modes'), modeSheetDone),
-  h('div', { class: 'ms-body' },
-    ...(Object.keys(CHOICES) as (keyof typeof CHOICES)[]).map((id) => choice(CHOICES[id].title, CHOICES[id].a, CHOICES[id].b, MODES[id].on, (v) => setMode(MODES[id], v))),
-    h('section', { class: 'ms-group' }, h('h3', {}, 'Also'), h('div', { class: 'ms-list' },
-      ...(Object.keys(SWITCHES) as (keyof typeof SWITCHES)[]).map((id) => switchRow(SWITCHES[id].title, SWITCHES[id].hint, MODES[id].on, (v) => setMode(MODES[id], v))),
-    )),
-    h('section', { class: 'ms-group' }, h('h3', {}, 'Rounding', sheetRoundOut),
-      h('div', { class: 'ms-round-wrap' }, sheetRound, h('div', { class: 'ms-round-ends', 'aria-hidden': 'true' }, h('span', {}, 'Auto'), h('span', {}, String(ROUND_SLIDER_MAX - 1))))),
-    msAppear,
-  ),
+  h('header', {}, h('h2', {}, 'Modes'), h('div', { class: 'ms-head-actions' }, msJumpThemes, modeSheetDone)),
+  msBody,
 );
 const modeScrim = h('div', { class: 'mode-scrim', hidden: true });
 let modeSheetReturn: HTMLElement | null = null;
@@ -258,8 +260,15 @@ const modeSheetMotion = new PresenceMotion([modeSheet, modeScrim], (phase) => {
   if (modeSheetReturn?.isConnected && !isLineField(modeSheetReturn)) modeSheetReturn.focus({ preventScroll: true });
   modeSheetReturn = null;
 });
-function openModeSheet(): void {
-  if (modeSheetMotion.open) return;
+export function openModeSheet(section?: 'appear'): void {
+  if (!narrow.matches) {
+    if (section === 'appear') setAppear(true, true);
+    return;
+  }
+  if (modeSheetMotion.open) {
+    if (section === 'appear') msAppear.scrollIntoView({ block: 'start', behavior: motionNow() === 'full' ? 'smooth' : 'auto' });
+    return;
+  }
   play('toggle');
   closePopovers();
   msAppear.append(appearBody);
@@ -271,7 +280,15 @@ function openModeSheet(): void {
   }
   window.addEventListener('keydown', modeSheetKeys, true);
   modeSheetMotion.set(true, motionNow() === 'full');
-  modeSheet.querySelector<HTMLElement>('[aria-checked=true]')?.focus({ preventScroll: true });
+  if (section === 'appear') {
+    requestAnimationFrame(() => {
+      msBody.scrollTop = Math.max(0, msAppear.offsetTop - 8);
+      msAppear.querySelector<HTMLElement>('select, button')?.focus({ preventScroll: true });
+    });
+  } else {
+    msBody.scrollTop = 0;
+    modeSheet.querySelector<HTMLElement>('[aria-checked=true]')?.focus({ preventScroll: true });
+  }
 }
 function closeModeSheet(): void {
   if (modeSheetMotion.open) modeSheetMotion.set(false, motionNow() === 'full');

@@ -19,7 +19,15 @@ const markListEdges = () => {
  */
 const SHEET_SLACK = 48;
 const sheetFits = (): boolean => {
-  const last = listEl.lastElementChild as HTMLElement | null;
+  // Skip absolute canvas overlays (wires SVG, tag layer, example frame) so the actual last block is measured.
+  let last: HTMLElement | null = null;
+  for (let i = listEl.children.length - 1; i >= 0; i--) {
+    const el = listEl.children[i];
+    if (el instanceof HTMLElement && !el.hidden && el.offsetHeight > 0 && getComputedStyle(el).position !== 'absolute') {
+      last = el;
+      break;
+    }
+  }
   if (!last) return true;
   const base = listEl.getBoundingClientRect().top - listEl.scrollTop;
   const over = last.getBoundingClientRect().bottom - base - listEl.clientHeight;

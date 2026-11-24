@@ -141,6 +141,29 @@ function syncMobileNav(): void {
   navKeys.hidden = !coarse.matches || chose;
 }
 
+function syncVisualViewport(): void {
+  const vv = window.visualViewport;
+  const root = document.documentElement;
+  if (!vv || !coarse.matches || vv.scale > 1.01) {
+    if (root.classList.contains('kb-open')) {
+      root.classList.remove('kb-open');
+      root.style.removeProperty('--vvh');
+      replaceToast();
+    }
+    return;
+  }
+  const kbOpen = window.innerHeight - vv.height > 80;
+  if (kbOpen) {
+    root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+    root.classList.add('kb-open');
+    if (vv.offsetTop > 0) window.scrollTo(0, 0);
+  } else if (root.classList.contains('kb-open')) {
+    root.classList.remove('kb-open');
+    root.style.removeProperty('--vvh');
+  }
+  replaceToast();
+}
+
 export function initShell(): void {
   mobileNav.append(h('div', { class: 'nav-seg', role: 'group', 'aria-label': 'Pane' }, navCalc, navGraph));
   // On a touch screen, the switch between the keypad and the system keyboard sits on the composer's top edge.
@@ -152,7 +175,12 @@ export function initShell(): void {
     if (!narrow.matches) doc.ui.view = 'calc';
     applyUI();
   });
-  coarse.addEventListener('change', () => applyUI());
+  coarse.addEventListener('change', () => {
+    syncVisualViewport();
+    applyUI();
+  });
+  window.visualViewport?.addEventListener('resize', syncVisualViewport);
+  window.visualViewport?.addEventListener('scroll', syncVisualViewport);
 }
 /** Between the app's keypad and the system keyboard, on a touch screen. */
 export function toggleSysKeyboard(): void {

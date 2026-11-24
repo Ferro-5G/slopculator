@@ -174,12 +174,21 @@ export function cleanBody<R extends DocRow>(raw: Record<string, unknown>, newId:
   return { rows: rows.length ? rows : [blankRow()], settings: cleanSettings(raw.settings), display: cleanDisplay(raw.display) };
 }
 
+/**
+ * Whether parsed JSON holds a sheet: a `rows` list with at least one line the app can read. Older exports carry no
+ * `app` field, so the rows are what's checked. Anything else (`{}`, another app's file) would load as a blank sheet.
+ */
+export function hasSheetRows(parsed: unknown): boolean {
+  const rows = (parsed as { rows?: unknown } | null)?.rows;
+  return Array.isArray(rows) && rows.some((r: unknown) => cleanRow(r) !== null);
+}
+
 export function restoreDoc<D>(read: () => string | null, normalize: (raw: unknown) => D, blank: () => D): { doc: D; restored: boolean } {
   try {
     const raw = read();
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { doc: normalize(parsed), restored: Array.isArray(parsed?.rows) && parsed.rows.some((r: unknown) => cleanRow(r) !== null) };
+      return { doc: normalize(parsed), restored: hasSheetRows(parsed) };
     }
   } catch {
     /* fall through to a blank document */

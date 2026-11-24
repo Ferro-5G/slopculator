@@ -45,12 +45,13 @@ export function dragLine(row: Extract<Row, { kind: 'expr' }>, text: string): voi
   putLine(row, text);
   onDrag(row.id);
 }
-export function applyFix(row: Extract<Row, { kind: 'expr' }>, text: string, end = true): void {
+export function applyFix(row: Extract<Row, { kind: 'expr' }>, text: string, end = true, focus = true): void {
   const before = row.text;
   writeLine(row, text);
   recordFix(row.id, before, text);
   play('fn');
   sheetChanged();
+  if (!focus) return;
   if (end) screen.focusRow(row.id);
   else screen.inputOf(row.id)?.focus();
 }

@@ -1,5 +1,5 @@
 import { tokenize, type Token } from './lexer';
-import { INFIX_WORDS, PREFIX_FUNCS, TRIG, isHeading } from './parser';
+import { INFIX_WORDS, PREFIX_FUNCS, TRIG, inParens, isHeading, parseSpanned, type Node, type Spanned } from './parser';
 import { Lru } from './memo';
 import { readError } from './errors';
 
@@ -16,11 +16,15 @@ export interface LineWarning extends Span {
   alt?: string;
   /** Shown at once rather than after typing pauses: the answer beside it (12 000 → 0) would mislead meanwhile. */
   instant?: boolean;
+  /** When the warning is an angle-mode mismatch, the mode to switch to with one tap. */
+  switchAngle?: 'deg' | 'rad';
 }
 
 const OPEN = new Set(['(', '[', '{']);
 const CLOSE = new Set([')', ']', '}']);
-const POSTFIX = new Set(['!', '%', '°']);
+const POSTFIX = new Set(['!', '%', '°', 'ᵀ']);
+const ANGLE_FUNCS = new Set(['deg', 'todeg', 'rad', 'torad']);
+const NON_CALL_WORDS = new Set([...INFIX_WORDS, 'with', 'where', 'for', 'and', 'or', 'xor', 'of']);
 
 function tokens(text: string): Token[] | null {
   try {
@@ -63,6 +67,32 @@ class Line {
     else return -1;
     while (k > 0 && isOp(this.toks[k], ...POSTFIX)) k++;
     return k;
+  }
+
+  private _spanned?: Spanned | null;
+
+  spanned(): Spanned | null {
+    if (this._spanned === undefined) {
+      try {
+        this._spanned = parseSpanned(this.text);
+      } catch {
+        this._spanned = null;
+      }
+    }
+    return this._spanned;
+  }
+
+  hasOpBetween(fromPos: number, toPos: number, op: string): boolean {
+    return this.toks.some((t) => t.pos >= fromPos && t.pos < toPos && isOp(t, op));
+  }
+
+  prevTokenBefore(pos: number): Token | undefined {
+    let prev: Token | undefined;
+    for (const t of this.toks) {
+      if (t.type === 'eof' || t.pos >= pos) break;
+      prev = t;
+    }
+    return prev;
   }
 
   afterPowered(i: number): number {
@@ -230,29 +260,216 @@ function fractionInASum(l: Line): LineWarning | null {
   return null;
 }
 
-function angleMode(l: Line, deg: boolean): LineWarning | null {
-  for (let i = 0; i < l.toks.length; i++) {
-    const t = l.toks[i];
-    if (t.type !== 'ident' || !TRIG.has(t.value)) continue;
-    const bracketed = isOp(l.toks[i + 1], '(');
-    const from = bracketed ? i + 2 : i + 1;
-    const end = bracketed ? l.afterGroup(i + 1) - 1 : from + 1;
-    if (end <= from) continue;
-    if (deg) {
-      for (let k = from; k < end; k++) {
-        if (l.toks[k].type === 'ident' && l.toks[k].value === 'π') {
-          return { ...l.span(i, bracketed ? end + 1 : end), message: 'Degrees are on, but π usually means radians. Check the Deg–Rad switch.' };
-        }
-      }
-    } else {
-      const n = l.toks[from];
-      const degreesLike = end === from + 1 && n.type === 'num' && n.num !== undefined && n.num >= 15 && n.num <= 360 && n.num % 15 === 0;
-      if (degreesLike) {
-        return { ...l.span(i, bracketed ? end + 1 : end), message: `Radians are on, and ${l.source(from, end)} looks like degrees. Check the Deg–Rad switch.` };
-      }
+function walk(n: Node, visit: (node: Node) => boolean | void): boolean {
+  if (visit(n)) return true;
+  switch (n.k) {
+    case 'un':
+    case 'post':
+    case 'abs':
+      return walk(n.a, visit);
+    case 'bin':
+      return walk(n.a, visit) || walk(n.b, visit);
+    case 'call':
+      if (n.base && walk(n.base, visit)) return true;
+      return n.args.some((a) => walk(a, visit));
+    case 'point':
+    case 'vec':
+    case 'bracket':
+    case 'list':
+    case 'rel':
+      return n.items.some((a) => walk(a, visit));
+    case 'piece':
+      return n.branches.some((b) => (b.cond ? walk(b.cond, visit) : false) || (b.val ? walk(b.val, visit) : false));
+    default:
+      return false;
+  }
+}
+
+function nodeSpan(sp: Spanned, n: Node, expand = true): [number, number] | null {
+  const raw = sp.spanOf(n);
+  if (!raw) return null;
+  let [s, e] = raw;
+  const text = sp.text;
+  while (e > s && text[e - 1] === ' ') e--;
+  if (expand && inParens(n)) {
+    for (;;) {
+      let ls = s;
+      while (ls > 0 && text[ls - 1] === ' ') ls--;
+      let re = e;
+      while (re < text.length && text[re] === ' ') re++;
+      if (ls > 0 && text[ls - 1] === '(' && re < text.length && text[re] === ')') {
+        s = ls - 1;
+        e = re + 1;
+      } else break;
     }
   }
-  return null;
+  return e > s ? [s, e] : null;
+}
+
+function hasUnmarkedPi(n: Node): boolean {
+  if (n.k === 'post' && n.op === '°') return false;
+  if (n.k === 'call' && ANGLE_FUNCS.has(n.name)) return false;
+  if (n.k === 'id' && n.name === 'π') return true;
+  switch (n.k) {
+    case 'un':
+    case 'post':
+    case 'abs':
+      return hasUnmarkedPi(n.a);
+    case 'bin':
+      return hasUnmarkedPi(n.a) || hasUnmarkedPi(n.b);
+    case 'call':
+      return (n.base ? hasUnmarkedPi(n.base) : false) || n.args.some(hasUnmarkedPi);
+    case 'point':
+    case 'vec':
+    case 'bracket':
+    case 'list':
+    case 'rel':
+      return n.items.some(hasUnmarkedPi);
+    case 'piece':
+      return n.branches.some((b) => (b.cond ? hasUnmarkedPi(b.cond) : false) || (b.val ? hasUnmarkedPi(b.val) : false));
+    default:
+      return false;
+  }
+}
+
+function fractionalPower(l: Line): LineWarning | null {
+  if (!l.toks.some((t) => isOp(t, '^')) || !l.toks.some((t) => isOp(t, '/'))) return null;
+  const sp = l.spanned();
+  if (!sp) return null;
+  const text = sp.text;
+  let found: LineWarning | null = null;
+  walk(sp.tree, (n) => {
+    if (n.k !== 'bin' || n.op !== '/') return;
+    if (n.a.k !== 'bin' || n.a.op !== '^' || inParens(n.a)) return;
+    // Only offer the rewrite when the parsed denominator is a standalone integer (not 2^1/3^2, 2^1/3x, 2^1/3√4, etc.).
+    if (n.b.k !== 'num' || inParens(n.b) || !Number.isInteger(n.b.v) || n.b.v <= 1) return;
+    const expNode = n.a.b;
+    const expAtom = expNode.k === 'un' && expNode.op === '-' && !inParens(expNode) ? expNode.a : expNode;
+    if (inParens(expNode) || expAtom.k !== 'num' || inParens(expAtom) || !Number.isInteger(expAtom.v)) return;
+    // Avoid false positives on ordinary algebraic terms like x^2/2 or v^2/2: warn for any ^1/n (nobody writes ^1 on
+    // purpose) and for numeric bases with a non-integer fraction (9^1/2, 8^2/3, 4^3/2).
+    const numBase = n.a.a.k === 'num' && !inParens(n.a.a);
+    const unitExp = expAtom.v === 1;
+    if (!unitExp && (!numBase || expAtom.v % n.b.v === 0)) return;
+    const baseSpan = nodeSpan(sp, n.a.a);
+    const expSpan = nodeSpan(sp, expNode);
+    const denSpan = nodeSpan(sp, n.b);
+    if (!baseSpan || !expSpan || !denSpan) return;
+    if (!l.hasOpBetween(baseSpan[1], expSpan[0], '^') || !l.hasOpBetween(expSpan[1], denSpan[0], '/')) return;
+    const baseSrc = brief(text.slice(baseSpan[0], baseSpan[1]));
+    const expSrc = text.slice(expSpan[0], expSpan[1]);
+    const denSrc = text.slice(denSpan[0], denSpan[1]);
+    const divGlyph = text.slice(expSpan[1], denSpan[0]).trim() || '/';
+    found = {
+      start: expSpan[0],
+      end: denSpan[1],
+      message: `Only ${expSrc} is in the exponent, so this is (${baseSrc}^${expSrc})${divGlyph}${denSrc}. Use brackets for a fractional power.`,
+      fix: `${text.slice(0, expSpan[0])}(${text.slice(expSpan[0], denSpan[1])})${text.slice(denSpan[1])}`,
+    };
+    return true;
+  });
+  return found;
+}
+
+function findBarePrefixArg(tree: Node, sp: Spanned, targetStart: number): [number, number] | null {
+  let found: [number, number] | null = null;
+  walk(tree, (n) => {
+    if (n.k !== 'call' || !PREFIX_FUNCS.has(n.name) || n.args.length !== 1) return;
+    const callSpan = nodeSpan(sp, n, false);
+    const argSpan = nodeSpan(sp, n.args[0]);
+    if (!callSpan || !argSpan) return;
+    if (argSpan[0] === targetStart && !sp.text.slice(callSpan[0], argSpan[0]).includes('(')) {
+      found = argSpan;
+      return true;
+    }
+  });
+  return found;
+}
+
+function stackedPower(l: Line): LineWarning | null {
+  if (l.toks.filter((t) => isOp(t, '^')).length < 2) return null;
+  const sp = l.spanned();
+  if (!sp) return null;
+  const text = sp.text;
+  let found: LineWarning | null = null;
+  walk(sp.tree, (n) => {
+    if (n.k !== 'bin' || n.op !== '^') return;
+    const midPow = n.b.k === 'un' && n.b.op === '-' && !inParens(n.b) ? n.b.a : n.b;
+    if (midPow.k !== 'bin' || midPow.op !== '^' || inParens(midPow)) return;
+    const baseSpan = nodeSpan(sp, n.a);
+    const midStartSpan = nodeSpan(sp, n.b);
+    const midAtomSpan = nodeSpan(sp, midPow.a);
+    const topSpan = nodeSpan(sp, midPow.b);
+    if (!baseSpan || !midStartSpan || !midAtomSpan || !topSpan) return;
+    const midStart = midStartSpan[0];
+    const midEnd = midAtomSpan[1];
+    if (!l.hasOpBetween(baseSpan[1], midStart, '^') || !l.hasOpBetween(midEnd, topSpan[0], '^')) return;
+    const baseSrc = brief(text.slice(baseSpan[0], baseSpan[1]));
+    const midSrc = brief(text.slice(midStart, midEnd));
+    const topSrc = brief(text.slice(topSpan[0], topSpan[1]));
+    const bareArg = findBarePrefixArg(sp.tree, sp, baseSpan[0]);
+    let fix: string;
+    if (bareArg) {
+      const inner = `(${text.slice(baseSpan[0], midEnd)})${text.slice(midEnd, bareArg[1])}`;
+      fix = `${text.slice(0, bareArg[0])}(${inner})${text.slice(bareArg[1])}`;
+    } else {
+      const prev = l.prevTokenBefore(baseSpan[0]);
+      const needsMul = prev?.type === 'ident' && !NON_CALL_WORDS.has(prev.value);
+      if (needsMul) {
+        const before = text.slice(0, baseSpan[0]).trimEnd();
+        fix = `${before} * (${text.slice(baseSpan[0], midEnd)})${text.slice(midEnd)}`;
+      } else {
+        fix = `${text.slice(0, baseSpan[0])}(${text.slice(baseSpan[0], midEnd)})${text.slice(midEnd)}`;
+      }
+    }
+    found = {
+      start: baseSpan[0],
+      end: topSpan[1],
+      message: `Powers group from the right, so this is ${baseSrc}^(${midSrc}^${topSrc}). Use brackets for (${baseSrc}^${midSrc})^${topSrc}.`,
+      fix,
+    };
+    return true;
+  });
+  return found;
+}
+
+function angleMode(l: Line, deg: boolean): LineWarning | null {
+  if (!l.toks.some((t) => t.type === 'ident' && TRIG.has(t.value))) return null;
+  const sp = l.spanned();
+  if (!sp) return null;
+  const text = sp.text;
+  let found: LineWarning | null = null;
+  walk(sp.tree, (n) => {
+    if (n.k !== 'call' || !TRIG.has(n.name) || n.args.length !== 1) return;
+    const arg = n.args[0];
+    const callSpan = nodeSpan(sp, n, false);
+    if (!callSpan) return;
+    if (deg) {
+      if (hasUnmarkedPi(arg)) {
+        found = {
+          start: callSpan[0],
+          end: callSpan[1],
+          message: 'Degrees are on, but π usually means radians. Check the Deg–Rad switch.',
+          switchAngle: 'rad',
+        };
+        return true;
+      }
+    } else {
+      const numNode = arg.k === 'un' && arg.op === '-' && !inParens(arg) ? arg.a : arg;
+      if (numNode.k === 'num' && numNode.v >= 15 && numNode.v <= 360 && numNode.v % 15 === 0) {
+        const argSpan = nodeSpan(sp, arg, false);
+        if (!argSpan) return;
+        found = {
+          start: callSpan[0],
+          end: callSpan[1],
+          message: `Radians are on, and ${text.slice(argSpan[0], argSpan[1])} looks like degrees. Check the Deg–Rad switch.`,
+          switchAngle: 'deg',
+        };
+        return true;
+      }
+    }
+  });
+  return found;
 }
 
 const warned = new Lru<string, LineWarning[]>(2000);
@@ -280,7 +497,7 @@ function findWarnings(text: string, deg: boolean): LineWarning[] {
   const lead = text.slice(0, offset);
   const trail = text.slice(offset + trimmed.length);
   const l = new Line(trimmed, toks);
-  const found = [numbersSideBySide(l), negativePower(l), divisionRunsOn(l), powerRunsOn(l), functionWithoutBrackets(l), fractionInASum(l), angleMode(l, deg)];
+  const found = [numbersSideBySide(l), negativePower(l), fractionalPower(l), stackedPower(l), divisionRunsOn(l), powerRunsOn(l), fractionInASum(l), angleMode(l, deg), functionWithoutBrackets(l)];
   return found.filter((w): w is LineWarning => !!w).map((w) => ({
     ...w,
     start: w.start + offset,

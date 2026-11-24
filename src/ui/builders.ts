@@ -1,6 +1,7 @@
 // Declarative GUI builders for multi-argument expressions: Calculus, Normal, Data list, Chance, and HVAC.
 // Pure logic with zero DOM so Web, iOS (SwiftUI), and Android (Material 3) render the exact same builders and live previews.
-import { evaluateDocument, type RowInput } from '../engine/document';
+import { evaluateDocument, parseLine, type RowInput } from '../engine/document';
+import { errorText } from '../engine/errors';
 import type { Settings } from '../engine/evaluator';
 import { plainValue, type DisplayOpts } from '../engine/format';
 import { isDist } from '../engine/values';
@@ -58,12 +59,33 @@ export interface FormBuilderSpec {
 export const BUILDER_FLUIDS = ['R-410A', 'R-454B', 'R-32', 'R-22', 'R-134a', 'R-404A'] as const;
 const fluidArg = (f: string): string => `"${(f || 'R-410A').replace(/^R-?/i, 'R')}"`;
 
-/** Parses a free-form list of numbers/expressions separated by commas, spaces, or newlines. */
+const PLAIN_NUMBER = /^[-+−]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
+
+/**
+ * Parses a free-form list separated by commas, semicolons or newlines. Spaces separate items only in a run of plain
+ * numbers (`12 15 18`, pasted from a column); anywhere else they belong to the item, so `2 + 3` stays one item.
+ */
 export function parseListItems(raw: string): string[] {
   return raw
-    .split(/[\n,;]+|\s+/)
+    .split(/[\n,;]+/)
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((chunk) => {
+      const words = chunk.split(/\s+/);
+      return words.length > 1 && words.every((w) => PLAIN_NUMBER.test(w)) ? words : [chunk];
+    });
+}
+
+/** Why the list can't be inserted, or '' when it can: nothing entered, or an item that isn't a valid expression. */
+function listProblem(raw: string): string {
+  const items = parseListItems(raw);
+  if (!items.length) return 'Enter at least one number.';
+  try {
+    parseLine(`{${items.join(', ')}}`);
+    return '';
+  } catch (e) {
+    return errorText(e);
+  }
 }
 
 const req = (vals: Record<string, string>, id: string, label: string): string =>
@@ -238,7 +260,7 @@ const DATA_BUILDER: FormBuilderSpec = {
       fields: [
         { id: 'items', label: 'Values', placeholder: '12, 15, 18, 22, 25', defaultValue: '', kind: 'list' },
       ],
-      validate: (vals) => (parseListItems(vals.items ?? '').length ? '' : 'Enter at least one number.'),
+      validate: (vals) => listProblem(vals.items ?? ''),
       build: (vals, name) => {
         const body = `{${parseListItems(vals.items ?? '').join(', ')}}`;
         return name.trim() ? `${name.trim()} = ${body}` : body;

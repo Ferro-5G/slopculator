@@ -21,7 +21,7 @@ const expect = (ok, what) => {
   }
 };
 
-for (const f of ['index.html', 'app.html', 'privacy.html', '_headers', 'preview.png', 'sitemap.xml', 'robots.txt']) expect(existsSync(join(dir, f)), `the build has ${f}`);
+for (const f of ['index.html', 'app.html', 'privacy.html', '_headers', 'preview.png', 'apple-touch-icon.png', 'manifest.webmanifest', 'sitemap.xml', 'robots.txt']) expect(existsSync(join(dir, f)), `the build has ${f}`);
 const rules = readFileSync(join(dir, '_headers'), 'utf8');
 const headers = Object.fromEntries(rules.split('\n').filter((l) => l.startsWith('  ')).map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
 const app = readFileSync(join(dir, 'app.html'), 'utf8');
@@ -34,7 +34,7 @@ for (const page of ['index.html', 'privacy.html']) {
   expect(!html.includes('{{'), `${page} has every placeholder filled`);
 }
 
-const types = { html: 'text/html; charset=utf-8', png: 'image/png', xml: 'application/xml', txt: 'text/plain' };
+const types = { html: 'text/html; charset=utf-8', png: 'image/png', webmanifest: 'application/manifest+json', xml: 'application/xml', txt: 'text/plain' };
 const server = createServer((req, res) => {
   let path = new URL(req.url, 'http://x').pathname;
   if (path === '/') path = '/index.html';

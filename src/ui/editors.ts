@@ -4,7 +4,8 @@ export const stepSize = (size: EditorSize, now: number, by: -1 | 1): number => M
 
 export function definedNames(rows: readonly ({ kind: 'expr'; text: string } | { kind: 'table' })[]): Set<string> {
   return new Set(rows.flatMap((r) => {
-    const m = r.kind === 'expr' ? /^\s*([\p{L}_][\p{L}\p{N}_]*)\s*=(?!=)/u.exec(r.text) : null;
+    // A function's name counts too (`f(x) = …`): a list or matrix given it would define the name twice.
+    const m = r.kind === 'expr' ? /^\s*([\p{L}_][\p{L}\p{N}_]*)\s*(?:\([^()=]*\)\s*)?=(?!=)/u.exec(r.text) : null;
     return m ? [m[1]] : [];
   }));
 }

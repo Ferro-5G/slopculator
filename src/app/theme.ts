@@ -178,7 +178,8 @@ function resolvedTheme(): WebTheme {
  * its colors, the curve colors before the tabs that are made from them, and the graph and the keys' fit last.
  */
 export function applyTheme(): void {
-  document.documentElement.dataset.theme = resolvedTheme();
+  const theme = resolvedTheme();
+  document.documentElement.dataset.theme = theme;
   document.documentElement.toggleAttribute('data-pride', prideOn());
   document.documentElement.toggleAttribute('data-glow', !!doc.ui.glow && !appearanceOf(doc.ui).contrast);
   document.documentElement.toggleAttribute('data-keyglow', !!doc.ui.keyGlow && !appearanceOf(doc.ui).contrast);
@@ -186,17 +187,25 @@ export function applyTheme(): void {
   document.documentElement.dataset.look = look;
   lookSheet.textContent = (look === 'retro' ? retroCss : modernCss) + canvasCss;
   lookSel.value = look;
-  applyColor(look, resolvedTheme());
+  applyColor(look, theme);
   applyMotion();
   syncSheetTitle();
   const cs = getComputedStyle(document.documentElement);
   curveColors = Array.from({ length: CURVES }, (_, i) => cs.getPropertyValue(`--curve-${i + 1}`).trim());
   syncTabColors();
   syncAppearance();
-  // Browser chrome on phones, and a native title bar, follows the panel color.
-  let meta = document.querySelector<HTMLMetaElement>('meta[name=theme-color]');
-  if (!meta) { meta = h('meta', { name: 'theme-color' }); document.head.append(meta); }
-  meta.content = cs.getPropertyValue('--panel').trim();
+  // Browser chrome and standalone status bars match the top canvas surface, not the lighter card fill.
+  const chromeBg = look === 'modern' && theme === 'ink'
+    ? '#06070c'
+    : look === 'modern' && theme === 'paper'
+      ? '#f3f5f9'
+      : cs.getPropertyValue('--bg').trim();
+  const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name=theme-color]')];
+  const meta = metas[0] ?? h('meta', { name: 'theme-color' });
+  if (!meta.isConnected) document.head.append(meta);
+  meta.removeAttribute('media');
+  meta.content = chromeBg;
+  for (const extra of metas.slice(1)) extra.remove();
   graph.refreshTheme();
   recompute();
   fitKeyLabels();

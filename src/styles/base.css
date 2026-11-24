@@ -16,6 +16,7 @@ body {
   font: 14px/1.4 var(--sans);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
 
@@ -26,6 +27,18 @@ body {
   }
 }
 
+@media (display-mode: standalone) {
+  html,
+  body {
+    height: 100%;
+  }
+}
+
+html.kb-open,
+html.kb-open body {
+  height: var(--vvh, 100dvh);
+}
+
 button,
 input,
 select,
@@ -34,9 +47,31 @@ output {
   color: inherit;
 }
 
+button,
+a,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+button,
+[role='button'],
+.brand-home {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
 button {
   cursor: pointer;
-  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  /* Stop iOS Safari from zooming into dialog, search, and slider-bound inputs on focus. */
+  input:not(.expr, .slider),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 :focus-visible {
@@ -249,7 +284,8 @@ button {
   padding: 0 0 4px;
 }
 
-.row.active:not(.typing) .warn-line:not([hidden]) {
+.row.active:not(.typing) .warn-line:not([hidden]),
+.row.blk.warn-open .warn-line:not([hidden]) {
   display: flex;
 }
 

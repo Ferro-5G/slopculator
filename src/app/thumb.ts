@@ -14,7 +14,7 @@ import { editText, insertFromSearch } from './lineeditor';
 import { coarse, narrow, kb } from './platform';
 import { focusLine, views } from './rowviews';
 import { activeId, doc } from './sheet';
-import { toggleSysKeyboard } from './shell';
+import { keypadOn, setKeypad, toggleSysKeyboard } from './shell';
 
 export const ti = { tab: null as number | null, page: 0, fluid: FLUIDS[0].key.ins! };
 export const tiRows = h('div', { class: 'ti-rows' });
@@ -31,10 +31,15 @@ deckPadBtn.addEventListener('mousedown', (e) => e.preventDefault());
 deckPadBtn.addEventListener('click', () => {
   if (coarse.matches && doc.ui.sysKeyboard) {
     closeThumb();
+    if (!keypadOn()) setKeypad(true);
     toggleSysKeyboard();
   } else if (ti.tab !== null) {
     play('toggle');
     closeThumb();
+    if (narrow.matches && !keypadOn()) setKeypad(true);
+  } else if (narrow.matches) {
+    play('toggle');
+    setKeypad(!keypadOn());
   }
 });
 export const deckBar = h('div', { class: 'deck-bar', role: 'toolbar', 'aria-label': 'Keypad categories' });
@@ -105,10 +110,10 @@ export function buildThumbRows(): void {
 }
 export function syncTabs(): void {
   const onKb = coarse.matches && !!doc.ui.sysKeyboard;
-  const onPad = !onKb && ti.tab === null;
+  const onPad = !onKb && ti.tab === null && (!narrow.matches || keypadOn());
   // Aurora Glow and Keyboard Glow take the open deck's color (the number pad's is the accent); the dock, and the canvas behind the
   // blocks, glide between them.
-  const deckColor = onPad || onKb ? 'var(--cv-accent)' : `var(--tab-${ti.tab})`;
+  const deckColor = onPad || onKb ? 'var(--cv-accent)' : ti.tab !== null ? `var(--tab-${ti.tab})` : 'var(--cv-accent)';
   composerDock.style.setProperty('--au-a', deckColor);
   tape.style.setProperty('--au-deck', deckColor);
   // Keyboard Glow backlights the keys in the same color.
@@ -116,7 +121,7 @@ export function syncTabs(): void {
   tiPage.style.setProperty('--kg', deckColor);
   deckPadBtn.classList.toggle('lit', onPad);
   deckPadBtn.setAttribute('aria-pressed', String(onPad));
-  deckPadBtn.setAttribute('aria-label', onPad ? 'Number pad' : onKb ? 'Use number pad' : `Close ${TABS[ti.tab!].name}`);
+  deckPadBtn.setAttribute('aria-label', onPad ? (narrow.matches ? 'Hide number pad' : 'Number pad') : onKb ? 'Use number pad' : ti.tab !== null ? `Close ${TABS[ti.tab].name}` : 'Show number pad');
   deckKbBtn.classList.toggle('lit', onKb);
   deckKbBtn.setAttribute('aria-pressed', String(onKb));
   tiTabs.forEach((b, i) => {

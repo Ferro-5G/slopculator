@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Settings } from '../src/engine/evaluator';
 import type { DisplayOpts } from '../src/engine/format';
 import { dataListSummary, evaluateBuilderPreview, FORM_BUILDERS, parseListItems } from '../src/ui/builders';
-import { EDITORS, polygonPreviewPoints, stepSize, vectorMagnitude, type ListEditor } from '../src/ui/editors';
+import { hasSheetRows } from '../src/ui/document';
+import { definedNames, EDITORS, polygonPreviewPoints, stepSize, vectorMagnitude, type ListEditor } from '../src/ui/editors';
 
 const { matrix, shape, vector } = EDITORS;
 const blank = (spec: ListEditor) => Array.from({ length: spec.size.max }, () => Array.from({ length: spec.columns }, () => ''));
@@ -101,5 +102,41 @@ describe('declarative GUI builders', () => {
     const line = FORM_BUILDERS.data.modes[0].build({ items: '10, 20, 30' }, 'L');
     expect(line).toBe('L = {10, 20, 30}');
     expect(dataListSummary('10, 20, 30', [], settings, display)).toBe('n = 3 · x̄ = 20 · s = 10');
+  });
+
+  it('keeps an expression with spaces as one data list item, and splits spaces only between plain numbers', () => {
+    expect(parseListItems('2 + 3, 10')).toEqual(['2 + 3', '10']);
+    expect(parseListItems('12 15 18')).toEqual(['12', '15', '18']);
+    expect(parseListItems('1.5e3 -2 .5')).toEqual(['1.5e3', '-2', '.5']);
+    const mode = FORM_BUILDERS.data.modes[0];
+    expect(mode.build({ items: '2 + 3, 10' }, '')).toBe('{2 + 3, 10}');
+    expect(mode.validate?.({ items: '2 + 3, 10' })).toBe('');
+  });
+
+  it("won't insert a data list that doesn't parse", () => {
+    const mode = FORM_BUILDERS.data.modes[0];
+    expect(mode.validate?.({ items: '' })).toBe('Enter at least one number.');
+    expect(mode.validate?.({ items: '2 +, 10' })).not.toBe('');
+  });
+
+  it("works the data list's stats out even when a function already has the scratch name", () => {
+    const rows = [{ id: 'f', kind: 'expr' as const, text: 'datalist(x) = x' }];
+    expect(dataListSummary('1, 2, 3', rows, settings, display)).toBe('n = 3 · x̄ = 2 · s = 1');
+  });
+
+  it('counts function names as taken', () => {
+    expect([...definedNames([{ kind: 'expr', text: 'f(x) = x^2' }, { kind: 'expr', text: 'g(a, b) = a b' }, { kind: 'expr', text: 'L = {1}' }, { kind: 'expr', text: 'f(2) == 4' }])]).toEqual(['f', 'g', 'L']);
+  });
+});
+
+describe('hasSheetRows', () => {
+  it('accepts a sheet with readable rows, old exports included, and nothing else', () => {
+    expect(hasSheetRows({ app: 'slopculator', version: 1, rows: [{ id: 'a', kind: 'expr', text: '1+1' }] })).toBe(true);
+    expect(hasSheetRows({ rows: [{ kind: 'expr', text: '' }] })).toBe(true);
+    expect(hasSheetRows({})).toBe(false);
+    expect(hasSheetRows([])).toBe(false);
+    expect(hasSheetRows(null)).toBe(false);
+    expect(hasSheetRows({ rows: [] })).toBe(false);
+    expect(hasSheetRows({ rows: [null, 3, 'x'] })).toBe(false);
   });
 });
