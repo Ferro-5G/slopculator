@@ -1,12 +1,12 @@
-export type LookPref = 'modern' | 'retro';
-export const LOOK_NAMES: [LookPref, string][] = [['modern', 'Modern'], ['retro', 'Retro']];
+export type LookPref = 'modern';
+export const LOOK_NAMES: [LookPref, string][] = [['modern', 'Modern']];
 
 export type MotionPref = 'full' | 'reduced' | 'off';
 export const MOTION_NAMES: [MotionPref, string][] = [['full', 'Full'], ['reduced', 'Reduced'], ['off', 'Off']];
 
 export type GraphRatePref = 'high' | '60';
 export const GRAPH_RATE_NAMES: [GraphRatePref, string][] = [['high', 'Highest'], ['60', '60 Hz']];
-export const GRAPH_RATE_NOTE = "How smoothly the graph moves. Highest uses your display's full rate while you move it, and 60 Hz uses a little less battery. A graph that's still draws nothing either way.";
+export const GRAPH_RATE_NOTE = "Highest uses your display's full refresh rate; 60 Hz saves battery.";
 /** The shortest gap between graph frames in ms. Under 16.7 so that timing jitter can't skip a 60 Hz frame. */
 export const graphFrameGap = (rate: GraphRatePref | undefined): number => (rate === '60' ? 15 : 0);
 export const motionOf = (pref: MotionPref | undefined, systemReduced: boolean): MotionPref => ((pref ?? 'full') === 'full' && systemReduced ? 'reduced' : pref ?? 'full');
@@ -53,7 +53,7 @@ export function atLeast(fg: string, bg: string, ratio: number): string {
 }
 
 export interface HeroCap { cap: string; top: string; ink: string; edge?: string }
-export interface SwatchBase { look: 'modern' | 'retro'; dark: boolean; hc: boolean; page: string; active: string; accent: string; opCap: string; opInk: string; hero: HeroCap }
+export interface SwatchBase { look: LookPref; dark: boolean; hc: boolean; page: string; active: string; accent: string; opCap: string; opInk: string; hero: HeroCap }
 export interface SwatchLayer { accent: string; accent2: string; onAccent?: string; accentSoft?: string; led: string; opInk: string; hero: HeroCap; caret: string }
 
 export function swatchOver(b: SwatchBase, color: Exclude<ColorPref, 'default'>): SwatchLayer {
@@ -65,9 +65,8 @@ export function swatchOver(b: SwatchBase, color: Exclude<ColorPref, 'default'>):
   const fill = b.dark ? s.dark : s.light;
   const ink = b.dark ? s.darkInk : '#ffffff';
   let top = fill;
-  if (b.look === 'retro' || !b.dark) for (let t = 0.12; t > 0; t -= 0.02) { const c = mix(fill, '#ffffff', t); if (contrast(ink, c) >= 4.5) { top = c; break; } }
-  // Retro Light's operators are charcoal caps with ivory legends whatever the swatch; elsewhere the legend is the accent, kept readable on its cap.
-  const opInk = b.look === 'retro' && !b.dark ? b.opInk : atLeast(fill, b.opCap, 4.5);
+  if (!b.dark) for (let t = 0.12; t > 0; t -= 0.02) { const c = mix(fill, '#ffffff', t); if (contrast(ink, c) >= 4.5) { top = c; break; } }
+  const opInk = atLeast(fill, b.opCap, 4.5);
   const accent = atLeast(atLeast(fill, b.page, 4.5), b.active, 4.5);
   return { accent, accent2: fill, onAccent: ink, accentSoft: fade(fill, b.dark ? 0.2 : 0.14), led: fill, opInk, hero: { cap: fill, top, ink, edge: mix(fill, '#000000', 0.35) }, caret: accent };
 }
@@ -107,8 +106,8 @@ export function appearanceOf(p: StoredAppearance): AppearanceChoice {
     case 'oled': return { mode: 'dark', pureBlack: true, contrast: false };
     case 'contrast': return { mode: 'system', pureBlack: false, contrast: true };
     case 'system': return { mode: 'system', pureBlack: false, contrast: false };
-    // Slopculator is designed dark first: with nothing chosen, it's dark whatever the system says.
-    default: return { mode: 'dark', pureBlack: false, contrast: false };
+    // Slopculator defaults to OLED pure black with Aurora Glow.
+    default: return { mode: 'dark', pureBlack: true, contrast: false };
   }
 }
 

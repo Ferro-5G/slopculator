@@ -1,7 +1,6 @@
 import { downloadBlob, fileDate, fileStem } from './download';
 import { showPrivacy } from './privacydialog';
 import { copyName, hasSheetRows, isEmptyLine, linesLabel, SAVED_SHEETS_FAILED, sheetAsText as sheetText, sheetLineCount, withSheetView } from '../ui/document';
-import { setSound, play } from './sound';
 import { showHelp, COMMANDS } from './commands';
 import { syncers } from './controls';
 import { type Doc, normalizeDoc, type Row, blankRow } from './docmodel';
@@ -17,7 +16,7 @@ import { type SavedSheet, loadSessions, store, sheetExists, writeSheet, removeSe
 import { coarse, kb, narrow } from './platform';
 import { rebuildRows } from './rows';
 import { focusRow, focusLine } from './rowviews';
-import { currentSheet, doc, saveSoon, autosaveSheet, setDoc, setCurrentSheetName, opts, results, sheetChanged, sheetFromAnotherTab, storedNameIsOurs, recompute } from './sheet';
+import { currentSheet, doc, autosaveSheet, setDoc, setCurrentSheetName, opts, results, sheetChanged, sheetFromAnotherTab, storedNameIsOurs, recompute } from './sheet';
 import { applyUI } from './shell';
 import { openModeSheet } from './settings';
 import { applyTheme, setAppear, syncAppearanceSlots } from './theme';
@@ -25,13 +24,6 @@ import { hideToast, showToast } from './toast';
 
 const menuBtn = h('button', { type: 'button', class: 'menu-btn', 'aria-haspopup': 'menu', 'aria-expanded': 'false' }, 'File');
 const menu = h('div', { class: 'menu', role: 'menu', hidden: true });
-export function toggleKeySound(chirp = false): void {
-  doc.ui.sound = doc.ui.sound === false;
-  setSound(doc.ui.sound);
-  saveSoon();
-  buildMenu();
-  if (chirp && doc.ui.sound) play('toggle');
-}
 
 export function buildMenu(): void {
   const item = (label: string, keys: string, fn: () => void, word = '') =>
@@ -162,11 +154,9 @@ function setCurrentSheet(name: string | null, persist = true): void {
   syncSheetTitle();
 }
 export function syncSheetTitle(): void {
-  // Modern's bar reads "Slopculator | Untitled sheet", as the canvas design has it; Retro's keeps its own words.
-  const retro = doc.ui.look === 'retro';
-  sheetTitle.textContent = currentSheet ?? (retro ? 'Sheet' : 'Untitled sheet');
+  sheetTitle.textContent = currentSheet ?? 'Untitled sheet';
   sheetTitle.classList.toggle('unnamed', !currentSheet);
-  brandName.hidden = retro;
+  brandName.hidden = false;
   sheetTitle.hidden = false;
 }
 /** The answer is handled when the button is pressed, not when the dialog finishes closing, so an Open straight after sees it. */
@@ -175,7 +165,7 @@ function nameDialog(title: string, initial: string, ok: string, note: string, do
   const dialog = dialogShell(
     title,
     h('label', { class: 'field' }, h('span', {}, 'Name'), name),
-    h('p', { class: 'muted' }, note),
+    ...(note ? [h('p', { class: 'muted' }, note)] : []),
     h('div', { class: 'mx-actions' }, cancelButton(), h('button', { type: 'submit', value: 'ok', class: 'primary' }, ok)),
   );
   dialog.querySelector('form')!.addEventListener('submit', (e) => {
@@ -198,7 +188,7 @@ export function saveSheet(): void {
     buildMenu();
     return;
   }
-  nameDialog('Save sheet', '', 'Save', 'Saved sheets stay on this device, and every edit goes into them as you work. Use Export to move one to another computer.', (n) => {
+  nameDialog('Save sheet', '', 'Save', 'Saved on this device. Edits save automatically.', (n) => {
     if (!writeSheet(n, doc)) return showToast(SAVED_SHEETS_FAILED);
     setCurrentSheet(n);
     showToast(`Saved "${n}"`);
@@ -208,7 +198,7 @@ export function saveSheet(): void {
 export function renameSheet(): void {
   const was = currentSheet;
   if (!was) return saveSheet();
-  nameDialog('Rename sheet', was, 'Rename', 'The sheet keeps its lines; only its name changes.', (n) => {
+  nameDialog('Rename sheet', was, 'Rename', '', (n) => {
     if (n === was) return;
     if (!writeSheet(n, doc, was)) return showToast(SAVED_SHEETS_FAILED);
     setCurrentSheet(n);
@@ -226,9 +216,8 @@ export function duplicateSheet(): void {
 }
 export function newSheet(): void {
   if (!leaveSheet()) return;
-  const was = currentSheet;
   const next: Doc = { ...JSON.parse(JSON.stringify(doc)), rows: [blankRow()] };
-  replaceDoc(next, null, was ? `New sheet. "${was}" is saved` : 'New sheet');
+  replaceDoc(next, null, 'New sheet');
 }
 export function openSessionDialog(): void {
   const listBox = h('div', { class: 'sheet-list' });
@@ -236,7 +225,7 @@ export function openSessionDialog(): void {
   const draw = () => {
     const list = loadSessions();
     if (!list.length) {
-      listBox.replaceChildren(h('p', { class: 'muted' }, 'No saved sheets yet. File → Save keeps the current one under a name.'));
+      listBox.replaceChildren(h('p', { class: 'muted' }, 'No saved sheets.'));
       return;
     }
     listBox.replaceChildren(
@@ -372,6 +361,6 @@ export function initFile(): void {
       : h('div', { class: 'brand' }, appMark(), wordmark(), brandName, sheetTitle),
     h('div', { class: 'spacer' }),
     menuWrap,
-    h('button', { type: 'button', class: 'help-btn', title: 'Keyboard shortcuts and typing tips', 'aria-label': 'Help', onclick: () => showHelp() }, '?'),
+    h('button', { type: 'button', class: 'help-btn', title: 'Keyboard shortcuts', 'aria-label': 'Help', onclick: () => showHelp() }, '?'),
   );
 }

@@ -550,15 +550,19 @@ await check('canvas: a window going from the phone\'s column to the wide canvas 
   expect(left.length === 0, `the column's steps stayed on the wide canvas: ${left}`);
 }, { width: 390, height: 844 });
 
-await check('desktop canvas: a line that reads another steps right under it, and its wire drops straight', async (page) => {
+await check('desktop canvas: a line that reads another steps right under it and the wire enters its input pin', async (page) => {
   await page.evaluate(() => window.slopculator.setLines(['p = 1.3', 'y = 2sin(90x) + p']));
   await page.waitForTimeout(500);
   const c = await column(page);
   const p = c.blocks['p = 1.3'], y = c.blocks['y = 2sin(90x) + p'];
   expect(y.left - p.left > 20 && y.top > p.bottom, `y doesn't step right under p: ${JSON.stringify({ p, y })}`);
-  const w = c.wires.find((x) => x.to !== '#graph');
-  const pts = wirePoints(w.d);
-  expect(pts.length === 2 && pts[0].x === pts[1].x, `p's wire into y isn't straight: ${w.d}`);
+  const offset = await page.locator('.ng-sock-in').evaluate((socket) => {
+    const path = document.querySelector('.cv-wires path.w:not([data-to="#graph"])');
+    const end = path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM());
+    const box = socket.getBoundingClientRect();
+    return Math.hypot(end.x - box.x - box.width / 2, end.y - box.y - box.height / 2);
+  });
+  expect(offset < 1, `p's wire misses the input pin by ${offset}px`);
 });
 
 await check('canvas: Steps unfolds a line into its working without moving it; a failing step says so briefly and the steps after it show —; open lines stay open', async (page) => {
@@ -890,30 +894,6 @@ await check('phone canvas: blocks stack in the sheet\'s order with a wire straig
   expect((await page.locator('.composer-tabs .ti-tab').count()) === 5, 'the tabs are not on the composer');
 }, true);
 
-await check('the Konami code unlocks Pride, strips itself from the line, and lands in Appearance', async (page) => {
-  await page.click('.appear-btn');
-  expect((await page.locator('.appear-menu button', { hasText: 'Pride colors' }).count()) === 0, 'Pride in Appearance before the code');
-  await page.keyboard.press('Escape');
-  await page.keyboard.type('88224646ba');
-  await page.waitForTimeout(250);
-  expect(await page.evaluate(() => document.documentElement.hasAttribute('data-pride')), 'no data-pride after the code');
-  const l = await lines(page);
-  expect(l[0].text === '', `the code stayed in the line: ${l[0].text}`);
-  await page.click('.appear-btn');
-  expect((await page.locator('.appear-menu button', { hasText: 'Pride colors' }).count()) === 1, 'no Pride switch in Appearance');
-  await page.keyboard.press('Escape');
-  for (const k of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight']) await page.keyboard.press(k);
-  await page.keyboard.type('ba');
-  await page.waitForTimeout(250);
-  expect(!(await page.evaluate(() => document.documentElement.hasAttribute('data-pride'))), 'the second code did not switch Pride off');
-  await page.reload();
-  await page.click('.appear-btn');
-  // The menu fills in once the saved unlock is read, which can take a slow machine longer than a fixed wait.
-  await page.locator('.appear-menu button', { hasText: 'Pride colors' }).waitFor({ timeout: 8000 }).catch(() => {});
-  expect((await page.locator('.appear-menu button', { hasText: 'Pride colors' }).count()) === 1, 'Pride left Appearance after a reload');
-  await page.screenshot({ path: '.shots/e2e-pride.png' });
-});
-
 await check('typo shows a fix button that corrects it', async (page) => {
   await page.keyboard.type('normcdf(1)');
   await page.keyboard.press('Enter');
@@ -1165,41 +1145,6 @@ await check('a regression line reads the table, shows its fit and defines m and 
   expect(outs[1] === '3' && outs[3] === '12' && outs[4] === '385' && outs[5] === '4.5' && /^0\.3333/.test(outs[6]) && outs[7] === '{1, 4, 9, 16}', `the answers: ${JSON.stringify(outs)}`);
   const named = await page.waitForFunction(() => window.slopculator.graph.names().some((n) => n.text.includes('~')), null, { timeout: 5000 }).then(() => true, () => false);
   expect(named, `the fit isn't drawn with its name: ${JSON.stringify(await page.evaluate(() => window.slopculator.graph.names().map((n) => n.text)))}`);
-});
-
-await check('keys play their recorded sounds: a digit, an operator and Enter each start a clip that has sound in it', async (page) => {
-  const played = () => page.evaluate(() => window.slopPlayed);
-  const press = async (label, tap) => {
-    const before = (await played()).length;
-    await tap(label);
-    await page.waitForFunction((n) => window.slopPlayed.length > n, before, { timeout: 5000 }).catch(() => { throw new Error(`${label} played nothing`); });
-    return (await played()).at(-1);
-  };
-  // Enter is on the composer; the rest are on the keypad.
-  const key = (label) => page.evaluate((label) => [...document.querySelectorAll('.keypad .key, .composer .key')].find((k) => k.querySelector('.kl')?.textContent.replace(/\s/g, '') === label && k.offsetParent).click(), label);
-  const digit = await press('7', key);
-  const operator = await press('+', key);
-  const enter = await press('ENTER', key);
-  for (const [name, clip] of Object.entries({ digit, operator, enter })) {
-    expect(clip.rate === 44100 && clip.ms > 5 && clip.ms < 200 && clip.peak > 0.15 && clip.peak <= 0.75, `the ${name} clip: ${JSON.stringify(clip)}`);
-  }
-  expect(operator.ms > digit.ms && enter.ms !== digit.ms, `an operator and Enter sound like a digit: ${JSON.stringify({ digit, operator, enter })}`);
-}, false, {
-  open: async (page) => {
-    // Every clip the page starts, as what it holds: the suite can't hear, but it can see that a real recording played.
-    await page.addInitScript(() => {
-      window.slopPlayed = [];
-      const start = AudioBufferSourceNode.prototype.start;
-      AudioBufferSourceNode.prototype.start = function (...args) {
-        const data = this.buffer.getChannelData(0);
-        let peak = 0;
-        for (const v of data) peak = Math.max(peak, Math.abs(v));
-        window.slopPlayed.push({ rate: this.buffer.sampleRate, ms: Math.round(this.buffer.duration * 1000), peak: Math.round(peak * 100) / 100 });
-        return start.apply(this, args);
-      };
-    });
-    await openApp(page);
-  },
 });
 
 await check('rounding is one slider from Auto to 15 places', async (page) => {
@@ -1597,10 +1542,6 @@ await check('lines you are not editing read as typeset math, and open as their s
   expect(after[1].typeset, 'a line not being edited stays typeset');
   await page.keyboard.press('ArrowDown');
   expect((await page.evaluate(() => document.activeElement.value)) === 'normcdf(1', 'arrow keys move between lines');
-  await page.selectOption('select.look', 'retro', { force: true });
-  await page.waitForTimeout(200);
-  const retro = await read();
-  expect(retro[1].typeset && !retro[1].frac && retro[1].exp, `Retro: ${JSON.stringify(retro[1])}`);
 });
 
 await check('All + combines lines, leaving empty ones out with a note', async (page) => {
@@ -1818,20 +1759,11 @@ await check('opening or importing a sheet keeps the keypad up with its two rows,
   expect((await lines(page))[0].text === '1+1', 'the file did not open');
 });
 
-await check('Modern is the default, and Retro switches and persists', async (page) => {
+await check('Modern is the default look', async (page) => {
   const look = () => page.evaluate(() => document.documentElement.dataset.look);
   const font = () => page.evaluate(() => getComputedStyle(document.querySelector('.modebar .desk-modes .seg button')).fontFamily);
   expect((await look()) === 'modern', 'starts Modern');
   expect((await font()).includes('Schibsted Grotesk'), await font());
-  await page.click('.appear-btn');
-  await page.selectOption('select.look', 'retro');
-  await page.waitForTimeout(400);
-  expect((await look()) === 'retro', 'switched');
-  expect((await font()).includes('Plex Mono'), await font());
-  await page.reload();
-  // A slow machine can take longer than any fixed wait to apply the saved look after a reload.
-  await page.waitForFunction(() => document.documentElement.dataset.look === 'retro', null, { timeout: 8000 }).catch(() => {});
-  expect((await look()) === 'retro', 'kept after a reload');
 });
 
 await check('zoom buttons glide, and land where a jump would', async (page) => {
@@ -1882,8 +1814,8 @@ await check('Enter on a broken line shakes it, and the new line slides in', asyn
 
 // The three follow-ups from #15. The fixes are in the script, not the stylesheets, but the two looks build their
 // keypads differently enough to run the keypad one in both. Selecting an error and the graph's PNG run in one.
-const setLook = (page, look) => page.selectOption('select.look', look, { force: true });
-for (const look of ['modern', 'retro']) {
+const setLook = async () => {};
+for (const look of ['modern']) {
   await check(`${look}: Ctrl+Z takes back a keypad insert`, async (page) => {
     await setLook(page, look);
     await page.keyboard.type('2+');
@@ -1970,34 +1902,20 @@ await check('Motion: Appearance sets it, and the choice survives a reload', asyn
   expect((await page.getAttribute('html', 'data-motion')) === 'off', 'Off survives a reload');
 });
 
-await check('Color: a swatch is a signal and never repaints the page, and High contrast raises it to 7:1', async (page) => {
-  const token = (k) => page.evaluate((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim(), k);
-  const accent = () => token('--accent');
-  await page.click('.appear-btn');
-  await page.evaluate(() => window.slopculator.setSettings({ theme: 'paper' }));
-  const own = await accent();
-  const page0 = await token('--bg');
-  const fill = await page.evaluate(() => getComputedStyle(document.querySelector('.swatch[aria-label="Teal color"]')).backgroundColor);
-  expect(fill === 'rgb(15, 118, 110)', `the swatch shows its color: ${fill}`);
-  await page.click('.swatch[aria-label="Teal color"]');
-  expect((await accent()) === '#0f766e', `teal accent: ${await accent()}`);
-  expect((await token('--bg')) === page0 && (await token('--key-bed')) === '#e3e4e9', `teal repainted the page: ${await token('--bg')}`);
-  expect((await page.getAttribute('.swatch[aria-label="Teal color"]', 'aria-checked')) === 'true', 'the swatch is checked');
-  // High contrast on Light: the swatch raised to 7:1 on white, no forced yellow.
-  const contrastSwitch = page.locator('.appear-switch', { hasText: 'High contrast' });
-  await contrastSwitch.click();
-  expect((await contrastSwitch.getAttribute('aria-checked')) === 'true', 'the High contrast switch still said off right after turning it on');
-  await page.locator('.mode-seg button', { hasText: 'Light' }).click();
-  expect((await page.evaluate(() => document.documentElement.dataset.theme)) === 'contrastLight', 'High contrast on Light');
-  expect((await accent()) === '#0c5b55', `High contrast raises teal to 7:1: ${await accent()}`);
-  await contrastSwitch.click();
-  expect((await contrastSwitch.getAttribute('aria-checked')) === 'false', 'the High contrast switch still said on right after turning it off');
-  await page.evaluate(() => window.slopculator.setSettings({ theme: 'paper' }));
-  await page.click('.swatch[aria-label="Default color"]');
-  expect((await accent()) === own, `Default restores the accent: ${await accent()}`);
+await check('Default look is OLED black with Aurora Glow on and Keyboard Glow removed', async (page) => {
+  const attrs = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.theme,
+    glow: document.documentElement.hasAttribute('data-glow'),
+    keyGlow: document.documentElement.hasAttribute('data-keyglow'),
+    bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+  }));
+  expect(attrs.theme === 'oled', `default theme is oled, got ${attrs.theme}`);
+  expect(attrs.glow, 'Aurora Glow should be on by default');
+  expect(!attrs.keyGlow, 'Keyboard Glow should not be active');
+  expect(attrs.bg === '#000' || attrs.bg === '#000000', `default background is OLED black, got ${attrs.bg}`);
 });
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`${look}: the modes sit in the top bar`, async (page) => {
     await setLook(page, look);
     await page.waitForTimeout(200);
@@ -2028,7 +1946,7 @@ await check('clearing shows Undo over the composer, saying what was cleared, key
 
 await check('phone: the top bar is one row with a Modes button, and the sheet holds every mode', async (page) => {
   expect(await page.isVisible('.keypad .numpad .key') && await page.isHidden('.keys-toggle'), 'a phone keeps its keypad and has no Keys button');
-  for (const look of ['modern', 'retro']) {
+  for (const look of ['modern']) {
     await setLook(page, look);
     await page.waitForTimeout(150);
     const bar = await page.locator('.modebar').boundingBox();
@@ -2065,16 +1983,16 @@ await check('phone: the top bar is one row with a Modes button, and the sheet ho
   const groups = await page.locator('.mode-sheet .choice').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
   expect(JSON.stringify(groups) === '["Angles","Answers","Huge answers","Standard deviation","Adding a percent","Working"]', `choices: ${groups}`);
   const switches = await page.locator('.mode-sheet .ms-switch .name').allTextContents();
-  expect(JSON.stringify(switches) === '["Percent probabilities","Line letters","Complex numbers"]', `switches: ${switches}`);
+  expect(JSON.stringify(switches) === '["Node canvas","Percent probabilities","Line letters","Complex numbers"]', `switches: ${switches}`);
   expect(await page.isVisible('.mode-sheet .ms-round'), 'rounding is in the sheet');
   await page.locator('.mode-sheet .choice').nth(0).locator('button').nth(1).tap();
   await page.waitForTimeout(100);
   const r = await lines(page);
   expect(Math.abs(Number(r[0].value) - Math.sin(30)) < 1e-9, `recomputed in radians: ${JSON.stringify(r[0])}`);
   await page.locator('.mode-sheet .choice').nth(0).locator('button').nth(0).tap();
-  await page.locator('.mode-sheet .ms-switch').first().tap();
-  expect(await page.evaluate(() => window.slopculator.settings().percent), 'percent turns on from the sheet');
   await page.locator('.mode-sheet .ms-switch').nth(1).tap();
+  expect(await page.evaluate(() => window.slopculator.settings().percent), 'percent turns on from the sheet');
+  await page.locator('.mode-sheet .ms-switch').nth(2).tap();
   await page.waitForTimeout(100);
   expect((await page.locator('.mode-sheet .ms-switch').nth(1).getAttribute('aria-checked')) === 'true', 'line letters turn on from the sheet');
   expect((await page.textContent('.row .idx')) === 'A', `letters show on the line: ${await page.textContent('.row .idx')}`);
@@ -2248,16 +2166,13 @@ await check('phone: the tabs\' colour notches stand 3:1 off their keys, and a li
     const still = document.createElement('style');
     still.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
     document.head.append(still);
-    const sel = (c, v) => { const s = document.querySelector(`select.${c}`); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
     const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
     const ratio = (x, y) => { const [a, b] = [lum(rgb(x)), lum(rgb(y))]; return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
-    for (const look of ['modern', 'retro']) for (const theme of ['paper', 'ink', 'oled', 'contrast', 'contrastLight']) {
-      sel('look', look);
-      window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme });
-      if (theme.startsWith('contrast')) [...document.querySelectorAll('.mode-seg button')].find((b) => b.textContent === (theme === 'contrast' ? 'Dark' : 'Light')).click();
+    for (const look of ['modern']) for (const theme of ['paper', 'ink', 'oled', 'contrast']) {
+      window.slopculator.setSettings({ theme });
       // Until the page wears the theme just chosen (a slow machine takes longer than any fixed wait), then two frames.
-      const want = theme === 'contrastLight' ? 'contrastLight' : theme;
+      const want = theme;
       for (let f = 0; f < 240 && document.documentElement.dataset.theme !== want; f++) await new Promise((r) => requestAnimationFrame(r));
       for (let f = 0; f < 2; f++) await new Promise((r) => requestAnimationFrame(r));
       for (const tab of document.querySelectorAll('.ti-tab')) {
@@ -2299,7 +2214,7 @@ await check('phone: Find opens focused and says where each function lives in the
 }, true);
 
 await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down the right edge, enter on the composer the one filled key', async (page) => {
-  for (const look of ['modern', 'retro']) {
+  for (const look of ['modern']) {
     await setLook(page, look);
     await page.waitForTimeout(200);
     const g = await page.evaluate(() => {
@@ -2447,7 +2362,7 @@ await check('phone: no key label under 12 px or cut, captions 10 px or more, and
   }
 }, true);
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`375 px phone, ${look}: ⌫ and the caret keys need no caption, every label 12 px or more, every tile whole and the keys never covered`, async (page) => {
     await setLook(page, look);
     await page.waitForTimeout(200);
@@ -2509,7 +2424,7 @@ for (const look of ['modern']) {
     expect(v.some((t) => t.length === 1998) && v.includes('1152921504606846976'), `every digit: ${v.map((t) => t.length)}`);
     const shown = await page.$$eval('.rows .row .result .val', (els) => els.map((e) => e.textContent));
     expect(shown.includes('1\u2009152\u2009921\u2009504\u2009606\u2009846\u2009976'), `grouped in threes: ${shown.map((t) => t.slice(0, 30))}`);
-    expect((await page.textContent('.out.long-answer .long-cue:not([hidden])')) === 'Scroll this answer · 1,998 digits', 'no scroll cue under the box that overflows');
+    expect((await page.textContent('.out.long-answer .long-cue:not([hidden])')) === '1,998 digits', 'no digit cue under the box that overflows');
     const g = await page.evaluate(() => {
       const row = [...document.querySelectorAll('.rows .row')].find((r) => (r.querySelector('.val')?.textContent.length ?? 0) > 1000);
       const r = row.getBoundingClientRect(), src = row.querySelector('.src').getBoundingClientRect(), val = row.querySelector('.val'), b = val.getBoundingClientRect();
@@ -2602,6 +2517,10 @@ await check('desktop: the keypad is as tall as its keys; a hint over it says wha
   await page.locator('.numpad .key', { hasText: /^7$/ }).first().hover();
   await page.waitForTimeout(150);
   expect((await hint()) === '', `a digit types itself, so it has no hint: ${await hint()}`);
+  await page.locator('.composer-enter').hover();
+  await page.waitForTimeout(150);
+  expect((await hint()) === '' && !(await page.locator('.composer-enter').getAttribute('title')), `ENTER needs no hint or tooltip: ${await hint()}`);
+  expect((await page.locator('.rail-list').textContent()).trim() === '', 'empty rail should stay blank');
   await page.locator('.numpad .key[data-action="back"]').first().hover();
   await page.waitForTimeout(100);
   expect((await hint()).length > 4, `pointing at ⌫: ${await hint()}`);
@@ -2618,7 +2537,7 @@ await check('desktop: the keypad is as tall as its keys; a hint over it says wha
   expect((await hint()) === '', 'the hint stayed after the pointer left');
 });
 
-await check('File keeps files; look, mode, color and motion are in Appearance', async (page) => {
+await check('File keeps files; motion and keypad preferences are in Appearance', async (page) => {
   await page.click('.menu-btn');
   const file = await page.locator('.menu-wrap:not(.appear-wrap) > .menu').textContent();
   for (const word of ['New sheet', 'Open', 'Save', 'Duplicate', 'Rename', 'Export', 'Import', 'PNG', 'SVG']) expect(file.includes(word), `File lost ${word}`);
@@ -2629,7 +2548,7 @@ await check('File keeps files; look, mode, color and motion are in Appearance', 
   await page.click('.appear-btn');
   expect(await page.isHidden('.menu-wrap:not(.appear-wrap) > .menu'), 'File stayed open under Appearance');
   expect(await page.isVisible('.appear-menu'), 'Appearance did not open');
-  for (const q of ['.appear-sample', 'select.look', '.mode-seg', '.swatch', '.appear-switch', 'select.motion']) expect(await page.locator(`.appear-menu ${q}`).first().isVisible(), `Appearance has no ${q}`);
+  for (const q of ['select.motion', '.seg']) expect(await page.locator(`.appear-menu ${q}`).first().isVisible(), `Appearance has no ${q}`);
   await page.keyboard.press('Escape');
   expect(await page.isHidden('.appear-menu'), 'Escape left Appearance open');
   expect(await page.evaluate(() => document.activeElement.classList.contains('appear-btn')), 'focus did not go back to the button');
@@ -2639,9 +2558,7 @@ await check('phone: Appearance is in the Modes sheet', async (page) => {
   expect(await page.isHidden('.appear-btn'), 'a sliders button for Appearance in a phone top bar');
   await page.locator('.modebar .modes .pill.more').tap();
   await page.waitForTimeout(450);
-  for (const q of ['.appear-sample', 'select.look', '.mode-seg', '.swatch', '.appear-switch', 'select.motion']) expect(await page.locator(`.mode-sheet ${q}`).first().isVisible(), `the sheet has no ${q}`);
-  await page.selectOption('.mode-sheet select.look', 'retro');
-  expect((await page.evaluate(() => document.documentElement.dataset.look)) === 'retro', 'Look from the sheet');
+  for (const q of ['select.motion']) expect(await page.locator(`.mode-sheet ${q}`).first().isVisible(), `the sheet has no ${q}`);
 }, true);
 
 await check('modern: the line being edited keeps the typeset face, so it does not jump', async (page) => {
@@ -2656,13 +2573,10 @@ await check('modern: the line being edited keeps the typeset face, so it does no
 await check('desktop: AC on the composer\'s edge shows its legend in every look and theme', async (page) => {
   const bad = await page.evaluate(async () => {
     const out = [];
-    const sel = (c, v) => { const s = document.querySelector(`select.${c}`); s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); };
     const rgb = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
-    for (const look of ['modern', 'retro']) for (const theme of ['paper', 'ink', 'oled', 'contrast', 'contrastLight']) {
-      sel('look', look);
-      window.slopculator.setSettings({ theme: theme === 'contrastLight' ? 'contrast' : theme });
-      if (theme.startsWith('contrast')) [...document.querySelectorAll('.mode-seg button')].find((b) => b.textContent === (theme === 'contrast' ? 'Dark' : 'Light')).click();
+    for (const look of ['modern']) for (const theme of ['paper', 'ink', 'oled', 'contrast']) {
+      window.slopculator.setSettings({ theme });
       await new Promise((r) => setTimeout(r, 120));
       const k = document.querySelector('.composer-ac');
       const l = k.querySelector('.kl'), lc = getComputedStyle(l);
@@ -2745,7 +2659,7 @@ await check('Fit is an action that never looks selected; 1:1 sleeps with no tile
   expect(square.pressed === 'true' && square.disabled && square.bg === home.bg, `1:1: ${JSON.stringify(square)}`);
 });
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`${look}: a parser error reads in plain words, with the parser's message kept in its title`, async (page) => {
     await setLook(page, look);
     await page.evaluate(() => window.slopculator.setLines(['normcdf(1', '2 +', '1 + 2)', '']));
@@ -2753,7 +2667,7 @@ for (const look of ['modern', 'retro']) {
     const errs = await page.$$eval('.row .err', (es) => es.map((e) => [e.textContent, e.title.split('\n')[0], e.getBoundingClientRect().height]));
     expect(errs.length === 3, JSON.stringify(errs));
     expect(errs[0][0] === 'normcdf( is missing a )' && errs[0][1] === 'Expected ")" to close normcdf(, got end of input', JSON.stringify(errs[0]));
-    expect(errs[1][0] === 'Unfinished: add what comes next' && errs[2][0] === 'Extra )', JSON.stringify(errs));
+    expect(errs[1][0] === 'Unfinished' && errs[2][0] === 'Extra )', JSON.stringify(errs));
     expect(errs.every((e) => e[2] < 30), `an error wraps: ${JSON.stringify(errs)}`);
     await page.locator('.row .err').first().click();
     await page.waitForTimeout(150);
@@ -2984,7 +2898,7 @@ await check('UX 4: a named sheet keeps its edits, Open sees a save at once, Dupl
   await page.waitForTimeout(150);
   const blank = await page.evaluate(() => window.slopculator.lines().map((l) => l.text).filter(Boolean));
   expect(blank.length === 0, `New sheet: ${blank}`);
-  expect((await page.textContent('.toast')).includes('"Doc A" is saved'), `New sheet toast: ${await page.textContent('.toast')}`);
+  expect((await page.textContent('.toast')).includes('New sheet'), `New sheet toast: ${await page.textContent('.toast')}`);
   await page.keyboard.press('Control+Alt+o');
   await page.locator('dialog .sheet-open', { hasText: 'Doc A' }).click();
   await page.waitForTimeout(150);
@@ -3213,7 +3127,7 @@ await check('UX2 7: an unfinished line being typed is calm, and shows its error 
   await page.keyboard.type('2*');
   await page.waitForTimeout(800);
   const op = await page.evaluate(() => { const r = document.querySelector('.rows .row'); return { err: r.classList.contains('has-error'), hint: r.querySelector('.out .calm-hint')?.textContent }; });
-  expect(!op.err && op.hint === 'Unfinished: add what comes next', `while typing 2*: ${JSON.stringify(op)}`);
+  expect(!op.err && op.hint === 'Unfinished', `while typing 2*: ${JSON.stringify(op)}`);
   const hintState = () => page.evaluate(() => { const r = document.querySelector('.rows .row'); const hint = r.querySelector('.out .calm-hint'); return { h: Math.round(r.getBoundingClientRect().height), shown: !!hint && getComputedStyle(hint).display !== 'none' }; });
   const before = await hintState();
   // (Brackets close as they're typed, so 2*(3 would be 2*(3), finished.)
@@ -3257,7 +3171,7 @@ const SIX = ['y = x^2/4 - 3', '12*3', '7+5', 'normalcdf(-1, 1, 0, 1)', 'r = 2', 
 for (const width of [1366]) {
   await check(`R4 desktop ${width}: switching look refolds the bar, so ? stays in the window`, async (page) => {
     await page.setViewportSize({ width, height: 900 });
-    for (const look of ['retro', 'modern', 'retro']) {
+    for (const look of ['modern']) {
       await setLook(page, look);
       await page.waitForTimeout(500);
       const g = await page.evaluate(() => { const b = document.querySelector('#app > .modebar'); return { over: b.scrollWidth - b.clientWidth, help: document.querySelector('#app > .modebar .help-btn').getBoundingClientRect().right }; });
@@ -3538,7 +3452,7 @@ await check('R5 phone: Modes, Find and File are word pills, as on the phone apps
   expect([g.modes, g.find, g.file].every((x) => x.bg !== 'rgba(0, 0, 0, 0)'), `pills with no ground: ${JSON.stringify(g)}`);
 }, true);
 
-for (const [where, phone] of [['desktop', false], ['phone', true]]) for (const look of ['modern', 'retro']) {
+for (const [where, phone] of [['desktop', false], ['phone', true]]) for (const look of ['modern']) {
   await check(`R5 ${where} ${look}: every key row's labels on one line, ⌫ with the digits on the desktop, two-line faces clear of the cap's top`, async (page) => {
     await setLook(page, look);
     await page.waitForTimeout(400);
@@ -3628,7 +3542,7 @@ await check('The screen reader says what the line shows', async (page) => {
   const slot = await type('nCr(1, ');
   expect(/^Line 1: nCr\(n, r\)/.test(slot), `an empty slot says the usage: ${slot}`);
   const unfinished = await type('nCr(1, ', 'End');
-  expect(unfinished === 'Line 1: Unfinished: add what comes next', `an unfinished line isn't an error: ${unfinished}`);
+  expect(unfinished === 'Line 1: Unfinished', `an unfinished line isn't an error: ${unfinished}`);
 });
 
 await check('UX4 4: Mac labels, a fresh ⌘/ then Enter does nothing, AC says ⌘Z, percent skips oapercent', async (page) => {
@@ -3655,7 +3569,7 @@ await check('UX4 4: Mac labels, a fresh ⌘/ then Enter does nothing, AC says �
   const t = (await lines(page)).map((l) => l.text);
   expect(!t.some((x) => x.includes('ln(')), `Enter on a fresh palette inserted: ${JSON.stringify(t)}`);
   const ac = await page.evaluate(() => document.querySelector('.composer-ac')?.getAttribute('aria-label') ?? '');
-  expect(/brings them back/.test(ac) && !/appears after/.test(ac), `AC: ${ac}`);
+  expect(/Clear all/.test(ac) && !/brings them back|appears after/.test(ac), `AC: ${ac}`);
   await page.keyboard.press('Control+/');
   await page.keyboard.type('percent');
   await page.waitForTimeout(150);
@@ -3757,7 +3671,7 @@ await check('Percent: phone Modes sheet\'s "Adding a percent" flips 80 + 15% bet
 }, true);
 
 // A bigger window is never tighter, and audit-e2e covers 761 × 560.
-for (const [w, h] of [[1280, 800]]) for (const look of ['modern', 'retro']) {
+for (const [w, h] of [[1280, 800]]) for (const look of ['modern']) {
   await check(`D2 desktop ${w}×${h} ${look}: File, Appearance and Modes open over the page and work with the mouse and the keys`, async (page) => {
     await page.setViewportSize({ width: w, height: h });
     await setLook(page, look);
@@ -3999,7 +3913,7 @@ await check('H2 phone: a 6 × 6 matrix grid scrolls inside its dialog on a narro
 }, true);
 
 for (const phone of [false, true]) await check(`design system: spoken key labels do not change styling (${phone ? 'phone' : 'desktop'})`, async (page) => {
-  for (const look of ['modern', 'retro']) {
+  for (const look of ['modern']) {
     await setLook(page, look);
     await page.evaluate(() => document.fonts.ready);
     const changed = await page.evaluate(() => {
@@ -4104,6 +4018,206 @@ await check('names like constructor typeset as themselves', async (page) => {
   const tex = await page.evaluate(() => [...document.querySelectorAll('.tex')].map((t) => t.textContent));
   expect(!tex.some((t) => /native code/.test(t)), `typeset: ${JSON.stringify(tex)}`);
   expect((await lines(page))[2].result === '7', 'the lines did not evaluate');
+});
+
+await check('node editor: spawn, wire, edit, block a cycle, disconnect and undo', async (page) => {
+  const menu = page.locator('.ng-menu');
+  const search = menu.getByRole('combobox', { name: 'Search math nodes' });
+  const spawn = async (template) => {
+    await search.fill(template);
+    await search.press('Enter');
+    await menu.waitFor({ state: 'detached' });
+  };
+  const add = async (template) => {
+    await page.getByRole('button', { name: '+ Node', exact: true }).click({ timeout: 3000 });
+    await spawn(template);
+  };
+  const out = page.locator('.ng-sock-out');
+  const operation = (title) => page.locator('.blk-node', { has: page.locator('.ng-head', { hasText: title }) });
+  const pin = (node, n) => node.locator(`.ng-sock-in[data-pin="${n}"]`);
+  const center = async (locator) => {
+    const { x, y, width, height } = await locator.boundingBox();
+    return { x: x + width / 2, y: y + height / 2 };
+  };
+  const drag = async (source, end, during = async () => {}) => {
+    const from = await center(source);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 12 });
+    await during();
+    await page.mouse.up();
+  };
+  const answers = async (expected) => {
+    const got = (await lines(page)).filter((line) => line.text).map(({ result, error }) => error || result);
+    expect(JSON.stringify(got.slice(2)) === JSON.stringify(expected), `answers: ${JSON.stringify(got)}`);
+  };
+
+  await add('Number');
+  await add('Number');
+  await add('Add');
+  const sum = operation('Add');
+  const a = await center(pin(sum, 0));
+  await drag(out.nth(0), { x: a.x - 18, y: a.y }, async () => {
+    expect(await pin(sum, 0).evaluate((el) => el.classList.contains('ng-snap')), 'the wire did not snap to Add A');
+  });
+  await drag(out.nth(1), await center(pin(sum, 1)));
+  await answers(['10']);
+
+  await drag(sum.locator('.ng-sock-out'), { x: 930, y: 520 });
+  expect(await page.locator('.ng-drag-layer path').isVisible(), 'the wire preview disappeared behind the spawn menu');
+  expect(await menu.getByRole('option', { name: /Number/ }).count() === 0, 'the contextual menu offered a node without inputs');
+  await spawn('Multiply');
+  const product = operation('Multiply');
+  await product.evaluate((el) => Promise.allSettled(el.getAnimations().map((animation) => animation.finished)));
+  const placed = await product.boundingBox();
+  expect(Math.hypot(placed.x - 930, placed.y - 520) < 1, `Multiply was placed at ${placed.x}, ${placed.y}`);
+  const b = product.getByRole('textbox', { name: 'Value for B' });
+  await b.fill('4');
+  await page.evaluate(() => {
+    window.nodeField = document.activeElement;
+    window.slopculator.setSettings({ deg: false });
+  });
+  // Wait two animation frames after recompute to verify the focused input survives render without replacing the node.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await b.evaluate((el) => el === window.nodeField && el === document.activeElement && el.value === '4'), 'recomputing replaced or reset the focused input');
+  await b.press('Enter');
+  await answers(['10', '40']);
+
+  const beforeCycle = await lines(page);
+  await drag(product.locator('.ng-sock-out'), await center(pin(sum, 0)), async () => {
+    expect(await page.locator('.ng-drag-layer.invalid path').isVisible(), 'the cycle preview did not turn invalid');
+    expect(await page.locator('.ng-drag-note').textContent() === 'That would make a loop', 'the cycle preview gave no reason');
+  });
+  expect((await page.locator('.toast').textContent()).includes('That would make a loop'), 'dropping a cycle gave no feedback');
+  expect(JSON.stringify(await lines(page)) === JSON.stringify(beforeCycle), 'dropping a cycle changed the sheet');
+  await pin(sum, 1).click({ modifiers: ['Alt'] });
+  await answers(['5', '20']);
+  await page.keyboard.press('ControlOrMeta+z');
+  await answers(['10', '40']);
+});
+
+await check('node editor: duplicate pins route separately, rewires are undoable, and Escape cancels', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 5', 'b = 7', 'n1 = a + a']));
+  const sum = page.locator('.blk-node');
+  const firstPin = sum.locator('.ng-sock-in[data-pin="0"]');
+  const otherOut = page.locator('.ng-sock-out').nth(1);
+  const endpoints = await sum.evaluate((block) => {
+    const distance = (point, socket) => {
+      const r = socket.getBoundingClientRect();
+      return Math.hypot(point.x - r.left - r.width / 2, point.y - r.top - r.height / 2);
+    };
+    const out = document.querySelector('.ng-sock-out');
+    return [...block.querySelectorAll('.ng-sock-in')].map((socket) => {
+      const key = `${out.dataset.row}>${socket.dataset.row}@${socket.dataset.pin}`;
+      const path = [...document.querySelectorAll('.cv-wires path.w')].find((el) => el.dataset.key === key);
+      if (!path) return null;
+      const matrix = path.getScreenCTM();
+      return [distance(path.getPointAtLength(0).matrixTransform(matrix), out),
+        distance(path.getPointAtLength(path.getTotalLength()).matrixTransform(matrix), socket)];
+    });
+  });
+  expect(endpoints.length === 2 && endpoints.every((pair) => pair?.every((d) => d < 1)), `socket offsets: ${JSON.stringify(endpoints)}`);
+
+  const startDrag = async (locator) => {
+    const box = await locator.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+  };
+  const moveTo = async (locator) => {
+    const box = await locator.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 10 });
+  };
+  const answer = async (value) => expect((await lines(page))[2].result === value, `wanted ${value}: ${JSON.stringify(await lines(page))}`);
+  const menu = page.locator('.ng-menu');
+  const preview = page.locator('.ng-drag-layer path');
+  await startDrag(firstPin);
+  await moveTo(otherOut);
+  await page.keyboard.press('Escape');
+  await preview.waitFor({ state: 'detached' });
+  await page.mouse.up();
+  await answer('10');
+
+  await startDrag(firstPin);
+  await moveTo(otherOut);
+  await page.mouse.up();
+  await answer('12');
+  await startDrag(firstPin);
+  await page.mouse.move(1000, 720, { steps: 10 });
+  await page.mouse.up();
+  await answer('5');
+  await page.keyboard.press('ControlOrMeta+z');
+  await answer('12');
+
+  await startDrag(otherOut);
+  await page.mouse.move(1000, 720, { steps: 10 });
+  await preview.waitFor();
+  await page.mouse.up();
+  await menu.waitFor();
+  await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+  await preview.waitFor({ state: 'detached' });
+  await answer('12');
+
+  await page.mouse.click(1000, 720, { button: 'right' });
+  await menu.waitFor();
+  const search = menu.getByRole('combobox');
+  expect(await search.evaluate((el) => el === document.activeElement), 'the spawn search did not take focus');
+  await search.press('ArrowDown');
+  await search.press('Enter');
+  await menu.waitFor({ state: 'detached' });
+  expect((await lines(page)).some((line) => line.text.includes('{1, 2, 3, 4}')), 'arrow navigation did not pick Data List');
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.locator('.palette input').fill('Add math node');
+  await page.locator('.palette :text-is("Add math node…")').click();
+  await menu.waitFor();
+  await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+});
+
+await check('node editor: portrait phone toggles Nodes on, spawns a node, and switches back to List', async (page) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.cv-nodes-pill').waitFor({ state: 'visible' });
+  await page.locator('.cv-nodes-pill').click();
+  await page.locator('.tape.cv-wide').waitFor();
+  await page.getByRole('button', { name: '+ Node' }).click();
+  const menu = page.locator('.ng-menu');
+  await menu.waitFor();
+  await menu.getByRole('combobox').fill('Add');
+  await menu.getByRole('option', { name: 'Add' }).click();
+  await menu.waitFor({ state: 'detached' });
+  await page.locator('.row.blk-node').first().waitFor();
+  expect((await lines(page)).some((line) => line.text.includes('n1 = 0 + 0')), `expected spawned Add node: ${JSON.stringify(await lines(page))}`);
+  await page.getByRole('button', { name: '← List' }).click();
+  await page.locator('.tape.cv-narrow').waitFor();
+  await page.locator('.cv-nodes-pill').waitFor({ state: 'visible' });
+});
+
+await check('slider keeps its min/max locked while focused during a drag and refits on release', async (page) => {
+  await page.evaluate(() => window.slopculator.setLines(['a = 1', 'y = a x']));
+  await page.waitForFunction(() => !!document.querySelector('.slider-row input[type=range]'));
+  const before = await page.evaluate(() => {
+    const inp = document.querySelector('.slider-row input[type=range]');
+    inp.focus();
+    const bounds = { min: inp.min, max: inp.max, step: inp.step, focused: document.activeElement === inp };
+    inp.value = '8';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    return bounds;
+  });
+  expect(before.focused, 'slider did not receive focus');
+  await page.waitForFunction(() => window.slopculator.lines()[0]?.value === 8);
+  const during = await page.evaluate(() => {
+    const inp = document.querySelector('.slider-row input[type=range]');
+    return { min: inp.min, max: inp.max, step: inp.step };
+  });
+  expect(JSON.stringify(during) === JSON.stringify({ min: before.min, max: before.max, step: before.step }), `bounds shifted mid-drag: ${JSON.stringify(before)} -> ${JSON.stringify(during)}`);
+  await page.evaluate(() => {
+    const inp = document.querySelector('.slider-row input[type=range]');
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    inp.blur();
+    window.slopculator.setSettings({});
+  });
+  await page.waitForFunction(() => document.querySelector('.slider-row input[type=range]')?.max === '20');
 });
 
 if (!process.env.E2E_MATCH && !shard) console.log(results.join('\n'));

@@ -1,5 +1,4 @@
 import { type MotionPref, motionOf } from '../ui/appearance';
-import { play } from './sound';
 import { doc } from './sheet';
 import { showToast } from './toast';
 
@@ -20,7 +19,6 @@ export function pulse(el: Element | null | undefined, cls: string): void {
 export async function copy(text: string, from?: Element | null): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
-    play('copy');
     pulse(from, 'copied');
     showToast(`Copied ${text.length > 40 ? text.slice(0, 40) + '…' : text}`);
   } catch {

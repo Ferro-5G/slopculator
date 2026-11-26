@@ -121,7 +121,7 @@ export function isSquareView(v: PlotView, w: number, h: number): boolean {
   return Math.abs(ux - uy) <= ux * 1e-3;
 }
 
-export const NOTHING_TO_FIT = 'Nothing to fit yet. Plot something first';
+export const NOTHING_TO_FIT = 'Nothing to fit';
 
 /** How much wider than the narrowest curve's range another curve may run before Fit stops following it. */
 const FIT_RATIO = 6;

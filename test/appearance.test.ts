@@ -8,7 +8,7 @@ describe('Appearance: the old theme preference read as Mode, Pure black and High
     expect(appearanceOf({ theme: 'oled' })).toEqual({ mode: 'dark', pureBlack: true, contrast: false });
     expect(appearanceOf({ theme: 'contrast' })).toEqual({ mode: 'system', pureBlack: false, contrast: true });
     expect(appearanceOf({ theme: 'system' })).toEqual({ mode: 'system', pureBlack: false, contrast: false });
-    expect(appearanceOf({})).toEqual({ mode: 'dark', pureBlack: false, contrast: false });
+    expect(appearanceOf({})).toEqual({ mode: 'dark', pureBlack: true, contrast: false });
   });
 
   it('gives every old theme back unchanged', () => {

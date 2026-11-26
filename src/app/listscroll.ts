@@ -262,11 +262,13 @@ export function initListscroll(): void {
     listEvent('intent');
     intentUntil = Infinity;
   }, { passive: true });
-  window.addEventListener('pointerup', (e) => {
+  const releasePointer = (e: PointerEvent) => {
     if (intentUntil === Infinity) intentUntil = performance.now() + 250;
-    // A tap on a line that removes it (its delete button) loses the touchend, but its pointerup still comes here.
+    // A tap on a line that removes it (its delete button) loses the touchend, but its pointerup/pointercancel still comes here.
     if (e.pointerType === 'touch' && e.isPrimary) listEvent('lift');
-  });
+  };
+  window.addEventListener('pointerup', releasePointer);
+  window.addEventListener('pointercancel', releasePointer);
   listEl.addEventListener('animationend', () => {
     cancelAnimationFrame(coverFrame);
     coverFrame = requestAnimationFrame(placeCovers);

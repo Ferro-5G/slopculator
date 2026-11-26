@@ -4,7 +4,7 @@
 // src/ui/canvas.ts and src/ui/cascade.ts decide the wires, placement and lanes; this draws them and takes the gestures.
 import {
   BELOW_GAP, CLEAR_EXAMPLE, columnOrder, EXAMPLE_GRAPH, EXAMPLE_TITLE, exampleFrameRect, GRAPH_BLOCK, isExampleRow,
-  PULSE_HOP_MS, pulseOrder, roundedPath, sheetWires, wireKey, zoomAbout, type CanvasRow, type CanvasView, type Point, type Rect,
+  PULSE_HOP_MS, pulseOrder, roundedPath, sheetWires, toWorld, wireKey, zoomAbout, type CanvasRow, type CanvasView, type Point, type Rect,
   type Size, type Wire,
 } from '../ui/canvas';
 import {
@@ -21,10 +21,10 @@ import { figurePorts, initFigures, syncFigures } from './figures';
 import { initPsych, psychBlock, psychPorts, syncPsych } from './psych';
 import { isPsychState, psychColumn, psychHosts, PSYCH_BLOCK } from '../ui/psych';
 import { pairedRows } from '../ui/figures';
-import { openLineEnds, trayRises } from '../ui/wireplace';
+import { openLineEnds, tagSpot, trayRises } from '../ui/wireplace';
 import { clearExample } from './example';
 import { composerBox, composerRowId, editingId, editLine, finishEdit } from './composer';
-import { h } from './dom';
+import { h, icon } from './dom';
 import { caretAt, mathNode } from './mathdom';
 import { slotForEnd } from '../ui/slots';
 import { copyableValue, selectedBlockActions, slotInfo } from '../ui/linestate';
@@ -37,10 +37,12 @@ import { narrow, kb } from './platform';
 import { focusRow, setHostedCheck, views } from './rowviews';
 import { openLineMenu } from './rows';
 import { doc, opts, results, rowIndex, saveSoon, sheetChanged } from './sheet';
-import { play } from './sound';
 import { CURVES, DURATIONS, STAGGER } from '../ui/motiontokens';
 import { EMPTY_STARTERS, STARTERS } from '../ui/starters';
 import { loadStarter } from './listtools';
+import { cancelNodeDrag, initNodeGraph, nodeDragLayer, openNodeMenu, refreshNodeDrag, syncNodeSockets, unwireNodePin } from './nodegraph';
+import { setNodesMode } from './shell';
+import { nodeSheetWires } from '../ui/nodegraph';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -51,6 +53,7 @@ let wires: Wire[] = [];
 /** Where each block was laid out last, in world units (wide) or in the column (narrow). */
 let rects = new Map<string, Rect>();
 let drawnWires = new Set<string>();
+let wideTagRoutes: [string, Point[]][] = [];
 const paths = new Map<string, SVGPathElement>();
 /** Each block's last size, so a block lifted into the composer keeps its spot. */
 const sizes = new Map<string, Size>();
@@ -67,6 +70,8 @@ let hostedIds = new Set<string>();
 let hosts = new Map<string, string>();
 /** Each readout port's height, in world units (wide) or in the column (narrow), by `row.port`. */
 let portYs = new Map<string, number>();
+const outPortYs = new Map<string, number>();
+const inPortYs = new Map<string, number>();
 /** A wire whose value tag was pinned by clicking it, or null. */
 let pinnedWire: string | null = null;
 /** The canvas block currently hovered on desktop, for highlighting its connected wires and peers. */
@@ -88,7 +93,11 @@ const mobileActions = h('div', { class: 'mobile-actions', role: 'toolbar', 'aria
 const clearBtn = h('button', { type: 'button', class: 'example-clear' }, CLEAR_EXAMPLE);
 const exampleFrame = h('div', { class: 'example-frame', hidden: true, role: 'group', 'aria-label': EXAMPLE_TITLE }, clearBtn);
 
-export const wide = (): boolean => !narrow.matches;
+export const wide = (): boolean => !narrow.matches || doc.ui.nodes === true;
+export function resetCanvasView(): void {
+  autoView = true;
+  cancelNodeDrag();
+}
 export const canvasWires = (): Wire[] => wires;
 export const canvasView = (): CanvasView => view;
 const motion = () => motionNow() === 'full';
@@ -183,7 +192,9 @@ function holdLook(): void {
 
 /** Lays the blocks out and draws the wires. Runs after every render. */
 export function layoutCanvas(): void {
-  wires = sheetWires(doc.rows, results, { lineNames: doc.settings.lineNames });
+  wires = wide()
+    ? nodeSheetWires(doc.rows, results, { lineNames: doc.settings.lineNames })
+    : sheetWires(doc.rows, results, { lineNames: doc.settings.lineNames });
   const cid = composerRowId();
   doc.rows.forEach((row, k) => {
     const v = views.get(row.id);
@@ -226,6 +237,7 @@ export function layoutCanvas(): void {
   hosts = psychHosts([...hostedIds].map((id) => ({ id })));
   if (psychBlock.isConnected && !watched.has(psychBlock)) { watched.add(psychBlock); blockSizes?.observe(psychBlock); }
   figureIds = syncFigures(cid, wide(), hostedIds);
+  syncNodeSockets(wide(), hostedIds, figureIds);
   trayRoom = syncUnfold(listEl, cid, wide(), tagDrag(), sheetNames(doc.rows, results, doc.settings.lineNames), hostedIds);
   if (wide()) layoutWide(cid); else layoutNarrow(cid);
   measurePorts();
@@ -262,6 +274,7 @@ function syncNarrowScrollEdges(): void {
 }
 
 function layoutWide(cid: string): void {
+  app.classList.toggle('narrow-nodes', narrow.matches);
   tape.classList.add('cv-wide');
   tape.classList.remove('cv-narrow');
   listEl.classList.remove('fade-top', 'fade-bottom');
@@ -390,6 +403,7 @@ function homeView(): CanvasView {
 }
 
 function layoutNarrow(cid: string): void {
+  app.classList.remove('narrow-nodes');
   tape.classList.add('cv-narrow');
   tape.classList.remove('cv-wide');
   // The example's title takes room above the column; set it before anything is measured.
@@ -496,8 +510,29 @@ function cascadeColumnLayout(ids: readonly string[]): void {
 /** Each readout port's height, from where its readout row sits now. */
 function measurePorts(): void {
   portYs = new Map();
+  outPortYs.clear();
+  inPortYs.clear();
   const lr = listEl.getBoundingClientRect();
   const scale = wide() ? view.scale : 1, scroll = wide() ? 0 : listEl.scrollTop;
+  const transform = wide() ? svg.getScreenCTM() : null;
+  if (transform) {
+    for (const [id, v] of views) {
+      const rect = rects.get(id);
+      if (!rect) continue;
+      const sockets = v.el.querySelectorAll<HTMLElement>('.ng-sock:not([hidden])');
+      if (!sockets.length) continue;
+      // Measure relative to the card so an entrance animation does not move the settled wire.
+      const top = v.el.getBoundingClientRect().top;
+      for (const socket of sockets) {
+        const r = socket.getBoundingClientRect();
+        if (!r.height) continue;
+        const y = rect.y + (r.top + r.height / 2 - top) / transform.d;
+        const pin = socket.dataset.pin;
+        if (pin === undefined) outPortYs.set(id, y);
+        else inPortYs.set(`${id}@${pin}`, y);
+      }
+    }
+  }
   for (const map of [figurePorts(), psychPorts()]) for (const [id, ports] of map) {
     if (!rects.has(id) || id === editingId) continue;
     for (const [port, el] of ports) {
@@ -531,12 +566,12 @@ function allSteps(): { id: string; r: Rect }[] {
 }
 
 /** A wide wire's route (wideWireRoute), round every block and every open line's steps, into a step when `toStep`. */
-function routed(w: Wire, opts: { minRun?: number; toStep?: string; to?: Rect; outY?: number; inSlot?: { index: number; count: number } } = {}): Point[] | null {
+function routed(w: Wire, opts: { minRun?: number; toStep?: string; to?: Rect; outY?: number; inY?: number; inSlot?: { index: number; count: number } } = {}): Point[] | null {
   const isEx = (id: string) => id === EXAMPLE_GRAPH || isExampleRow(doc.rows[rowIndex(id)] ?? {});
   const extra = allSteps().filter((s) => s.id !== opts.toStep).map((s) => s.r);
   // The strip between an open line and its tray is where its steps rise into it: other wires keep out.
   for (const [id, t] of trayRects) { const l = rects.get(id); if (l && id !== w.from) extra.push({ x: t.x, y: l.y + l.h + 2, w: Math.max(t.w, l.w), h: BELOW_GAP - 4 }); }
-  return wideWireRoute(w, wires, rects, frameRect, isEx, { editingId, minRun: opts.minRun, extra, to: opts.to, outY: opts.outY, inSlot: opts.inSlot, hosts });
+  return wideWireRoute(w, wires, rects, frameRect, isEx, { editingId, minRun: opts.minRun, extra, to: opts.to, outY: opts.outY, inY: opts.inY, inSlot: opts.inSlot, hosts });
 }
 
 /** Runnable reference token for a block or one of its readout ports, inserted when clicking its output dot. */
@@ -555,7 +590,6 @@ function insertPortRef(rowId: string, port?: string): void {
   if (!ref) { flashBlock(rowId); return; }
   focusRow(composerRowId());
   insertText(ref);
-  play('toggle');
   flashBlock(rowId);
 }
 
@@ -608,6 +642,7 @@ function syncMobileSelection(): void {
   if (wide() || !selectedBlock || k < 0) {
     mobileActions.hidden = true;
     mobileActions.replaceChildren();
+    nodesPillBtn.hidden = !narrow.matches || wide();
     return;
   }
   const row = doc.rows[k];
@@ -622,7 +657,6 @@ function syncMobileSelection(): void {
       if (act.id === 'edit') {
         const caret = selectedCaret;
         setSelectedBlock(null);
-        play('toggle');
         editLine(id, caret);
       } else if (act.id === 'copy') {
         const fn = copyableValue(r, opts());
@@ -630,7 +664,6 @@ function syncMobileSelection(): void {
         setSelectedBlock(null);
       } else if (act.id === 'toggleGraph') {
         row.hidden = !row.hidden;
-        play('toggle');
         sheetChanged();
       } else if (act.id === 'delete') {
         setSelectedBlock(null);
@@ -644,6 +677,7 @@ function syncMobileSelection(): void {
   });
   mobileActions.replaceChildren(...btns);
   mobileActions.hidden = false;
+  nodesPillBtn.hidden = true;
 }
 
 /** A wire's path and its two ports. `state` is lit, dim, focus or plain; err dashes it coral (after a failing step). */
@@ -676,8 +710,8 @@ function bindWireNodes(w: Wire, key: string, d: string, els: SVGElement[], hits:
     if (w.fromPort) el.dataset.port = w.fromPort;
   }
   const outRef = refForPort(w.from, w.fromPort);
-  svgTitle(out, outRef ? `Click to insert ${outRef}` : 'Output');
-  svgTitle(inn, w.name ? `Click to inspect ${w.name}` : 'Connected to graph');
+  if (outRef) svgTitle(out, `Insert ${outRef}`);
+  if (w.name) svgTitle(inn, `Inspect ${w.name}`);
   const hit = document.createElementNS(NS, 'path');
   hit.setAttribute('d', d);
   hit.classList.add('hit');
@@ -685,6 +719,7 @@ function bindWireNodes(w: Wire, key: string, d: string, els: SVGElement[], hits:
   hit.dataset.to = toHost;
   hit.dataset.row = w.from;
   hit.dataset.key = key;
+  if (w.toPin !== undefined) hit.dataset.toPin = String(w.toPin);
   hits.push(hit);
   p.dataset.from = fromHost;
   p.dataset.to = toHost;
@@ -703,6 +738,30 @@ function trayWires(o: OpenLine, line: Rect, tray: Rect): SVGElement[] {
   const tops = o.u.line.reads.map((id) => ({ id, rect: stepRect(o, id, tray)! }));
   for (const { id, points } of trayRises(tops, line)) kids.push(...wireEls(roundedPath(points), points[0], points[points.length - 1], ['step', ...(ok(id) ? [] : ['err'])]));
   return kids;
+}
+
+/** Socket routes can run down the side of a block. Use an earlier segment if the tag would cover the card. */
+function clearTagRuns(entries: [string, Point[]][]): [string, Point[]][] {
+  const tags = new Map([...tagLayer.querySelectorAll<HTMLElement>('.cv-tag.on')].map((tag) => [tag.dataset.key, tag]));
+  if (!tags.size) return entries;
+  const blocks = [...new Set(rects.values()), ...trayRects.values()];
+  return entries.map(([key, points]) => {
+    const tag = tags.get(key);
+    if (!tag) return [key, points];
+    const w = tag.offsetWidth, h = tag.offsetHeight;
+    const clear = (run: Point[]) => {
+      const { x, y, vert } = tagSpot(run, w, h);
+      const pad = vert ? 4 : 0;
+      return blocks.every((r) => x + w / 2 + pad <= r.x || x - w / 2 - pad >= r.x + r.w || y + h / 2 <= r.y || y - h / 2 >= r.y + r.h);
+    };
+    if (clear(points)) return [key, points];
+    for (let i = points.length - 1; i > 0; i--) {
+      const [a, b] = [points[i - 1], points[i]];
+      const room = a.x === b.x ? Math.abs(a.y - b.y) >= h + 16 : Math.abs(a.x - b.x) >= w + 20;
+      if (room && clear([a, b])) return [key, [a, b]];
+    }
+    return [key, points];
+  });
 }
 
 function drawWires(): void {
@@ -741,7 +800,8 @@ function drawWires(): void {
     const key = wireKey(w);
     const state = stateOf(key);
     const o = open.get(w.to), tray = trayRects.get(w.to);
-    const outY = w.fromPort ? portYs.get(`${w.from}.${w.fromPort}`) : undefined;
+    const outY = w.fromPort ? portYs.get(`${w.from}.${w.fromPort}`) : outPortYs.get(w.from);
+    const inY = w.toPin === undefined ? undefined : inPortYs.get(`${w.to}@${w.toPin}`);
     if (o && tray && w.name) {
       // Into an open line: to each step that reads the name itself, and to the line only if it reads it itself.
       const ends = openLineEnds(o.u, w.name);
@@ -755,8 +815,9 @@ function drawWires(): void {
         if (!pts) continue;
         const sd = roundedPath(pts);
         const els = wireEls(sd, pts[0], pts[pts.length - 1], [state]);
+        if (!w.fromPort && outY !== undefined) els[1].classList.add('ng-routed');
         bindWireNodes(w, key, sd, els, hits);
-        if (!firstPts) {
+        if (!firstPts && inY === undefined) {
           firstPts = pts;
           paths.set(key, els[0] as SVGPathElement);
           tagged.push([key, pts]);
@@ -764,7 +825,7 @@ function drawWires(): void {
         }
         kids.push(...els);
       }
-      if (!ends.line) continue;
+      if (!ends.line && inY === undefined) continue;
     }
     let d: string, from: Point, to: Point;
     if (routes) {
@@ -773,13 +834,15 @@ function drawWires(): void {
       d = roundedPath(r.points, 6); from = r.points[0]; to = r.points[r.points.length - 1];
       tagged.push([key, r.points]);
     } else {
-      const pts = routed(w, { minRun: tagRun(key), outY });
+      const pts = routed(w, { minRun: tagRun(key), outY, inY });
       if (!pts) continue;
       d = roundedPath(pts); from = pts[0]; to = pts[pts.length - 1];
       tagged.push([key, pts]);
     }
     const els = wireEls(d, from, to, [state]);
     const p = els[0] as SVGPathElement;
+    if (!w.fromPort && outY !== undefined) els[1].classList.add('ng-routed');
+    if (inY !== undefined) els[2].classList.add('ng-routed');
     bindWireNodes(w, key, d, els, hits);
     if (animate && !drawnWires.has(key) && drawnWires.size > 0) p.classList.add('draw-in');
     paths.set(key, p);
@@ -806,12 +869,13 @@ function drawWires(): void {
     dot.dataset.row = rowId;
     dot.dataset.port = port;
     const ref = refForPort(rowId, port);
-    svgTitle(dot, ref ? `Click to insert ${ref}` : port);
+    svgTitle(dot, ref ? `Insert ${ref}` : port);
     kids.push(dot);
   }
   // A pulse in flight keeps running over the redrawn wires (a slider drag redraws them on every step).
   const flying = [...svg.querySelectorAll('path.pulse')];
-  svg.replaceChildren(...hits, ...kids, ...flying);
+  svg.replaceChildren(...hits, ...kids, ...flying, nodeDragLayer);
+  refreshNodeDrag();
   if (pinnedWire && !now.has(pinnedWire)) pinnedWire = null;
   syncPeerGlow();
   for (const p of svg.querySelectorAll<SVGPathElement>('path.draw-in')) {
@@ -822,7 +886,8 @@ function drawWires(): void {
   }
   drawnWires = now;
   keepTags(now);
-  if (isWide) placeTags(tagged);
+  wideTagRoutes = isWide ? tagged : [];
+  if (isWide) placeTags(clearTagRuns(wideTagRoutes));
   else placeTags(tagged, { blocks: [...rects.values(), ...trays], bounds: { x: 2, y: 0, w: listEl.clientWidth - 4, h: Math.max(listEl.scrollHeight, listEl.clientHeight) } });
   if (!isWide) for (const o of openLines().values()) drawNarrowTree(o);
 }
@@ -917,14 +982,7 @@ function emptyCanvas(): HTMLElement {
   });
   emptyEl = h('div', { class: 'cv-empty', hidden: true },
     h('div', { class: 'cv-empty-badge', 'aria-hidden': 'true' }, mark),
-    h('div', { class: 'cv-empty-starters', role: 'group', 'aria-label': 'Start with an example' }, ...chips),
-    h('p', { class: 'cv-empty-tips', 'aria-hidden': 'true' },
-      h('span', {}, kb('Ctrl+K'), ' Find'),
-      h('span', { class: 'cv-empty-dot' }, '·'),
-      h('span', {}, 'Drag blocks to arrange'),
-      h('span', { class: 'cv-empty-dot' }, '·'),
-      h('span', {}, kb('Ctrl+Scroll'), ' to zoom'),
-    ));
+    h('div', { class: 'cv-empty-starters', role: 'group', 'aria-label': 'Start with an example' }, ...chips));
   return emptyEl;
 }
 /** Shows the empty canvas while the sheet has no blocks, graphs, or active edit; fades it out otherwise. */
@@ -973,7 +1031,12 @@ function sendPulse(fromId: string): void {
     const key = wireKey(w);
     // The wire's tag shows the new value as the pulse reaches its end.
     glow.animate([{ strokeDashoffset: 18 }, { strokeDashoffset: -len }], { duration: PULSE_HOP_MS * 2, delay: hop * PULSE_HOP_MS, easing: 'linear', fill: 'both' })
-      .finished.then(() => { glow.remove(); tagArrived(key, true); }, () => glow.remove());
+      .finished.then(() => {
+        glow.remove();
+        tagArrived(key, true);
+        // Its new value may be wide enough to need a different segment.
+        if (wide() && wideTagRoutes.length) placeTags(clearTagRuns(wideTagRoutes));
+      }, () => glow.remove());
   }
   for (const { id, hop } of order) {
     const el = blockEl(id);
@@ -982,17 +1045,29 @@ function sendPulse(fromId: string): void {
 }
 
 // Zoom and fit, in the top bar on a wide window.
-const zoomBtn = (label: string, title: string, run: () => void, cls = 'cv-btn') => h('button', { type: 'button', class: cls, title: kb(title), onclick: run }, label);
+const zoomBtn = (label: string, title: string, run: () => void, cls = 'cv-btn') => h('button', { type: 'button', class: cls, ...(title ? { title: kb(title) } : {}), onclick: run }, label);
 const zoomOut = h('output', { class: 'cv-zoom', 'aria-live': 'off' }, '100%');
-const tidyBtn = zoomBtn('Reset layout', 'Return moved blocks and graph to automatic layout', () => resetAllLayout());
+const addNodeBtn = zoomBtn('+ Node', 'Add math node', () => addMathNode(addNodeBtn));
+addNodeBtn.setAttribute('aria-haspopup', 'dialog');
+const nodesBackBtn = zoomBtn('← List', 'Back to list view', () => setNodesMode(false), 'cv-btn cv-nodes-back');
+nodesBackBtn.hidden = true;
+const nodesPillBtn = h('button', { type: 'button', class: 'cv-nodes-pill', 'aria-label': 'Switch to node canvas', title: 'Switch to node canvas', hidden: true, onclick: () => setNodesMode(true) });
+nodesPillBtn.innerHTML = '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true"><path d="M5.4 5.2H8.5C9.4 5.2 9.4 10.8 10.6 10.8M5.4 10.8H7.2" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3.6" cy="5.2" r="1.6" fill="currentColor"/><circle cx="3.6" cy="10.8" r="1.6" fill="currentColor"/><circle cx="12.2" cy="10.8" r="1.6" fill="currentColor"/></svg>';
+const tidyBtn = zoomBtn('Reset layout', '', () => resetAllLayout(), 'cv-btn cv-reset');
+tidyBtn.setAttribute('aria-label', 'Reset layout');
+tidyBtn.replaceChildren(icon('home'), h('span', { class: 'cv-reset-label' }, 'Reset layout'));
 tidyBtn.hidden = true;
 function hasPinnedNodes(): boolean {
   return !!doc.ui.graphBlock || !!doc.ui.psychAt || doc.rows.some((r) => !!r.at);
 }
 function syncNodeControls(): void {
   const wideNow = wide();
+  const compactWide = narrow.matches && wideNow;
   graphUnpin.hidden = !wideNow || !doc.ui.graphBlock;
   tidyBtn.hidden = !wideNow || !hasPinnedNodes();
+  addNodeBtn.hidden = !wideNow;
+  nodesBackBtn.hidden = !compactWide;
+  nodesPillBtn.hidden = !narrow.matches || wideNow || !mobileActions.hidden;
 }
 function glideBlocks(): void {
   if (!motion()) return;
@@ -1016,7 +1091,6 @@ function resetGraphLayout(): void {
     layoutCanvas();
   };
   apply(undefined);
-  play('toggle');
   pushStep({ label: 'Graph back to auto layout', undo: () => apply(before), redo: () => apply(undefined) });
 }
 function resetGraphSize(): void {
@@ -1031,7 +1105,6 @@ function resetGraphSize(): void {
     layoutCanvas();
   };
   apply(after);
-  play('toggle');
   pushStep({ label: 'Reset graph size', undo: () => apply(before), redo: () => apply(after) });
 }
 function resetAllLayout(): void {
@@ -1063,7 +1136,6 @@ function resetAllLayout(): void {
     layoutCanvas();
   };
   clearAll();
-  play('toggle');
   pushStep({ label: 'Reset canvas layout', undo: restoreAll, redo: clearAll });
 }
 export function zoomBy(factor: number): void {
@@ -1098,17 +1170,40 @@ export function revealBlock(id: string): void {
     setView({ scale: view.scale, dx: view.dx + dx, dy: view.dy + dy }, true);
   }
 }
+/** Give a node spawned from the toolbar or Find a clear spot in the part of the canvas in view. */
+export function addMathNode(trigger?: HTMLElement): void {
+  if (!wide()) return;
+  const bounds = freeArea(), frame = tape.getBoundingClientRect();
+  const blocks = [...rects.values(), ...trayRects.values()];
+  const w = 340 * view.scale, h = 200 * view.scale;
+  const first = { x: bounds.x + 18, y: bounds.y + 32 };
+  let at = first;
+  findSpot: for (let y = first.y; y <= Math.max(first.y, bounds.y + bounds.h - h); y += 32) {
+    for (let x = first.x; x <= Math.max(first.x, bounds.x + bounds.w - w); x += 32) {
+      const p = toWorld(view, { x, y });
+      const room = { x: p.x - 18, y: p.y - 18, w: 358, h: 218 };
+      if (blocks.some((r) => room.x < r.x + r.w && r.x < room.x + room.w && room.y < r.y + r.h && r.y < room.y + room.h)) continue;
+      at = { x, y };
+      break findSpot;
+    }
+  }
+  const r = trigger?.getBoundingClientRect();
+  openNodeMenu(r ? { x: r.left, y: r.bottom + 6 } : { x: frame.left + at.x, y: frame.top + at.y }, toWorld(view, at), trigger);
+}
+
 export const canvasTools = h('div', { class: 'cv-tools', role: 'group', 'aria-label': 'Canvas' },
+  nodesBackBtn,
   zoomBtn('−', 'Zoom out (Ctrl+Alt+−)', () => zoomBy(1 / ZOOM_STEP), 'cv-btn cv-zoom-btn'),
   zoomOut,
   zoomBtn('+', 'Zoom in (Ctrl+Alt+=)', () => zoomBy(ZOOM_STEP), 'cv-btn cv-zoom-btn'),
-  zoomBtn('Fit all', 'Show every block (Ctrl+Alt+0)', () => fitCanvas(), 'cv-btn cv-sep'),
+  zoomBtn('Fit all', 'Fit all (Ctrl+Alt+0)', () => fitCanvas(), 'cv-btn cv-sep'),
+  addNodeBtn,
   tidyBtn,
 );
 
 /** What a press on the canvas takes no notice of: controls inside blocks keep their own. A value block's answer button
  * (.result) still lets a drag move the block, while a plain click on it copies as always. */
-const ownsPointer = (t: Element) => !!t.closest('input:not(.expr), button:not(.result), select, textarea, a, label, .extra, .tbl, .graph-host, .graph-dock, .blk-resize, .example-frame, .blk-example-graph, .fh:not(.fixed), .cv-seg');
+const ownsPointer = (t: Element) => !!t.closest('.ng-sock, .ng-pin-val, .ng-pin-unwire, .ng-menu, input:not(.expr), button:not(.result), select, textarea, a, label, .extra, .tbl, .graph-host, .graph-dock, .blk-resize, .example-frame, .blk-example-graph, .fh:not(.fixed), .cv-seg');
 
 /** The block a drag holds, kept still on a narrow canvas while tags come and go above it. */
 let held: string | null = null;
@@ -1159,7 +1254,7 @@ export function initCanvas(): void {
   // Only pointers on the canvas itself defer layout (sliders, graph/figure handles); clicks on the composer, tabs or
   // top bar never trigger an extra layout pass on release.
   listEl.addEventListener('pointerdown', () => { pointerDown = true; layoutDeferred = false; }, true);
-  for (const type of ['pointerup', 'pointercancel'] as const) window.addEventListener(type, () => {
+  for (const type of ['pointerup', 'pointercancel', 'blur'] as const) window.addEventListener(type, () => {
     if (!pointerDown) return;
     pointerDown = false;
     if (layoutDeferred) { layoutDeferred = false; layoutCanvas(); }
@@ -1170,7 +1265,11 @@ export function initCanvas(): void {
   });
   listEl.addEventListener('keyup', (e) => { if (sliderRow(e.target)) release(); });
   const head = modeBar.querySelector('.head-pill');
+  const brand = modeBar.querySelector('.brand');
   modeBar.insertBefore(canvasTools, head);
+  if (brand?.nextSibling) modeBar.insertBefore(nodesPillBtn, brand.nextSibling);
+  else modeBar.insertBefore(nodesPillBtn, head);
+  initNodeGraph({ isWide: wide, insert: insertPortRef, flash: flashBlock, pulse: sendPulse, keepView: () => { autoView = false; } });
   composerDock.insertBefore(mobileActions, composerBox);
   composerBox.addEventListener('pointerdown', () => { if (selectedBlock) setSelectedBlock(null); }, true);
   clearBtn.addEventListener('click', () => clearExample());
@@ -1196,6 +1295,7 @@ export function initCanvas(): void {
     autoView = false;
     if (e.ctrlKey || e.metaKey) setView(zoomAbout(view, Math.exp(-e.deltaY * 0.01), { x: e.clientX - r.left, y: e.clientY - r.top }));
     else setView({ ...view, dx: view.dx - e.deltaX, dy: view.dy - e.deltaY });
+    refreshNodeDrag();
   }, { passive: false });
 
   // A press on a block: a click edits it in the composer, a drag (wide) moves it. A press on the background pans.
@@ -1231,7 +1331,7 @@ export function initCanvas(): void {
     if (!onResult && wide()) try { block.setPointerCapture(e.pointerId); } catch { /* a pointer the browser doesn't track (a synthetic one) */ }
     // A long press on a touch screen opens the line's menu, as a right-click does.
     let held = false;
-    const hold = e.pointerType === 'mouse' ? 0 : window.setTimeout(() => { held = true; if (row) { play('toggle'); openLineMenu(row, start.x, start.y); } }, 420); // The long-press threshold the line menu has always used.
+    const hold = e.pointerType === 'mouse' ? 0 : window.setTimeout(() => { held = true; if (row) openLineMenu(row, start.x, start.y); }, 420); // The long-press threshold the line menu has always used.
     const move = (m: PointerEvent) => {
       const dist = Math.hypot(m.clientX - start.x, m.clientY - start.y);
       if (dist > 6) clearTimeout(hold);
@@ -1260,6 +1360,7 @@ export function initCanvas(): void {
         trayRects.set(id, t);
         Object.assign(o.tray.style, { left: `${t.x}px`, top: `${t.y}px` });
       }
+      measurePorts();
       drawWires();
     };
     const up = () => {
@@ -1288,16 +1389,13 @@ export function initCanvas(): void {
         // First tap on mobile selects the block and shows quick actions; tapping again opens it to edit.
         if (selectedBlock === id) {
           setSelectedBlock(null);
-          play('toggle');
           editLine(id, caret);
         } else {
           selectedCaret = caret;
           setSelectedBlock(id);
-          play('toggle');
         }
         return;
       }
-      play('toggle');
       editLine(id, caret);
     };
     window.addEventListener('pointermove', move);
@@ -1348,10 +1446,14 @@ export function initCanvas(): void {
     }
     const key = el.dataset.key;
     if (!key) return;
+    if (e.altKey && el.matches('path.hit[data-to-pin]')) {
+      const wire = wires.find((w) => wireKey(w) === key);
+      if (wire?.toPin !== undefined) unwireNodePin(wire.to, wire.toPin);
+      return;
+    }
     pinnedWire = pinnedWire === key ? null : key;
     focusWire(pinnedWire);
     if (el.dataset.from) flashBlock(el.dataset.from);
-    play('toggle');
   });
   svg.addEventListener('dblclick', (e) => {
     const el = (e.target as Element)?.closest<SVGElement>('path.hit, circle.port-in');

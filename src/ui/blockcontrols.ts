@@ -37,7 +37,7 @@ export interface BlockControlState {
 export function blockControls(s: BlockControlState): BlockControl[] {
   const out: BlockControl[] = [];
   if (s.figure) out.push({ kind: 'choice', id: 'view', label: 'Show', options: VIEW_OPTIONS, value: s.view });
-  if (s.steps) out.push({ kind: 'toggle', id: 'steps', text: UNFOLD_LABEL, label: s.stepsOpen ? 'Hide the steps' : 'Show the steps', on: s.stepsOpen, flag: s.failed });
+  if (s.steps) out.push({ kind: 'toggle', id: 'steps', text: UNFOLD_LABEL, label: UNFOLD_LABEL, on: s.stepsOpen, flag: s.failed });
   return out;
 }
 

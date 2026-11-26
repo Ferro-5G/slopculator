@@ -63,15 +63,14 @@ function sharedBreakpoints(): Plugin {
   };
 }
 
-/** A look's stylesheet writes @palette; where its colors go; this fills them in from the palettes both platforms draw. */
+/** The stylesheet writes @palette; where its colors go; this fills them in from the palettes both platforms draw. */
 function sharedColors(): Plugin {
   return {
     name: 'shared-colors',
     enforce: 'pre',
     transform(code, id) {
-      const look = /\/(modern|retro)\.css(\?|$)/.exec(id)?.[1] as 'modern' | 'retro' | undefined;
-      if (!look || !code.includes('@palette;')) return null;
-      return { code: code.replace('@palette;', paletteCss(look)), map: null };
+      if (!/\/modern\.css(\?|$)/.test(id) || !code.includes('@palette;')) return null;
+      return { code: code.replace('@palette;', paletteCss('modern')), map: null };
     },
   };
 }

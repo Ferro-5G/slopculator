@@ -1243,9 +1243,8 @@
 .canvas-ui .rows > .cv-tray {
   position: absolute;
   margin: 0;
-  border: 1px solid var(--rule);
-  border-radius: var(--cv-radius);
-  background: color-mix(in srgb, var(--cv-block) 34%, transparent);
+  border: none;
+  background: transparent;
   z-index: auto;
 }
 .canvas-ui .cv-tree {
@@ -1427,13 +1426,6 @@
 }
 .canvas-ui .rail-list > :first-child {
   margin-top: auto;
-}
-.canvas-ui .rail-empty {
-  padding: 14px 12px 10px;
-  text-align: center;
-  font: 400 13px/1.45 var(--sans);
-  color: var(--ink-3);
-  user-select: none;
 }
 .canvas-ui .rail-item {
   position: relative;
@@ -2460,6 +2452,78 @@
   .canvas-ui .cv-tools {
     display: none;
   }
+  .canvas-ui .cv-nodes-pill {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--cv-edge-2);
+    background: color-mix(in srgb, var(--cv-block) 88%, transparent);
+    backdrop-filter: blur(12px);
+    color: var(--ink-2);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.08);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+  }
+  .canvas-ui .cv-nodes-pill:active {
+    transform: scale(0.92);
+  }
+  .canvas-ui .cv-nodes-pill[hidden] {
+    display: none;
+  }
+  #app.canvas-ui.narrow-nodes .tape.cv-viewport {
+    animation: cv-mode-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes cv-mode-in {
+    from { opacity: 0.4; transform: scale(1.03); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  :root[data-motion='off'] #app.canvas-ui.narrow-nodes .tape.cv-viewport {
+    animation: none;
+  }
+  #app.canvas-ui.narrow-nodes .left > .modebar .brand,
+  #app.canvas-ui.narrow-nodes .left > .modebar .spacer,
+  #app.canvas-ui.narrow-nodes .left > .modebar .desk-modes,
+  #app.canvas-ui.narrow-nodes .left > .modebar .modes,
+  #app.canvas-ui.narrow-nodes .left > .modebar .head-pill .head-find,
+  #app.canvas-ui.narrow-nodes .left > .modebar .head-pill .head-history {
+    display: none;
+  }
+  #app.canvas-ui.narrow-nodes .left > .modebar .cv-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    order: 1;
+  }
+  #app.canvas-ui.narrow-nodes .left > .modebar .cv-tools .cv-zoom-btn,
+  #app.canvas-ui.narrow-nodes .left > .modebar .cv-tools .cv-zoom {
+    display: none;
+  }
+  #app.canvas-ui.narrow-nodes .left > .modebar .cv-tools .cv-nodes-back {
+    margin-right: auto;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  #app.canvas-ui.narrow-nodes .left > .modebar .cv-tools .cv-btn {
+    padding: 0 9px;
+    height: 30px;
+    font-size: 13px;
+  }
+  #app.canvas-ui.narrow-nodes .cv-reset .gi {
+    display: inline-flex;
+  }
+  #app.canvas-ui.narrow-nodes .cv-reset-label {
+    display: none;
+  }
+  #app.canvas-ui.narrow-nodes .tape.cv-viewport {
+    touch-action: none;
+  }
   .canvas-ui .main > .left {
     display: flex;
     flex-direction: column;
@@ -3043,7 +3107,7 @@
     gap: 6px;
     box-sizing: border-box;
     height: calc(50px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+    padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--rule);
     background: var(--bg);
   }
@@ -3078,7 +3142,7 @@
     border: 1px solid var(--cv-edge);
     border-radius: 10px;
     box-shadow: none;
-    font-size: 14px;
+    font-size: 13px;
     color: var(--ink-2);
   }
   #app.canvas-ui .left > .modebar .desk-modes .seg {
@@ -3092,11 +3156,11 @@
     justify-content: center;
     height: 100%;
     min-height: 0;
-    padding: 0 10px;
+    padding: 0 6px;
     border: 0;
     border-radius: 7px;
     background: none;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1;
     color: var(--ink-2);
   }
@@ -3112,20 +3176,28 @@
     min-width: 0;
     min-height: 0;
     margin: 0;
-    padding: 0 11px;
+    padding: 0 7px;
     position: relative;
   }
   #app.canvas-ui .left > .modebar .modes .more[aria-expanded='true'] {
     background: var(--cv-raised);
   }
-  /* 33 px pills, 45 px to a thumb. */
-  #app.canvas-ui .left > .modebar .modes .more::after,
-  #app.canvas-ui .left > .modebar .head-pill .head-find::after,
-  #app.canvas-ui .left > .modebar .head-pill .menu-btn::after,
-  #app.canvas-ui .left > .modebar .head-pill .head-history::after {
+  /* 32 px pills, 44 px+ to a thumb. */
+  #app.canvas-ui .left > .modebar .modes .more::after {
     content: '';
     position: absolute;
     inset: -6px 0;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-find::after,
+  #app.canvas-ui .left > .modebar .head-pill .menu-btn::after {
+    content: '';
+    position: absolute;
+    inset: -6px -3px;
+  }
+  #app.canvas-ui .left > .modebar .head-pill .head-history::after {
+    content: '';
+    position: absolute;
+    inset: -6px -6px;
   }
   #app.canvas-ui .left > .modebar .head-pill .head-find,
   #app.canvas-ui .left > .modebar .head-pill .menu-btn,
@@ -3149,8 +3221,8 @@
     width: auto;
     height: 33px;
     min-height: 0;
-    padding: 0 11px;
-    font-size: 14px;
+    padding: 0 7px;
+    font-size: 13px;
     line-height: 1;
     color: var(--ink-2);
     background: var(--cv-block);
@@ -3166,9 +3238,9 @@
     background: var(--cv-block);
     border: 1px solid var(--cv-edge);
   }
-  /* 33 px drawn, 44 px to a thumb. */
+  /* 32 px drawn, 44 px to a thumb. */
   #app.canvas-ui .left > .modebar .head-pill .head-history::after {
-    inset: -6px -5.5px;
+    inset: -6px -6px;
   }
   #app.canvas-ui .left > .modebar .head-find .gi {
     display: none !important;
@@ -3266,7 +3338,7 @@
     top: auto;
     flex: none;
     margin-top: 6px;
-    padding: 7px 7px 7px 6px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -3291,10 +3363,7 @@
     stroke-dasharray: 4 5;
   }
   .canvas-ui .cv-narrow .cv-tree circle.port-in {
-    fill: var(--cv-wire);
-  }
-  .canvas-ui .cv-narrow .cv-tree circle.port-in.err {
-    fill: color-mix(in srgb, var(--err) 65%, transparent);
+    display: none;
   }
   .canvas-ui .cv-narrow .cv-step {
     position: relative;
@@ -4849,8 +4918,8 @@ dialog.examples-dialog .sc-lines {
     &[data-theme='oled'] .mode-sheet {
       background: rgba(12, 13, 18, 0.88);
     }
-    & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
-      height: 34px;
+    & #app.canvas-ui .left > .modebar :is(.cv-nodes-pill, .desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
+      height: 32px;
       border-radius: 999px;
       background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
       backdrop-filter: none;
@@ -4863,9 +4932,10 @@ dialog.examples-dialog .sc-lines {
         inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
         0 4px 12px rgba(0, 0, 0, 0.34);
     }
+    & #app.canvas-ui .left > .modebar .cv-nodes-pill,
     & #app.canvas-ui .left > .modebar .head-pill .head-history {
-      width: 34px;
-      min-width: 34px;
+      width: 32px;
+      min-width: 32px;
     }
     & #app.canvas-ui .left > .modebar .desk-modes .seg {
       padding: 2px;
@@ -4885,8 +4955,8 @@ dialog.examples-dialog .sc-lines {
       border-radius: 999px;
     }
     & #app.canvas-ui .left > .modebar .brand .mark {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
       border-radius: 999px;
       background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
       backdrop-filter: none;
@@ -5335,7 +5405,20 @@ dialog.examples-dialog .sc-lines {
   }
 }
 :root[data-look='modern'][data-theme='oled'] {
+  & .toast {
+    background: rgba(24, 26, 34, 0.84);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.52);
+  }
+  & .toast button {
+    color: var(--accent);
+    text-decoration: none;
+  }
   & .canvas-ui .rows > .row.blk {
+    background: rgba(20, 20, 24, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
+  }
+  & .canvas-ui .cv-step {
     background: rgba(20, 20, 24, 0.8);
     border-color: rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
@@ -5379,9 +5462,13 @@ dialog.examples-dialog .sc-lines {
 :root[data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) {
   & .canvas-ui .composer-dock {
     --au-a: var(--cv-accent);
-    --au-b: var(--cv-iris);
+    --au-b: color-mix(in srgb, var(--au-a) 55%, #7c8cff);
     --au-k: 1;
     transition: --au-a 0.36s ease-out, --au-b 0.36s ease-out;
+  }
+  & .canvas-ui .composer:not([data-state='idle']) {
+    border-color: transparent;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.34);
   }
   &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer-dock {
     --au-k: 0.6;
@@ -5395,35 +5482,46 @@ dialog.examples-dialog .sc-lines {
   & .canvas-ui .composer::after {
     /* The light runs the whole way round, the two colors meeting on each side, so both ends of the bar match. */
     background: conic-gradient(from var(--cv-ang), var(--au-a), var(--au-b) 25%, var(--au-a) 50%, var(--au-b) 75%, var(--au-a));
-    opacity: 0.5;
+    opacity: 0;
+    clip-path: inset(0 100% 0 0 round var(--cv-radius));
+    transition: opacity 0.28s ease-out, clip-path 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  & .canvas-ui .composer[data-state='typing']::after {
+    opacity: 0.78;
+    clip-path: inset(0 0 0 0 round var(--cv-radius));
+  }
+  & .canvas-ui .composer[data-state='err']::after {
+    opacity: 0.72;
+    clip-path: inset(0 0 0 0 round var(--cv-radius));
   }
   & .canvas-ui .composer[data-state='ok']::after {
     opacity: 1;
+    clip-path: inset(0 0 0 0 round var(--cv-radius));
   }
   & .canvas-ui .composer .composer-halo {
-    inset: -22px;
-    border-radius: calc(var(--cv-radius) + 22px);
+    inset: -22px -8px;
+    border-radius: calc(var(--cv-radius) + 12px);
     background:
       radial-gradient(closest-side at 30% 50%, var(--au-a), transparent),
       radial-gradient(closest-side at 70% 50%, var(--au-b), transparent);
     filter: blur(28px);
-    opacity: calc(0.18 * var(--au-k));
+    opacity: 0;
     transition: opacity 0.36s ease-out;
   }
   & .canvas-ui .composer[data-state='typing'] .composer-halo {
-    opacity: calc(0.26 * var(--au-k));
+    opacity: calc(0.18 * var(--au-k));
   }
   & .canvas-ui .composer[data-state='ok'] .composer-halo {
-    opacity: calc(0.42 * var(--au-k));
+    opacity: calc(0.32 * var(--au-k));
   }
   & .canvas-ui .composer[data-state='err'] .composer-halo {
-    opacity: calc(0.22 * var(--au-k));
+    opacity: calc(0.18 * var(--au-k));
   }
   & .canvas-ui .composer.stir .composer-halo {
     animation: au-drift 9s cubic-bezier(0.45, 0, 0.55, 1) 1 both;
   }
   & .canvas-ui .composer-enter {
-    box-shadow: 0 0 18px color-mix(in srgb, var(--cv-accent) 60%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--cv-accent) 26%, transparent);
   }
   & .canvas-ui .rows > .row.blk {
     border-color: color-mix(in srgb, var(--c, var(--cv-accent)) 48%, var(--cv-edge));
@@ -5470,6 +5568,7 @@ dialog.examples-dialog .sc-lines {
 :root[data-glow][data-motion='reduced'] .canvas-ui .composer::after {
   animation: none;
   --cv-ang: 35deg;
+  clip-path: none;
 }
 :root[data-glow][data-motion='off'] .canvas-ui :is(.composer-halo, .rows > .row.blk.landed),
 :root[data-glow][data-motion='reduced'] .canvas-ui :is(.composer-halo, .rows > .row.blk.landed) {
@@ -5482,9 +5581,8 @@ dialog.examples-dialog .sc-lines {
   }
 }
 /* The canvas behind the blocks takes the open deck's color too: a faint orb of it at the top left (--au-deck, set
-   beside the composer's --au-a from the deck bar) and a violet one at the right. The layer sits under the blocks and
-   takes no pointer; its tint glides once when the deck changes and then rests. Each orb's color is scaled against
-   the layer's opacity, so the violet lands at 0.14 on dark themes and 0.11 on light ones. */
+   beside the composer's --au-a from the deck bar) and an analogous cool indigo-blue companion at the right. The layer sits
+   under the blocks and takes no pointer; its tint glides once when the deck changes and then rests. */
 :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .tape.cv-viewport::before {
   --au-a: var(--au-deck, var(--cv-accent));
   content: '';
@@ -5494,15 +5592,15 @@ dialog.examples-dialog .sc-lines {
   pointer-events: none;
   background:
     radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
-    radial-gradient(46% 52% at 90% 54%, rgba(167, 139, 250, 0.7), transparent 72%);
-  opacity: 0.2;
+    radial-gradient(46% 52% at 90% 54%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
+  opacity: 0.18;
   transition: --au-a 0.42s ease-out;
 }
 :root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .tape.cv-viewport::before {
   background:
     radial-gradient(60% 55% at 12% 10%, var(--au-a), transparent 72%),
-    radial-gradient(46% 52% at 90% 54%, rgba(124, 92, 240, 0.786), transparent 72%);
-  opacity: 0.14;
+    radial-gradient(46% 52% at 90% 54%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
+  opacity: 0.13;
 }
 /* On phone, match iOS CanvasAtmosphere.tsx cloud positions (20% 16% and 86% 56% of the canvas area above the keypad). */
 @media (--phone) {
@@ -5518,261 +5616,18 @@ dialog.examples-dialog .sc-lines {
     pointer-events: none;
     background:
       radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
-      radial-gradient(72% 38% at 86% 32%, rgba(167, 139, 250, 0.75), transparent 72%);
-    opacity: 0.28;
+      radial-gradient(72% 38% at 86% 32%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
+    opacity: 0.24;
     transition: --au-a 0.42s ease-out;
   }
   :root[data-look='modern'][data-glow][data-theme='oled'] .canvas-ui .main > .left::before {
-    opacity: 0.22;
+    opacity: 0.19;
   }
   :root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .main > .left::before {
     background:
       radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
-      radial-gradient(72% 38% at 86% 32%, rgba(124, 92, 240, 0.786), transparent 72%);
-    opacity: 0.19;
-  }
-}
-
-/* ---------- Keyboard Glow: the keys take the deck's color ----------
-   Its own switch, apart from Aurora Glow. The canvas's atmosphere carries on behind the keypad, so the light runs from
-   the canvas down behind the keys with no seam. Each key's cap is tinted with the open deck's color (--kg, set from the
-   deck bar), operators a step stronger; the legends stay as they are. Under Pride colors each key takes its stripe of
-   the flag, running diagonally across the keys (row plus column). The same as keyGlow.ts and the full-screen
-   atmosphere on the phones. */
-:root[data-look='modern'][data-keyglow]:not([data-theme='contrast'], [data-theme='contrastLight']) {
-  & .canvas-ui .keypad {
-    isolation: isolate;
-  }
-  & .canvas-ui .keypad::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-    background:
-      radial-gradient(70% 70% at 18% 105%, var(--kg, var(--cv-accent)), transparent 75%),
-      radial-gradient(60% 65% at 86% -5%, color-mix(in srgb, var(--kg, var(--cv-accent)) 55%, #8e7bff), transparent 72%);
-    opacity: 0.32;
-  }
-  &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .keypad::before {
-    opacity: 0.22;
-  }
-  &[data-pride] .canvas-ui .keypad::before {
-    background:
-      radial-gradient(40% 60% at 4% 20%, var(--pr-6), transparent 72%),
-      radial-gradient(40% 60% at 30% 100%, var(--pr-5), transparent 72%),
-      radial-gradient(40% 60% at 70% 105%, var(--pr-4), transparent 72%),
-      radial-gradient(40% 60% at 98% 30%, var(--pr-3), transparent 72%);
-    opacity: var(--pr-glow, 0.34);
-  }
-  & .canvas-ui .keypad .pad .key:not(.hero) {
-    --kg-a: 24%;
-    background-image: linear-gradient(color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) var(--kg-a), transparent), color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) var(--kg-a), transparent));
-  }
-  & .canvas-ui .keypad .pad .key.op {
-    --kg-a: 42%;
-  }
-  /* A tab's tiles take its color the same way. */
-  & .canvas-ui .ti-grid .ti-tile {
-    background-image: linear-gradient(color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) 20%, transparent), color-mix(in srgb, var(--kg-c, var(--kg, var(--cv-accent))) 20%, transparent));
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+1) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+2) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+3) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+4) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+5) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .ti-grid .ti-tile:nth-child(6n+6) {
-    --kg-c: var(--pr-6);
-  }
-  /* On a tinted cap an operator's accent-coloured sign would sink into it, so it turns white. */
-  & .canvas-ui .keypad .pad .key.op .kl {
-    color: #fff;
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+1) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+2) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+3) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+4) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-5);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+5) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+1) {
-    --kg-c: var(--pr-6);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+2) {
-    --kg-c: var(--pr-1);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+3) {
-    --kg-c: var(--pr-2);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+4) {
-    --kg-c: var(--pr-3);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+5) {
-    --kg-c: var(--pr-4);
-  }
-  &[data-pride] .canvas-ui .keypad .pad .krow:nth-child(6n+6) .key:nth-child(6n+6) {
-    --kg-c: var(--pr-5);
-  }
-}
-
-/* ---------- Pride colors (Modern): the flag in neon, lit the way Aurora Glow is ----------
-   The theme stays as it is. Six neon clouds sit round the canvas's edges, the composer's rim and the light behind it
-   run through the flag, Enter wears it, and a stripe of it lies along the deck bar. The same colors as NEON_DARK and
-   NEON_LIGHT in src/ui/palettes.ts, which the phones draw. */
-:root[data-look='modern'][data-pride]:not([data-theme='contrast'], [data-theme='contrastLight']) {
-  --pr-1: #ff2e63;
-  --pr-2: #ff8a00;
-  --pr-3: #ffe600;
-  --pr-4: #00f58a;
-  --pr-5: #1fb6ff;
-  --pr-6: #b44dff;
-  --pr-flag: var(--pr-1), var(--pr-2), var(--pr-3), var(--pr-4), var(--pr-5), var(--pr-6);
-  --pr-glow: 0.36;
-  /* The accent turns neon violet, as palettes.ts makes it on the phones. */
-  --led: #c77dff;
-  &:is(:not([data-theme]), [data-theme='paper']) {
-    --led: #9b30f5;
-    --pr-1: #f0124d;
-    --pr-2: #ff7a00;
-    --pr-3: #f5c800;
-    --pr-4: #00d977;
-    --pr-5: #0a9cf5;
-    --pr-6: #9b30f5;
-    --pr-glow: 0.3;
-  }
-  &[data-theme='oled'] {
-    --pr-glow: 0.3;
-  }
-  & .canvas-ui .tape.cv-viewport::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(42% 42% at 8% 6%, var(--pr-1), transparent 72%),
-      radial-gradient(42% 42% at 92% 10%, var(--pr-2), transparent 72%),
-      radial-gradient(42% 42% at 102% 50%, var(--pr-3), transparent 72%),
-      radial-gradient(42% 42% at 86% 94%, var(--pr-4), transparent 72%),
-      radial-gradient(42% 42% at 12% 90%, var(--pr-5), transparent 72%),
-      radial-gradient(42% 42% at -2% 46%, var(--pr-6), transparent 72%);
-    opacity: var(--pr-glow);
-  }
-  & .canvas-ui .composer::after {
-    background: conic-gradient(from var(--cv-ang), var(--pr-flag), var(--pr-1));
-    opacity: 0.9;
-  }
-  & .canvas-ui .composer .composer-halo {
-    inset: -22px;
-    border-radius: calc(var(--cv-radius) + 22px);
-    background: linear-gradient(90deg, var(--pr-flag));
-    filter: blur(28px);
-    opacity: 0.4;
-  }
-  & .canvas-ui .composer-enter {
-    background: linear-gradient(100deg, var(--pr-flag));
-    border-color: transparent;
-  }
-  & .canvas-ui .composer-enter .kl {
-    color: #1a1024;
-  }
-  & .canvas-ui .deck-bar {
-    border-bottom: 2px solid transparent;
-    border-image: linear-gradient(90deg, var(--pr-1) 0 16.67%, var(--pr-2) 0 33.33%, var(--pr-3) 0 50%, var(--pr-4) 0 66.67%, var(--pr-5) 0 83.33%, var(--pr-6) 0) 1;
+      radial-gradient(72% 38% at 86% 32%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
+    opacity: 0.17;
   }
 }
 
@@ -5960,6 +5815,332 @@ dialog.examples-dialog .sc-lines {
   }
   .canvas-ui .cv-empty-copy,
   .canvas-ui .cv-empty-tips {
+    display: none;
+  }
+}
+
+/* ---------- math nodes ---------- */
+.canvas-ui .ng-chrome {
+  display: contents;
+}
+.canvas-ui .ng-chrome [hidden],
+.canvas-ui .ng-drag-note[hidden] {
+  display: none;
+}
+.canvas-ui .cv-wide > .rows > .row.blk-node {
+  min-width: 210px;
+  padding-top: 46px;
+}
+.canvas-ui .cv-wide .row.blk-node.blk-value:not(.blk-figure) > .cv-steps {
+  top: 46px;
+}
+.canvas-ui .cv-wide .row.blk-node > .del {
+  z-index: 2;
+}
+.canvas-ui .cv-wide .row.blk:not(.blk-figure):has(.ng-pins:not([hidden])) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.canvas-ui .cv-wide .row.blk:not(.blk-figure) .ng-pins {
+  grid-row: 2;
+}
+.canvas-ui .cv-wide .row.blk:has(.ng-chrome :active):active {
+  transform: none;
+}
+.canvas-ui .ng-head {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 28px 0 12px;
+  border-radius: calc(var(--cv-radius) - 1px) calc(var(--cv-radius) - 1px) 0 0;
+  border-bottom: 1px solid var(--cv-edge);
+  background: color-mix(in srgb, var(--cv-accent) 12%, var(--cv-block));
+  color: var(--ink);
+  font: 650 12px/1.2 var(--sans);
+}
+.canvas-ui :is(.ng-title, .ng-name, .ng-pin-src) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvas-ui .ng-symbol {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 24px;
+  padding: 3px 4px;
+  background: var(--cv-accent-soft);
+  border-radius: 5px;
+  color: var(--ink);
+  font: 600 13px/1.2 var(--mono);
+}
+.canvas-ui .ng-name {
+  margin-left: auto;
+  max-width: 9ch;
+  padding: 2px 6px;
+  background: var(--cv-block);
+  border: 1px solid var(--cv-edge);
+  border-radius: 4px;
+  color: var(--ink-2);
+  font: 500 11px/1 var(--mono);
+}
+.canvas-ui .ng-pins {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  min-width: 0;
+  margin: 10px -18px -11px -24px;
+  padding: 6px 14px 8px 16px;
+  border-top: 1px solid var(--cv-edge);
+  border-radius: 0 0 calc(var(--cv-radius) - 1px) calc(var(--cv-radius) - 1px);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  display: grid;
+  gap: 4px;
+}
+.canvas-ui .ng-pin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--ink-2);
+  font: 600 12px/1.2 var(--sans);
+}
+.canvas-ui .ng-pin-label {
+  min-width: 2.5ch;
+}
+.canvas-ui .ng-pin-src {
+  margin-left: auto;
+  max-width: 20ch;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--cv-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cv-accent) 28%, transparent);
+  border-radius: 7px;
+  color: var(--cv-accent-ink, var(--cv-accent));
+  font: 500 11.5px/1.2 var(--mono);
+}
+.canvas-ui .ng-pin-val {
+  margin-left: auto;
+  width: 9ch;
+  min-width: 0;
+  max-width: 65%;
+  padding: 3px 7px;
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  color: var(--ink);
+  text-align: right;
+  font: 500 12px/1.2 var(--mono);
+  user-select: text;
+}
+.canvas-ui .ng-pin-unwire {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: 15px/1 var(--sans);
+  cursor: pointer;
+}
+.canvas-ui .ng-pin-unwire:hover:not(:disabled) {
+  color: var(--err);
+}
+.canvas-ui .ng-pin-unwire:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.canvas-ui .ng-sock {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--ink) 26%, transparent);
+  cursor: crosshair;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.canvas-ui .ng-sock::before {
+  content: '';
+  display: block;
+  width: 3.5px;
+  height: 14px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: width 120ms ease, height 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.canvas-ui .ng-sock-out {
+  right: -1px;
+  top: 50%;
+  transform: translate(50%, -50%);
+}
+.canvas-ui .ng-sock-out::before {
+  transform: translateX(-5px);
+}
+.canvas-ui .blk-node .ng-sock-out {
+  top: 17px;
+}
+.canvas-ui .ng-sock-in {
+  /* The flex row sets the static vertical position. The card sets the horizontal edge. */
+  left: -1px;
+  transform: translateX(-50%);
+}
+.canvas-ui .ng-sock-in::before {
+  transform: translateX(5px);
+}
+.canvas-ui .ng-sock:is(.wired, .ng-sock-out) {
+  color: color-mix(in srgb, var(--cv-accent) 72%, var(--ink));
+}
+.canvas-ui .ng-sock.wired::before {
+  color: var(--cv-accent);
+  background: var(--cv-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--cv-accent) 45%, transparent);
+}
+.canvas-ui .ng-wiring-out .ng-sock-in[data-editable='true'],
+.canvas-ui .ng-wiring-in .ng-sock-out,
+.canvas-ui .ng-sock:is(:hover, :focus-visible, .ng-snap) {
+  color: var(--cv-accent);
+}
+.canvas-ui .ng-sock.ng-snap::before {
+  width: 5px;
+  height: 18px;
+  box-shadow: 0 0 10px color-mix(in srgb, currentColor 65%, transparent);
+}
+.canvas-ui .ng-sock.invalid {
+  color: var(--err);
+}
+.canvas-ui .cv-wires circle.ng-routed {
+  pointer-events: none;
+}
+.canvas-ui .cv-wires circle.ng-snap {
+  fill: var(--cv-accent);
+  stroke: var(--cv-accent);
+  stroke-width: 3px;
+}
+.canvas-ui .cv-wires circle.ng-snap.invalid {
+  fill: var(--err);
+  stroke: var(--err);
+}
+.canvas-ui .ng-drag-layer {
+  color: var(--cv-accent);
+  pointer-events: none;
+}
+.canvas-ui .ng-drag-layer.invalid {
+  color: var(--err);
+}
+.canvas-ui .ng-drag-layer path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+}
+.canvas-ui .ng-drag-layer circle {
+  fill: currentColor;
+}
+.canvas-ui .ng-drag-note,
+.canvas-ui .ng-menu {
+  position: fixed;
+  z-index: 85;
+  box-sizing: border-box;
+  border: 1px solid var(--cv-edge-2);
+  background: var(--bg);
+  color: var(--ink);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.22);
+}
+.canvas-ui .ng-drag-note {
+  padding: 5px 9px;
+  border-color: var(--err);
+  border-radius: 7px;
+  color: var(--err);
+  font: 650 12px/1.2 var(--sans);
+  pointer-events: none;
+}
+.canvas-ui .ng-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(308px, calc(100vw - 16px));
+  max-height: min(368px, calc(100vh - 16px));
+  padding: 8px;
+  border-radius: var(--cv-radius);
+}
+[data-look='modern']:not([data-theme^='contrast']) .canvas-ui .ng-menu {
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(18px);
+}
+.canvas-ui .ng-search {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--cv-edge-2);
+  border-radius: 6px;
+  background: var(--cv-block);
+  color: var(--ink);
+  font: 500 14px/1.3 var(--sans);
+}
+.canvas-ui :is(.ng-search, .ng-pin-val, .ng-sock, .ng-pin-unwire):focus-visible {
+  outline: 2px solid var(--cv-accent);
+  outline-offset: 1px;
+}
+.canvas-ui .ng-options {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.canvas-ui .ng-category {
+  padding: 7px 8px 3px;
+  color: var(--ink-2);
+  font: 650 11px/1.2 var(--sans);
+}
+.canvas-ui .ng-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: 500 13px/1.15 var(--sans);
+}
+.canvas-ui .ng-option:is(:hover, [aria-selected='true']) {
+  border-color: var(--cv-accent);
+  background: var(--cv-accent-soft);
+}
+.canvas-ui .ng-option small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+/* Keep the SVG hit strokes behind the socket buttons at the edges of wide cards. */
+.canvas-ui .cv-wide > .rows > .cv-wires {
+  z-index: 1;
+}
+.canvas-ui .cv-reset .gi {
+  display: none;
+}
+@media (--desktop) and (max-width: 900px) {
+  #app.canvas-ui > .modebar {
+    gap: 6px;
+    padding-inline: 14px;
+  }
+  #app.canvas-ui > .modebar .cv-tools .cv-btn {
+    padding-inline: 7px;
+  }
+  .canvas-ui .cv-reset .gi {
+    display: inline-flex;
+  }
+  .canvas-ui .cv-reset-label {
     display: none;
   }
 }

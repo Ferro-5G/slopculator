@@ -241,7 +241,7 @@ export function spokenError(text: string, error: string, calm: boolean, isUnit: 
   return `error. ${lineErrorText(text, error, isUnit, other)}`;
 }
 
-export const UNFINISHED_HINT = 'Unfinished: add what comes next';
+export const UNFINISHED_HINT = 'Unfinished';
 
 /**
  * An error short enough for a step's box or a block's row, from its form (never its wording): "Not real" for a root

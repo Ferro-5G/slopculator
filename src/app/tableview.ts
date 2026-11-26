@@ -2,7 +2,6 @@ import { cmdOrCtrl } from './platform';
 import type { RowResult } from '../engine/document';
 import { type DisplayOpts, formatNumber, plainValue } from '../engine/format';
 import { friendlyError } from '../ui/errortext';
-import { play } from './sound';
 import type { Row } from './docmodel';
 import { h } from './dom';
 import { deleteRow, addRow } from './edits';
@@ -36,7 +35,6 @@ export function makeTableView(row: Extract<Row, { kind: 'table' }>): RowView {
         build();
         sheetChanged();
         grid.querySelector<HTMLInputElement>(`thead th:nth-child(${Math.max(1, ci)}) input`)?.focus();
-        play('fn');
       });
       inp.addEventListener('focus', () => { setTarget(inp); setActive(row.id); });
       head.append(h('th', {}, inp));
@@ -85,7 +83,6 @@ export function makeTableView(row: Extract<Row, { kind: 'table' }>): RowView {
             sheetChanged();
             const target = grid.querySelector<HTMLInputElement>(`input[data-r="${Math.max(0, r - 1)}"][data-c="${ci}"]`);
             target?.focus();
-            play('fn');
           }
         });
         const td = h('td', { class: 'cell' }, inp);
@@ -157,11 +154,10 @@ export function renderTableFoot(v: RowView, r: RowResult, o: DisplayOpts): void 
   }
   const fit = t && t.ev === undefined && !t.columns[1]?.computed ? leastSquares(t.columns[0]?.values ?? [], t.columns[1]?.values ?? []) : null;
   if (fit) {
-    const btn = h('button', { type: 'button', class: 'fix', title: 'Add the least-squares line as a new line; it graphs over the points' }, `Fit line  (r² = ${fit.r2.toFixed(4)})`);
+    const btn = h('button', { type: 'button', class: 'fix' }, `Fit line  (r² = ${fit.r2.toFixed(4)})`);
     btn.addEventListener('click', () => {
       const a = Number(fit.a.toPrecision(6)), b = Number(fit.b.toPrecision(6));
       addRow(r.id, { kind: 'expr', text: `y = ${a}x ${b < 0 ? '−' : '+'} ${Math.abs(b)}` });
-      play('fn');
     });
     notes.push(btn);
   }

@@ -37,9 +37,6 @@ export interface AppearancePrefs {
   color?: ColorPref;
   /** Aurora Glow: the light over the canvas, the composer and the keys. */
   glow?: boolean;
-  /** Keyboard Glow: the keys backlit in the open tab's color (the flag's under Pride), on its own switch. */
-  keyGlow?: boolean;
-  pride?: boolean;
   padLeft?: boolean;
 }
 
@@ -64,9 +61,11 @@ export interface SheetView {
   psych?: 'numbers';
   /** Where the person dragged the psychrometric chart on a wide canvas. Unset, the layout places it. */
   psychAt?: { x: number; y: number };
+  /** Show the 2D node canvas on a phone or narrow window instead of the stacked column. */
+  nodes?: boolean;
 }
 
-const SHEET_VIEW_FIELDS: readonly (keyof SheetView)[] = ['graph', 'graphPinned', 'keypad', 'view', 'graphBlock', 'flow', 'psych', 'psychAt'];
+const SHEET_VIEW_FIELDS: readonly (keyof SheetView)[] = ['graph', 'graphPinned', 'keypad', 'view', 'graphBlock', 'flow', 'psych', 'psychAt', 'nodes'];
 
 export const CURRENT_SHEET_KEY = 'slopculator:current';
 export const RECENT_MAX = 6;
@@ -107,6 +106,7 @@ export function cleanSheetView(raw: Record<string, unknown>): SheetView {
     ...(raw.flow === 2 ? { flow: 2 as const } : {}),
     ...(raw.psych === 'numbers' ? { psych: 'numbers' as const } : {}),
     ...(cleanPoint(raw.psychAt) ? { psychAt: cleanPoint(raw.psychAt)! } : {}),
+    ...(typeof raw.nodes === 'boolean' ? { nodes: raw.nodes } : {}),
   };
 }
 
@@ -147,8 +147,6 @@ export function cleanAppearance(raw: Record<string, unknown>): AppearancePrefs {
     ...(graphRate ? { graphRate } : {}),
     ...(color ? { color } : {}),
     ...(typeof raw.glow === 'boolean' ? { glow: raw.glow } : {}),
-    ...(typeof raw.keyGlow === 'boolean' ? { keyGlow: raw.keyGlow } : {}),
-    ...(typeof raw.pride === 'boolean' ? { pride: raw.pride } : {}),
     ...(typeof raw.padLeft === 'boolean' ? { padLeft: raw.padLeft } : {}),
   };
 }

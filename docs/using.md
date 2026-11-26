@@ -117,7 +117,7 @@ Every area is one Tab stop (top bar, line tools, composer, keypad, graph), with 
 
 ## Looks and accessibility
 
-Open **Appearance** (sliders icon on desktop, or inside Modes on phones) to switch between **Modern** and **Retro**, pick System/Light/Dark, enable Pure black (OLED) or High contrast, choose an accent color, adjust Aurora/Keyboard Glow, set Motion (Full, Reduced, Off), or toggle key sounds.
+Open **Appearance** (sliders icon on desktop, or inside Modes on phones) to switch between **Modern** and **Retro**, pick System/Light/Dark, enable Pure black (OLED) or High contrast, choose an accent color, adjust Aurora/Keyboard Glow, or set Motion (Full, Reduced, Off).
 
 There is also a hidden color theme unlocked with the classic code on the number pad arrows followed by B A.
 

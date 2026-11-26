@@ -4,7 +4,7 @@
 // same places. No DOM here.
 import {
   BELOW_GAP, belowKey, boundsOf, BLOCK_GRID, EXAMPLE_GRAPH, EXAMPLE_GRAPH_GAP, EXAMPLE_GRAPH_SIZE, exampleFrameRect, fitAll, fitsAsIs, FLOW, flowLayout,
-  GRAPH_BLOCK, roundedPath, routeWire, settleBlocks, type CanvasView, type FlowBlock, type FlowKind, type Point, type Rect, type Size,
+  GRAPH_BLOCK, roundedPath, routeWire, settleBlocks, wireKey, type CanvasView, type FlowBlock, type FlowKind, type Point, type Rect, type Size,
   type Wire,
 } from './canvas';
 
@@ -346,6 +346,8 @@ export interface RouteOptions {
   to?: Rect;
   /** When several wires enter the same step box, this wire's index and total count so their ports spread apart. */
   inSlot?: { index: number; count: number };
+  /** The measured input socket's height on the block's left edge, in world units. */
+  inY?: number;
   /** Where a wire from a readout's port leaves its block's right edge (the port's height, in world units). */
   outY?: number;
   /** Rows drawn inside another block (a moist-air state in the psychrometric chart), by the block they're in. */
@@ -370,10 +372,11 @@ export function wideWireRoute(w: Wire, wires: readonly Wire[], rects: ReadonlyMa
   // Wires into the block (or any row inside it), each at its own height, in the order their sources sit.
   const into = o.to ? [w] : wires.filter((x) => host(x.to) === host(w.to) && rects.has(x.from) && x.from !== editingId && host(x.from) !== host(x.to)).sort((p, q) => rects.get(p.from)!.y - rects.get(q.from)!.y);
   const count = o.to ? (o.inSlot?.count ?? 1) : into.length;
-  const i = o.to ? (o.inSlot?.index ?? 0) : into.findIndex((x) => x === w || (x.from === w.from && x.to === w.to && x.fromPort === w.fromPort));
+  const i = o.to ? (o.inSlot?.index ?? 0) : into.findIndex((x) => x === w || wireKey(x) === wireKey(w));
   const many = count > 1;
   return routeWire(a, b, obstacles, {
-    inY: many ? (o.to ? Math.round(b.y + (b.h * (i + 1)) / (count + 1)) : Math.min(b.y + b.h - 16, b.y + 26 + i * WIRE_IN_STEP)) : undefined,
+    inY: o.inY,
+    spreadY: many ? (o.to ? Math.round(b.y + (b.h * (i + 1)) / (count + 1)) : Math.min(b.y + b.h - 16, b.y + 26 + i * WIRE_IN_STEP)) : undefined,
     // Into its top too: several wires arrive at their own places along it, so two never draw (or tag) as one.
     inX: many ? Math.min(b.x + b.w - 16, b.x + 28 + i * WIRE_IN_STEP) : undefined,
     lane: many ? Math.round((i - (count - 1) / 2) * 8) : 0,
@@ -385,10 +388,12 @@ export function wideWireRoute(w: Wire, wires: readonly Wire[], rects: ReadonlyMa
 }
 
 /** Every wire's route (see wideWireRoute); wires to or from the block being changed in the composer aren't drawn. */
-export function wideWireRoutes(wires: readonly Wire[], rects: ReadonlyMap<string, Rect>, frame: Rect | null, isExample: (id: string) => boolean, editingId: string | null = null, minRun: (w: Wire) => number = () => 0, more: { portY?: (w: Wire) => number | undefined; hosts?: ReadonlyMap<string, string> } = {}): WireRoute[] {
+export function wideWireRoutes(wires: readonly Wire[], rects: ReadonlyMap<string, Rect>, frame: Rect | null, isExample: (id: string) => boolean, editingId: string | null = null, minRun: (w: Wire) => number = () => 0, more: { portY?: (w: Wire) => number | undefined; inPortY?: (w: Wire) => number | undefined; hosts?: ReadonlyMap<string, string> } = {}): WireRoute[] {
   const out: WireRoute[] = [];
   for (const w of wires) {
-    const points = wideWireRoute(w, wires, rects, frame, isExample, { editingId, minRun: minRun(w), outY: w.fromPort ? more.portY?.(w) : undefined, hosts: more.hosts });
+    const points = wideWireRoute(w, wires, rects, frame, isExample, {
+      editingId, minRun: minRun(w), inY: more.inPortY?.(w), outY: w.fromPort || w.toPin !== undefined ? more.portY?.(w) : undefined, hosts: more.hosts,
+    });
     if (points) out.push({ wire: w, points, d: roundedPath(points), from: points[0], to: points[points.length - 1] });
   }
   return out;

@@ -17,7 +17,7 @@ import { reordering, setReorder } from './rows';
 import { views, focusLine, isLineField } from './rowviews';
 import { opts, currentResults, activeId, rowIndex, doc } from './sheet';
 import { keypadOn, setKeypad, graphOn, setGraph } from './shell';
-import { cycleTheme, applyTheme } from './theme';
+import { applyTheme } from './theme';
 import { closeThumb, toggleTab, ti, tiPage, turnPage } from './thumb';
 import { showToast } from './toast';
 
@@ -41,7 +41,7 @@ function copyAnswer(): void {
 export function showHelp(): void {
   const groups: [string, [string, string][]][] = [
     ['Lines', [
-      ['Enter', 'New line below (or jump to the empty one)'],
+      ['Enter', 'New line'],
       ['↑ / ↓', 'Move between lines'],
       ['Alt+↑ / Alt+↓', 'Move the line itself up or down'],
       ['Alt+Shift+↑ / ↓', 'Duplicate the line above or below'],
@@ -50,12 +50,12 @@ export function showHelp(): void {
       ['Tab', 'Finish a function name; otherwise go to the next area'],
       ['Ctrl+Shift+Backspace', 'Delete the line (Backspace on an empty line too)'],
       ['Ctrl+Alt+Backspace', 'Clear every line'],
-      ['Ctrl+Z / Ctrl+Shift+Z', 'Undo or redo: typing in the line first, then deleted lines, clears, new sheets and opens, as far back as you like'],
+      ['Ctrl+Z / Ctrl+Shift+Z', 'Undo / redo'],
       ['Ctrl+Alt+C', 'Copy the answer on your line (or the last one)'],
       ['Ctrl+Alt+N', 'Add a normal curve'],
     ]],
     ['Getting around', [
-      ['Tab / Shift+Tab', 'Top bar → line (its fix first, if it offers one) → keypad tabs and keys → graph'],
+      ['Tab / Shift+Tab', 'Move between areas'],
       ['Esc', 'Back to your line from anywhere'],
       ['Ctrl+Alt+K', 'Jump into the keypad (again: back to the line)'],
       ['Ctrl+Alt+G', 'Jump into the graph (again: back to the line)'],
@@ -65,8 +65,14 @@ export function showHelp(): void {
       ['Ctrl+Alt+← / →', 'The open tab\'s pages'],
       ['Enter / Esc', 'In a tab: insert the tile and go back to the line / close it'],
       ['Ctrl+K', 'Find any function or command (Ctrl+/ too)'],
-      ['Ctrl+Alt+Y', 'History: everything you have calculated'],
-      ['Ctrl+Alt+H', 'This list'],
+      ['Ctrl+Alt+Y', 'History'],
+      ['Ctrl+Alt+H', 'Keyboard shortcuts'],
+    ]],
+    ['On the wide canvas', [
+      ['+ Node / right-click empty canvas', 'Add a math node'],
+      ['Drag an output', 'Connect to an input or drop on empty canvas to add a node'],
+      ['Drag a connected input', 'Rewire it to an output or drop on empty canvas to disconnect'],
+      ['Alt+click an input or wire', 'Disconnect the input'],
     ]],
     ['In the graph', [
       ['Arrows (Shift: farther)', 'Pan'],
@@ -81,7 +87,7 @@ export function showHelp(): void {
       ['Ctrl+Alt+D / E / M / P', 'Deg–Rad, Exact, Sample SD, Percent'],
       ['Ctrl+Alt+L', 'Line letters (line 1 is A)'],
       ['Ctrl+Alt+T', 'Next theme'],
-      ['Ctrl+Alt+S / O', 'Save / open a named sheet (a named sheet keeps every edit)'],
+      ['Ctrl+Alt+S / O', 'Save / open sheet'],
       ['Ctrl+Alt+Shift+N', 'New sheet'],
     ]],
   ];
@@ -216,9 +222,8 @@ export function initCommands(): void {
       return;
     }
     const act: Record<string, () => void> = {
-              g: () => focusRegion('graph'),
+      g: () => focusRegion('graph'),
       k: () => focusRegion('keypad'),
-      t: () => cycleTheme(),
       z: runUndo,
       f: () => fitGraph(),
     };

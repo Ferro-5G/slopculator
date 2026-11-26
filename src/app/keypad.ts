@@ -1,5 +1,4 @@
 import { type Key, keyCall, capTone, keyCaption, legendText, LONG_LABEL, keyLegend, CLEAR_ARM_MS, CLEAR_MS, CARET_DELAY_MS, CARET_REPEAT_MS, CARET_SCRUB, LABEL_TWO, LABEL_MIN, padRows, isWordKey } from '../ui/keypad';
-import { play } from './sound';
 import { caretStep } from '../ui/lineedit';
 import { backspaceEdit } from '../ui/slots';
 import { h } from './dom';
@@ -9,9 +8,8 @@ import { keypadEl, composerDock } from './layout';
 import { applyBackspace, editText, commitLine, commaSteps, insertText } from './lineeditor';
 import { openMatrixEditor } from './editors';
 import { kb } from './platform';
-import { konamiStep, KONAMI_KEYS } from './pride';
 import { views, viewOfInput } from './rowviews';
-import { doc, saveSoon, rowIndex, activeId, currentResults, activeInput } from './sheet';
+import { doc, saveSoon, rowIndex, activeId, activeInput } from './sheet';
 import { closeThumb, deckBar, tiPage, tiRows, buildThumbRows } from './thumb';
 
 let redrawKeys = () => {};
@@ -109,31 +107,16 @@ export function keyButton(k: Key): HTMLButtonElement {
   b.addEventListener('mousedown', (e) => e.preventDefault());
   if (k.action === 'left' || k.action === 'right') caretKey(b, k);
   const cleared = k.action === 'back' ? backKey(b) : null;
-  const cue = () => (k.action === 'enter' ? (activeId && currentResults()[rowIndex(activeId)]?.error ? 'error' : 'enter') : tone === 'num' ? 'tick' : 'fn');
-  // The click lands on touch-down, as a physical key's does; the key still acts on release. A keyboard or scripted
-  // click (no pointer down first) sounds as it acts.
-  let sounded = false;
-  if (k.action !== 'left' && k.action !== 'right') {
-    b.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      sounded = true;
-      play(cue());
-    });
-  }
   b.addEventListener('click', (e) => {
     if ((k.action === 'left' || k.action === 'right') && e.detail !== 0) return;
-    const early = sounded && e.detail !== 0;
-    sounded = false;
     if (cleared?.()) return;
     closeThumb();
-    if (!early) play(cue());
     b.classList.remove('pop');
     void b.offsetWidth; // restart the press animation
     b.classList.add('pop');
     if (k.action) runKeyAction(k.action);
     else if (k.ins === ',' && commaSteps()) { /* stepped to the next slot */ }
     else insertText(k.ins ?? k.label);
-    konamiStep(k.action === 'left' ? 'L' : k.action === 'right' ? 'R' : KONAMI_KEYS[k.label]);
   });
   b.addEventListener('mouseenter', () => showKeyHelp(k, b, false));
   b.addEventListener('focus', () => showKeyHelp(k, b, true));
@@ -154,9 +137,7 @@ function caretKey(b: HTMLButtonElement, k: Key): void {
     pointer = { id: e.pointerId, lastX: e.clientX, acc: 0, scrubbing: false, before: line()?.selectionStart ?? null, repeating: false };
     b.classList.add('held');
     closeThumb();
-    play('fn');
     step(k.action as 'left' | 'right');
-    konamiStep(k.action === 'left' ? 'L' : 'R');
     start = window.setTimeout(() => {
       if (pointer) pointer.repeating = true;
       repeat = window.setInterval(() => step(k.action as 'left' | 'right'), CARET_REPEAT_MS);
@@ -195,7 +176,6 @@ function backKey(b: HTMLButtonElement): () => boolean {
     fire = window.setTimeout(() => {
       cleared = true;
       b.classList.remove('arming');
-      play('fn');
       runKeyAction('clear');
     }, CLEAR_MS);
   });
@@ -214,8 +194,8 @@ export function clearKeyHintSoon(): void {
 function showKeyHelp(k: Key | null, key?: HTMLElement, now = false): void {
   const tip = keyHelp;
   if (!tip) return;
-  // A digit or point types just itself: "6 types 6" says nothing.
-  if (k && !k.title && (k.ins ?? k.label) === k.label) k = null;
+  // Self-explanatory keys (digits, basic operators, ENTER, or keys without help text) stay quiet in the hover strip.
+  if (k && (!k.title || k.quiet)) k = null;
   cancelKeyHintTimer();
   if (keyHint.offsetParent) {
     if (k) fillKeyHelp(keyHint, k);
@@ -241,14 +221,14 @@ function showKeyHelp(k: Key | null, key?: HTMLElement, now = false): void {
   tip.style.top = `${kr.top - hr.top - 6}px`;
 }
 function fillKeyHelp(keyHelp: HTMLElement, k: Key): void {
-  const insert = k.ins ? k.ins.replace('¦', '…') : '';
-  const text = k.title ? kb(k.title) : insert || k.label;
+  if (!k.title) { keyHelp.replaceChildren(); return; }
+  const text = kb(k.title);
   const name = keyCall(k);
   if (name && text.startsWith(name)) {
     keyHelp.replaceChildren(h('span', { class: 'kh-text' }, h('b', { class: 'kh-name' }, name), text.slice(name.length)));
     return;
   }
-  keyHelp.replaceChildren(h('span', { class: 'kh-key' }, k.label), h('span', { class: 'kh-text' }, k.title ? text : `types ${insert || k.label}`));
+  keyHelp.replaceChildren(h('span', { class: 'kh-key' }, k.label), h('span', { class: 'kh-text' }, text));
 }
 /**
  * Measured rather than styled by length, because the two looks use different faces and the key width follows the window.

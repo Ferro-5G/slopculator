@@ -35,7 +35,7 @@ export function openHistoryDialog(): void {
     first = found[0];
     clear.disabled = !all.length;
     if (!found.length) {
-      listBox.replaceChildren(h('p', { class: 'muted' }, all.length ? 'Nothing matches that search.' : 'Finished lines land here and stay, even after Clear all.'));
+      listBox.replaceChildren(h('p', { class: 'muted' }, all.length ? 'No matches.' : 'No history yet.'));
       return;
     }
     const parts: HTMLElement[] = [];
@@ -46,7 +46,7 @@ export function openHistoryDialog(): void {
         day = label;
         parts.push(h('div', { class: 'history-day' }, label));
       }
-      const open = h('button', { type: 'button', class: 'sheet-open history-open', title: `Insert ${e.text}` },
+      const open = h('button', { type: 'button', class: 'sheet-open history-open' },
         h('span', { class: 'history-text' }, e.text),
         h('span', { class: 'sheet-meta' }, entryTime(e.at), e.sheet ? ` · ${e.sheet}` : ''));
       open.addEventListener('click', () => use(e.text));
@@ -57,7 +57,7 @@ export function openHistoryDialog(): void {
       });
       const row: HTMLElement[] = [open];
       if (e.result) {
-        const answer = h('button', { type: 'button', class: 'history-result', title: `Insert the answer ${e.result}` }, `= ${e.result}`);
+        const answer = h('button', { type: 'button', class: 'history-result' }, `= ${e.result}`);
         answer.addEventListener('click', () => use(e.result));
         row.push(answer);
       }

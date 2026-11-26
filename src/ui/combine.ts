@@ -6,7 +6,7 @@ export type CombineOp = '+' | '-' | '*' | '/';
 /** Each operation, its symbol and its name, for the controls that offer them. */
 export const COMBINE_OPS: [CombineOp, string, string][] = [['+', '+', 'Add'], ['-', '−', 'Subtract'], ['*', '×', 'Multiply'], ['/', '/', 'Divide']];
 /** What the operations do, in a sentence, for the controls with room to say. */
-export const COMBINE_HELP = 'Every line with a number, in a new line. Empty lines are left out.';
+export const COMBINE_HELP = 'Combines all numeric lines into a new line';
 export const COMBINE_TOO_FEW = 'Needs at least two lines with a number';
 
 export interface CombineLine {

@@ -1,25 +1,17 @@
 import modernCss from '../styles/modern.css?inline';
-import retroCss from '../styles/retro.css?inline';
 import canvasCss from '../styles/canvas.css?inline';
-import { type AppearanceChoice, appearancePatch, appearanceOf, GRAPH_RATE_NAMES, GRAPH_RATE_NOTE, graphFrameGap, type GraphRatePref, MODE_NAMES, MOTION_NAMES, type MotionPref, type ColorPref, COLOR_NAMES, type WebTheme, themeOfChoice, luminance, contrast, atLeast, type ThemeValue, LOOK_NAMES, THEME_NAMES } from '../ui/appearance';
-import { ENTER, PAD, capTone, isWordKey } from '../ui/keypad';
+import { type AppearanceChoice, appearancePatch, appearanceOf, GRAPH_RATE_NAMES, GRAPH_RATE_NOTE, graphFrameGap, type GraphRatePref, MOTION_NAMES, type MotionPref, type WebTheme, themeOfChoice, luminance, contrast, atLeast, type ThemeValue } from '../ui/appearance';
 import { tabHues } from '../ui/palettes';
-import { colorTokens } from '../ui/webtokens';
-import { play } from './sound';
-import { syncers } from './controls';
 import { CURVES } from '../ui/document';
-import type { LookName } from './docmodel';
 import { h } from './dom';
 import { motionNow, osReduceMotion } from './feedback';
-import { syncSheetTitle, buildMenu, toggleKeySound } from './file';
+import { syncSheetTitle, buildMenu } from './file';
 import { fitKeyLabels, switchPadSide } from './keypad';
 import { modeBar, graph } from './layout';
 import { placePopover, addPopover, closePopovers } from './overlay';
 import { dark } from './platform';
-import { prideUnlocked, setPride, prideOn } from './pride';
 import { SLIDERS_ICON, headPill, refitBar } from './settings';
 import { doc, saveSoon, recompute } from './sheet';
-import { showToast } from './toast';
 import { settleMotions } from './motion';
 
 const lookSheet = document.createElement('style');
@@ -28,9 +20,7 @@ const lookSheet = document.createElement('style');
 const styleNonce = document.querySelector<HTMLStyleElement>('style[nonce]')?.nonce;
 if (styleNonce) lookSheet.nonce = styleNonce;
 export let curveColors: string[] = [];
-// Appearance's Mode (System, Light, Dark), Pure black when dark and High contrast, as on the phones. They replace the
-// old five-way theme, which is still read (appearanceOf) and kept in step (appearancePatch). Ctrl+Alt+T cycles the old
-// themes.
+
 function setAppearance(change: Partial<AppearanceChoice>): void {
   Object.assign(doc.ui, appearancePatch(doc.ui, change));
   appearanceChanged();
@@ -39,41 +29,19 @@ export function appearanceChanged(): void {
   applyTheme();
   saveSoon();
 }
+/** Kept for programmatic testing via the page API. */
 export function setThemeValue(t: ThemeValue): void {
   setAppearance(appearanceOf({ theme: t }));
 }
-/** The drawn part of a role=switch button; its aria-checked moves it. */
-const knob = () => h('span', { class: 'knob', 'aria-hidden': 'true' });
-const modeButtons = MODE_NAMES.map(([m, label]) => h('button', { type: 'button', onclick: () => setAppearance({ mode: m }) }, label));
-const modeSeg = h('div', { class: 'seg mode-seg', role: 'group', 'aria-label': 'Mode' }, ...modeButtons);
-const switchSyncs: (() => void)[] = [];
-function appearSwitch(name: string, hint: string, get: () => boolean, set: (v: boolean) => void): HTMLElement {
-  const b = h('button', { type: 'button', role: 'switch', class: 'appear-pride appear-switch', ...(hint ? { title: hint } : {}), onclick: () => { play('toggle'); set(!get()); } }, h('span', {}, name), knob());
-  const sync = () => b.setAttribute('aria-checked', String(get()));
-  switchSyncs.push(sync);
-  sync();
-  return b;
-}
-const pureBlackSwitch = appearSwitch('Pure black when dark', 'Dark draws on true black', () => appearanceOf(doc.ui).pureBlack, (v) => setAppearance({ pureBlack: v }));
-const contrastSwitch = appearSwitch('High contrast', 'Black and white, outlined keys, the color raised to 7:1', () => appearanceOf(doc.ui).contrast, (v) => setAppearance({ contrast: v }));
-const glowSwitch = appearSwitch('Aurora Glow', '', () => !!doc.ui.glow, (v) => { doc.ui.glow = v; appearanceChanged(); });
-const keyGlowSwitch = appearSwitch('Keyboard Glow', '', () => !!doc.ui.keyGlow, (v) => { doc.ui.keyGlow = v; appearanceChanged(); });
-/** Mode and the two switches all read one appearance, so a change to any of them redraws all three. */
-const syncAppearance = () => {
-  const m = appearanceOf(doc.ui).mode;
-  MODE_NAMES.forEach(([v], i) => modeButtons[i].setAttribute('aria-pressed', String(v === m)));
-  for (const sync of switchSyncs) sync();
-};
-const lookSel = h('select', { class: 'look', title: 'Look', 'aria-label': 'Look' },
-  ...LOOK_NAMES.map(([v, label]) => h('option', { value: v }, label)),
-);
-const motionSel = h('select', { class: 'motion', title: 'Reduced keeps quick fades, and nothing bounces or slides. Off stops every animation.', 'aria-label': 'Motion' },
+
+const motionSel = h('select', { class: 'motion', title: 'Reduced keeps quick fades without bounce or slide.', 'aria-label': 'Motion' },
   ...MOTION_NAMES.map(([v, label]) => h('option', { value: v }, label)),
 );
 const motionNote = h('div', { class: 'menu-note', hidden: true }, 'Reduce motion is on in system settings, so Full acts like Reduced.');
 const rateSel = h('select', { class: 'motion', title: GRAPH_RATE_NOTE, 'aria-label': 'Graph frame rate' },
   ...GRAPH_RATE_NAMES.map(([v, label]) => h('option', { value: v }, label)),
 ) as HTMLSelectElement;
+
 export function setGraphRate(r: GraphRatePref): void {
   doc.ui.graphRate = r;
   applyMotion();
@@ -94,36 +62,12 @@ function applyMotion(): void {
   graph.frameGap = graphFrameGap(doc.ui.graphRate);
   rateSel.value = doc.ui.graphRate ?? 'high';
 }
-export const setColor = (c: ColorPref) => {
-  doc.ui.color = c;
-  appearanceChanged();
-};
-const swatches = new Map(COLOR_NAMES.map(([c, label]) => [c, h('button', { type: 'button', class: 'swatch', role: 'radio', title: label, 'aria-label': `${label} color`, onclick: () => setColor(c) })]));
-const colorRow = h('div', { class: 'menu-row' }, h('span', {}, 'Color'), h('div', { class: 'swatches', role: 'radiogroup', 'aria-label': 'Color' }, ...swatches.values()));
-let colorProps: string[] = [];
-function applyColor(look: LookName, theme: WebTheme): void {
-  const root = document.documentElement;
-  for (const k of colorProps) root.style.removeProperty(k);
-  const pride = prideOn();
-  const own = getComputedStyle(root).getPropertyValue('--accent').trim();
-  const chosen = doc.ui.color ?? 'default';
-  for (const [c, el] of swatches) {
-    el.style.setProperty('--swatch', colorTokens(look, theme, c)['--accent'] ?? own);
-    el.setAttribute('aria-checked', String(c === chosen));
-  }
-  colorRow.hidden = pride;
-  const tokens = pride ? {} : colorTokens(look, theme, chosen);
-  colorProps = Object.keys(tokens);
-  for (const [k, v] of Object.entries(tokens)) root.style.setProperty(k, v);
-}
-const prideSlot = h('div', { class: 'pride-slot' });
-const deviceSlot = h('div', { class: 'pride-slot device-slot' });
+
+const deviceSlot = h('div', { class: 'device-slot' });
 export function syncAppearanceSlots(): void {
   const padLeft = !!doc.ui.padLeft;
   const setPadSide = (left: boolean) => { if (!!doc.ui.padLeft !== left) { switchPadSide(); buildMenu(); } };
   deviceSlot.replaceChildren(
-    h('button', { type: 'button', role: 'switch', class: 'appear-pride', 'aria-checked': String(doc.ui.sound !== false), onclick: () => toggleKeySound() },
-      h('span', {}, 'Key sounds'), knob()),
     h('div', { class: 'menu-row' },
       h('span', {}, 'Number pad'),
       h('div', { class: 'seg', role: 'group', 'aria-label': 'Number pad' },
@@ -131,31 +75,15 @@ export function syncAppearanceSlots(): void {
         h('button', { type: 'button', 'aria-pressed': String(!padLeft), onclick: () => setPadSide(false) }, 'Right'),
       )),
   );
-  prideSlot.replaceChildren(...(prideUnlocked() ? [h('button', { type: 'button', role: 'switch', class: 'appear-pride', 'aria-checked': String(!!doc.ui.pride), onclick: () => setPride(!doc.ui.pride) },
-    h('span', {}, 'Pride colors'), knob())] : []));
 }
-function appearSample(): HTMLElement {
-  const keys = [...['7', '8', '9', '×'].map((l) => PAD.flat().find((k) => k.label === l)!), ENTER];
-  return h('div', { class: 'appear-sample', role: 'img', 'aria-label': 'Sample: the line 7 + 5 with its answer 12, and the keys 7, 8, 9, times and enter, in the chosen appearance' },
-    h('div', { class: 'as-line' }, h('span', { class: 'as-idx' }, '2'), h('span', { class: 'as-expr' }, '7+5'), h('span', { class: 'as-ans' }, '12')),
-    h('div', { class: 'as-keys' }, ...keys.map((k) => h('span', { class: `key ${capTone(k)}${isWordKey(k) ? ' word' : ''}` }, h('span', { class: 'kl' }, k.label)))));
-}
+
 export const appearBody = h('div', { class: 'appear-body' },
-  appearSample(),
-  h('label', { class: 'menu-row' }, h('span', {}, 'Look'), lookSel),
-  h('div', { class: 'menu-row' }, h('span', {}, 'Mode'), modeSeg),
-  colorRow,
-  pureBlackSwitch,
-  contrastSwitch,
-  glowSwitch,
-  keyGlowSwitch,
   h('label', { class: 'menu-row' }, h('span', {}, 'Motion'), motionSel),
   motionNote,
   h('label', { class: 'menu-row' }, h('span', {}, 'Graph frame rate'), rateSel),
-  prideSlot,
   deviceSlot,
 );
-export const appearBtn = h('button', { type: 'button', class: 'appear-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', 'aria-label': 'Appearance', title: 'Appearance: look, mode, color and motion' });
+export const appearBtn = h('button', { type: 'button', class: 'appear-btn', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', 'aria-label': 'Appearance' });
 export const appearMenu = h('div', { class: 'menu appear-menu', role: 'dialog', 'aria-label': 'Appearance', hidden: true }, appearBody);
 const appearWrap = h('div', { class: 'menu-wrap appear-wrap' }, appearBtn, appearMenu);
 export function setAppear(open: boolean, focusFirst = false): void {
@@ -180,24 +108,20 @@ function resolvedTheme(): WebTheme {
 export function applyTheme(): void {
   const theme = resolvedTheme();
   document.documentElement.dataset.theme = theme;
-  document.documentElement.toggleAttribute('data-pride', prideOn());
-  document.documentElement.toggleAttribute('data-glow', !!doc.ui.glow && !appearanceOf(doc.ui).contrast);
-  document.documentElement.toggleAttribute('data-keyglow', !!doc.ui.keyGlow && !appearanceOf(doc.ui).contrast);
-  const look = doc.ui.look ?? 'modern';
-  document.documentElement.dataset.look = look;
-  lookSheet.textContent = (look === 'retro' ? retroCss : modernCss) + canvasCss;
-  lookSel.value = look;
-  applyColor(look, theme);
+  // Aurora Glow is the default look; Keyboard Glow is removed.
+  document.documentElement.toggleAttribute('data-glow', !appearanceOf(doc.ui).contrast);
+  document.documentElement.removeAttribute('data-keyglow');
+  document.documentElement.dataset.look = 'modern';
+  lookSheet.textContent = modernCss + canvasCss;
   applyMotion();
   syncSheetTitle();
   const cs = getComputedStyle(document.documentElement);
   curveColors = Array.from({ length: CURVES }, (_, i) => cs.getPropertyValue(`--curve-${i + 1}`).trim());
   syncTabColors();
-  syncAppearance();
   // Browser chrome and standalone status bars match the top canvas surface, not the lighter card fill.
-  const chromeBg = look === 'modern' && theme === 'ink'
+  const chromeBg = theme === 'ink'
     ? '#06070c'
-    : look === 'modern' && theme === 'paper'
+    : theme === 'paper'
       ? '#f3f5f9'
       : cs.getPropertyValue('--bg').trim();
   const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name=theme-color]')];
@@ -209,21 +133,9 @@ export function applyTheme(): void {
   graph.refreshTheme();
   recompute();
   fitKeyLabels();
-  // A look's faces change the chips' widths without resizing the bar, so it folds again here.
   refitBar();
 }
-export function cycleTheme(): void {
-  const i = THEME_NAMES.findIndex(([t]) => t === (doc.ui.theme ?? 'system'));
-  const next = THEME_NAMES[(i + 1) % THEME_NAMES.length];
-  setThemeValue(next[0]);
-  showToast(`Theme: ${next[1]}`);
-}
-/**
- * The tabs' colour notches: Math blue, Stats green, Chance violet, Matrix amber, HVAC teal, from the theme's own curve
- * colours, each pushed until it stands 3:1 off the key it sits on, so a notch reads in every look and theme, High
- * contrast and pure black included. A lit tab wears its colour with black
- * or white over it, whichever stands further off; a tile's name wears it where it reads at 4.5:1, else the third ink.
- */
+
 /** Any CSS colour as #rrggbb, read back from the browser; null for one that isn't a plain colour. */
 function cssHex(c: string): string | null {
   if (/^#[0-9a-f]{6}$/i.test(c)) return c.toLowerCase();
@@ -238,9 +150,7 @@ function cssHex(c: string): string | null {
 function syncTabColors(): void {
   const cs = getComputedStyle(document.documentElement);
   const v = (name: string) => cssHex(cs.getPropertyValue(name).trim());
-  const retro = doc.ui.look === 'retro';
-  // Retro's is a gradient, so a colour has to stand off both its ends.
-  const caps = (retro ? [v('--cap-fn'), v('--cap-fn-top')] : [v('--key-fn')]).filter((c): c is string => !!c);
+  const caps = [v('--key-fn')].filter((c): c is string => !!c);
   const tile = caps[0] ?? '#d1d3da';
   const darkTheme = luminance(v('--panel') ?? '#ffffff') < 0.2;
   const hues = tabHues(curveColors.map((c) => cssHex(c)), darkTheme);
@@ -258,11 +168,6 @@ function syncTabColors(): void {
 export function initTheme(): void {
   addPopover({ close: () => setAppear(false), exclusive: true, outside: true, isOpen: () => !appearMenu.hidden, returnFocus: () => appearBtn.focus() });
   document.head.append(lookSheet);
-  syncers.push(syncAppearance);
-  lookSel.addEventListener('change', () => {
-    doc.ui.look = lookSel.value as LookName;
-    appearanceChanged();
-  });
   rateSel.addEventListener('change', () => setGraphRate(rateSel.value as GraphRatePref));
   motionSel.addEventListener('change', () => {
     setMotion(motionSel.value as MotionPref);

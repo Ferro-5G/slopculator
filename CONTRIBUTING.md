@@ -12,12 +12,15 @@ npm run dev
 ## Checks
 
 ```sh
-npm run lint           # scripts/lint.mjs: error reading, timers, layer imports
+npm run lint           # scripts/lint.mjs: error reading, timers/rAF/effects, layer imports, stray Markdown
 npm run typecheck      # tsc-rs
-npm test               # vitest
+npm test               # vitest (includes fast-check engine property tests)
 npm run build          # dist/index.html
 npm run e2e            # drives dist/index.html in Chrome
-npm run verify         # runs all of the above in order
+npm run cli -- doctor  # reusable CLI for driving dist/index.html
+npm run fuzz:ui        # Bombadil property-based UI fuzzing against dist/index.html
+npm run perf:ui        # end-to-end UI performance benchmark against dist/index.html
+npm run verify         # runs lint, test, build, and e2e in order
 ```
 
 CI runs `lint`, `typecheck`, `test`, and `build` on pull requests (`e2e` runs on manual dispatch). Run `npm run verify` locally before asking for review.

@@ -38,18 +38,18 @@ export const graphDock = h('div', { class: 'graph-dock' }, graphChips, graphSlid
 export const graphUnpin = h('button', {
   type: 'button',
   class: 'blk-unpin',
-  title: 'Return graph to automatic layout',
+  title: 'Reset graph layout',
   'aria-label': 'Reset graph position and size',
   hidden: true,
 }, 'Auto');
-export const graphGrip = h('div', { class: 'blk-grip', title: 'Drag to move graph · Double-click to reset layout' },
+export const graphGrip = h('div', { class: 'blk-grip' },
   h('span', { class: 'blk-grip-dots', 'aria-hidden': 'true' }),
   h('span', { class: 'blk-grip-title', 'aria-hidden': 'true' }, 'Graph'),
   graphUnpin,
 );
-export const graphResize = h('div', { class: 'blk-resize', title: 'Drag to resize graph · Double-click to reset size', 'aria-hidden': 'true' });
+export const graphResize = h('div', { class: 'blk-resize', 'aria-hidden': 'true' });
 export const graphPane = h('section', { class: 'graph-pane blk blk-graph', 'aria-label': 'Graph' }, graphGrip, graphHost, graphDock, marksHint, graphResize);
-export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', title: 'Drag to resize', hidden: true });
+export const splitter = h('div', { class: 'splitter', role: 'separator', 'aria-orientation': 'vertical', hidden: true });
 export const main = h('main', { class: 'main' }, leftPane);
 export const toast = h('div', { class: 'toast', role: 'status' });
 toast.inert = true;

@@ -98,7 +98,7 @@ const withSi = (args: string[], si: boolean): string => (si ? [...args, '"SI"'].
 const CALC_BUILDER: FormBuilderSpec = {
   kind: 'calc',
   title: 'Calculus builder',
-  subtitle: 'Fill in the labeled slots instead of memorizing argument order.',
+  subtitle: '',
   action: 'Insert',
   modes: [
     {
@@ -165,7 +165,7 @@ const CALC_BUILDER: FormBuilderSpec = {
 const NORMAL_BUILDER: FormBuilderSpec = {
   kind: 'normal',
   title: 'Normal curve builder',
-  subtitle: 'Compute areas, tails, or percentiles without guessing parameter order.',
+  subtitle: '',
   action: 'Insert',
   modes: [
     {
@@ -254,9 +254,9 @@ const DATA_BUILDER: FormBuilderSpec = {
     {
       id: 'list',
       label: 'Data list',
-      note: 'Creates a named list ready for mean(L), median(L), sds(L), or fivenum(L).',
+      note: '',
       names: ['L', 'X', 'Y', 'D', 'S', 'A', 'B'],
-      nameHint: 'Optional — name it to reuse in mean(L), sds(L), or fivenum(L).',
+      nameHint: 'Name it to reuse in mean(L), sds(L), or fivenum(L).',
       fields: [
         { id: 'items', label: 'Values', placeholder: '12, 15, 18, 22, 25', defaultValue: '', kind: 'list' },
       ],
@@ -277,7 +277,7 @@ const DATA_BUILDER: FormBuilderSpec = {
 const CHANCE_BUILDER: FormBuilderSpec = {
   kind: 'chance',
   title: 'Probability builder',
-  subtitle: 'Binomial and Poisson probabilities with clearly labeled parameters.',
+  subtitle: '',
   action: 'Insert',
   modes: [
     {
@@ -339,7 +339,7 @@ const CHANCE_BUILDER: FormBuilderSpec = {
 const HVAC_BUILDER: FormBuilderSpec = {
   kind: 'hvac',
   title: 'HVAC builder',
-  subtitle: 'Labeled engineering inputs with units and optional SI metric mode.',
+  subtitle: '',
   action: 'Insert',
   modes: [
     {

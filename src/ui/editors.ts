@@ -98,9 +98,9 @@ const MATRIX_EDITOR: MatrixEditor = {
   names: [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'],
   text: {
     title: 'New matrix',
-    subtitle: 'Enter values cell by cell — blank cells become 0.',
+    subtitle: 'Blank cells become 0.',
     nameLabel: 'Matrix name',
-    nameHint: 'Optional — reuse in formulas like det(A) or inv(A).',
+    nameHint: 'Reuse in formulas like det(A) or inv(A).',
     sizeLabel: 'Rows',
     action: 'Insert matrix',
     add: 'Add a row',
@@ -118,9 +118,9 @@ const SHAPE_EDITOR: ListEditor = {
   names: ['T', 'P', 'Q', 'R', 'S', 'U', 'V', 'W'],
   text: {
     title: 'New shape',
-    subtitle: 'Enter (x, y) corners in order to plot a closed polygon.',
+    subtitle: 'Corners in order.',
     nameLabel: 'Shape name',
-    nameHint: 'Optional — transform later with rotation(90) * T.',
+    nameHint: 'Transform later with rotation(90) * T.',
     sizeLabel: 'Points',
     action: 'Draw shape',
     add: 'Add a point',
@@ -153,9 +153,9 @@ const VECTOR_EDITOR: ListEditor = {
   names: ['v', 'u', 'w', 'p', 'q', 'r', 's', 't'],
   text: {
     title: 'New vector',
-    subtitle: 'Enter components along each axis — blank entries become 0.',
+    subtitle: 'Blank entries become 0.',
     nameLabel: 'Vector name',
-    nameHint: 'Optional — reuse in mag(v) or dot(v, u).',
+    nameHint: 'Reuse in mag(v) or dot(v, u).',
     sizeLabel: 'Dimensions',
     action: 'Insert vector',
     add: 'Add a component',
@@ -177,12 +177,12 @@ export type EditorKind = 'matrix' | 'shape' | 'vector' | 'calc' | 'normal' | 'da
 export interface EditorTile { editor: EditorKind; mode?: string; face: string; name: string; label: string; title: string; wide?: boolean }
 
 export const EDITOR_TILES: Record<EditorKind, EditorTile> = {
-  matrix: { editor: 'matrix', face: 'Matrix builder…', name: '2×2, 3×3, up to 6×6', label: 'Build a matrix of any size up to 6 × 6', title: 'Open the visual Matrix Builder (2×2, 3×3, up to 6×6)', wide: true },
-  shape: { editor: 'shape', face: 'Shape…', name: 'polygon builder', label: 'Build a polygon from corner points', title: 'Open the visual Polygon Builder with live preview' },
-  vector: { editor: 'vector', face: 'Vector…', name: 'vector builder', label: 'Build a 2D to 6D vector', title: 'Open the visual Vector Builder with live magnitude' },
-  calc: { editor: 'calc', face: 'Calculus builder…', name: '∫ · d/dx · Σ', label: 'Build an integral, derivative, or sum', title: 'Open the guided Calculus Builder with labeled inputs', wide: true },
-  normal: { editor: 'normal', face: 'Normal…', name: 'curve builder', label: 'Build a normal probability or percentile', title: 'Open the guided Normal Curve Builder with live answer' },
-  data: { editor: 'data', face: 'Data list…', name: 'list builder', label: 'Build a named data list with live stats', title: 'Open the Data List Builder with live mean and SD' },
-  chance: { editor: 'chance', face: 'Chance…', name: 'prob builder', label: 'Build a binomial or Poisson probability', title: 'Open the guided Probability Builder with live answer' },
-  hvac: { editor: 'hvac', face: 'HVAC…', name: 'guided builder', label: 'Build an HVAC calculation with labeled units', title: 'Open the guided HVAC Builder with unit labels' },
+  matrix: { editor: 'matrix', face: 'Matrix builder…', name: '2×2, 3×3, up to 6×6', label: 'Build a matrix up to 6 × 6', title: 'Matrix up to 6×6', wide: true },
+  shape: { editor: 'shape', face: 'Shape…', name: 'polygon', label: 'Build a polygon from corners', title: 'Polygon from corners' },
+  vector: { editor: 'vector', face: 'Vector…', name: '2D to 6D', label: 'Build a 2D to 6D vector', title: '2D to 6D vector' },
+  calc: { editor: 'calc', face: 'Calculus builder…', name: '∫ · d/dx · Σ', label: 'Build an integral, derivative, or sum', title: 'Integral, derivative, or sum', wide: true },
+  normal: { editor: 'normal', face: 'Normal…', name: 'area & z', label: 'Build a normal probability or percentile', title: 'Normal probability or percentile' },
+  data: { editor: 'data', face: 'Data list…', name: 'named list', label: 'Build a data list', title: 'Data list' },
+  chance: { editor: 'chance', face: 'Chance…', name: 'binom · Poisson', label: 'Build a binomial or Poisson probability', title: 'Binomial or Poisson probability' },
+  hvac: { editor: 'hvac', face: 'HVAC…', name: 'air · refrig · duct', label: 'Build an HVAC calculation', title: 'Superheat, subcool, moist air, coil, or duct' },
 };

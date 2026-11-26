@@ -1,25 +1,40 @@
-// Rules the type checker can't see: failures are read through their form and not their wording, timers don't creep in,
-// and the shared layers stay free of the platforms. Each problem prints as file:line and what to do instead.
+// Rules the type checker can't see: failures are read through their form and not their wording, timers/rAF/effects don't
+// creep in, layers stay clean, private directories don't leak into public code, and stray Markdown notes don't land in
+// the tree. Each problem prints as file:line and what to do instead.
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-// Timer counts per file. The mobile app keeps its own list, so a checkout without mobile/ has nothing stale to lower.
+// Caps per file. The mobile app keeps its own list, so a checkout without mobile/ has nothing stale to lower.
 const BASELINES = [
-  { path: 'mobile/lint-baseline.json', covers: (file) => file.startsWith('mobile/') },
-  { path: 'scripts/lint-baseline.json', covers: () => true },
+  { path: 'mobile/lint-baseline.json', covers: (file) => file.startsWith('mobile/'), sections: ['timers', 'raf', 'useEffect'] },
+  { path: 'scripts/lint-baseline.json', covers: () => true, sections: ['timers', 'raf'] },
 ];
-const SKIP_DIRS = new Set(['node_modules', 'build', 'dist', 'dist-node', 'Pods', '.expo', '.gradle']);
+const SKIP_DIRS = new Set(['node_modules', 'build', 'dist', 'dist-node', 'dist-site', 'Pods', '.expo', '.gradle', '.git', '.shots', '.claude']);
 const SOURCE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 
 const MESSAGE_DIRS = ['src', 'mobile/src'];
 const MESSAGE_HOME = 'src/engine/errors.ts';
+const CONSOLE_LOG_DIRS = ['src', 'mobile/src'];
 const TIMER_DIRS = ['src', 'mobile/src', 'mobile/modules', 'mobile/scripts', 'mobile/test', 'scripts', 'test'];
+const RAF_DIRS = ['src', 'mobile/src', 'mobile/modules', 'scripts', 'test'];
+const EFFECT_DIRS = ['mobile/src'];
+const PRIVATE_DIRS = ['mobile', 'src-tauri'];
+const PUBLIC_CODE_DIRS = ['src', 'test', 'site'];
 const LAYERS = [
   { dir: 'src/engine', may: ['src/engine'], says: 'src/engine imports nothing outside itself' },
   { dir: 'src/ui', may: ['src/ui', 'src/engine'], says: 'src/ui imports only itself and src/engine' },
 ];
+const MOBILE_LAYERS = [
+  { dir: 'mobile/src/state', forbid: ['mobile/src/components', 'mobile/src/app'], says: 'mobile/src/state stays below UI components and screens' },
+  { dir: 'mobile/src/lib', forbid: ['mobile/src/components', 'mobile/src/app'], says: 'mobile/src/lib stays below UI components and screens' },
+  { dir: 'mobile/src/components', forbid: ['mobile/src/app'], says: 'mobile/src/components does not import routes from mobile/src/app' },
+];
+const ALLOWED_ROOT_MD = new Set([
+  'AGENTS.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'PRIVACY.md', 'README.md', 'SECURITY.md', 'THIRD_PARTY_NOTICES.md',
+]);
+const ALLOWED_SUB_MD = new Set(['mobile/AGENTS.md', 'mobile/README.md', 'trailer/README.md', 'src-tauri/README.md']);
 const ALIASES = { '@engine': 'src/engine', '@shared': 'src/ui' };
 const PLATFORM_GLOBALS = /(?<![\w$])(?:globalThis\s*\.\s*)?(?:document|window|navigator|localStorage|HTMLElement|process|Buffer|__dirname|__filename)(?![\w$])/g;
 
@@ -27,14 +42,14 @@ const posix = (path) => path.split(sep).join('/');
 const inside = (path, dir) => path === dir || path.startsWith(`${dir}/`);
 const lineAt = (code, at) => code.slice(0, at).split('\n').length;
 
-function walk(dir, found = []) {
-  const full = join(root, dir);
+function walk(dir, found = [], matcher = SOURCE) {
+  const full = dir ? join(root, dir) : root;
   if (!existsSync(full)) return found;
   for (const entry of readdirSync(full, { withFileTypes: true })) {
-    const path = `${dir}/${entry.name}`;
+    const path = dir ? `${dir}/${entry.name}` : entry.name;
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) walk(path, found);
-    } else if (SOURCE.test(entry.name)) found.push(path);
+      if (!SKIP_DIRS.has(entry.name)) walk(path, found, matcher);
+    } else if (matcher.test(entry.name)) found.push(path);
   }
   return found;
 }
@@ -269,12 +284,22 @@ function checkMessages(file, code, report) {
 function importTarget(spec, file) {
   const alias = /^(@engine|@shared)(\/.*)?$/.exec(spec);
   if (alias) return ALIASES[alias[1]] + (alias[2] ?? '');
+  if (file.startsWith('mobile/') && spec.startsWith('@/')) {
+    return spec.startsWith('@/assets/') ? `mobile/${spec.slice(2)}` : `mobile/src/${spec.slice(2)}`;
+  }
   return spec.startsWith('.') ? posix(relative(root, resolve(root, dirname(file), spec))) : null;
+}
+
+function importKind(code, at) {
+  const before = code.slice(Math.max(0, at - 40), at);
+  if (/\b(?:from|import)\s*$/.test(before)) return 'static';
+  if (/\b(?:import|require)\s*\(\s*$/.test(before)) return 'dynamic';
+  return null;
 }
 
 function checkLayer(file, code, strings, layer, report) {
   for (const s of strings) {
-    if (!/\b(?:from|import)\s*$|\b(?:import|require)\s*\(\s*$/.test(code.slice(Math.max(0, s.at - 40), s.at))) continue;
+    if (!importKind(code, s.at)) continue;
     const target = importTarget(s.text, file);
     if (target !== null && layer.may.some((dir) => inside(target, dir))) continue;
     report(file, s.at, `${layer.says}, so "${s.text}" can't be imported here. Move what you need into this layer, or have the platform pass it in.`);
@@ -288,10 +313,92 @@ function checkLayer(file, code, strings, layer, report) {
   }
 }
 
-function timerCalls(code) {
-  return [...code.matchAll(/(?<![\w$])(?:setTimeout|sleep)\s*\(/g)]
+function checkMobileLayer(file, code, strings, layer, report) {
+  for (const s of strings) {
+    if (!importKind(code, s.at)) continue;
+    const target = importTarget(s.text, file);
+    if (target !== null && layer.forbid.some((dir) => inside(target, dir))) {
+      report(file, s.at, `${layer.says}, so "${s.text}" can't be imported here. Pass a callback in or move shared logic down into mobile/src/state or mobile/src/lib.`);
+    }
+  }
+}
+
+function checkPrivateImports(file, code, strings, allowDynamic, report) {
+  for (const s of strings) {
+    const kind = importKind(code, s.at);
+    if (!kind || (allowDynamic && kind === 'dynamic')) continue;
+    const target = importTarget(s.text, file) ?? s.text;
+    const hit = PRIVATE_DIRS.find((dir) => inside(target, dir));
+    if (hit) {
+      report(file, s.at, `files outside ${hit}/ cannot import from "${s.text}" because ${hit}/ is excluded from the public copy.`);
+    }
+  }
+}
+
+function checkConsoleLogs(file, code, report) {
+  for (const m of code.matchAll(/(?<![\w$])console\s*\.\s*log\s*\(/g)) {
+    report(file, m.index, 'remove console.log from app/engine source before shipping.');
+  }
+}
+
+function checkMarkdown(problems) {
+  for (const file of walk('', [], /\.md$/i).sort()) {
+    if (ALLOWED_ROOT_MD.has(file) || ALLOWED_SUB_MD.has(file)) continue;
+    if (file.startsWith('docs/') || file.startsWith('.github/')) continue;
+    problems.push(`${file}:1: stray Markdown file outside docs/ and the repo root docs. Move real documentation into docs/ or delete the scratch note.`);
+  }
+}
+
+function callMatches(code, pattern) {
+  return [...code.matchAll(pattern)]
     .filter((m) => !/\bfunction\s*\*?\s*$/.test(code.slice(Math.max(0, m.index - 20), m.index)))
     .map((m) => m.index);
+}
+
+const timerCalls = (code) => callMatches(code, /(?<![\w$])(?:setTimeout|sleep)\s*\(/g);
+const rafCalls = (code) => callMatches(code, /(?<![\w$])requestAnimationFrame\s*\(/g);
+const effectCalls = (code) => callMatches(code, /(?<![\w$])useEffect\s*\(/g);
+
+const BUDGETS = {
+  timers: {
+    dirs: TIMER_DIRS,
+    count: timerCalls,
+    message: (count, allowed, path) =>
+      `this file has ${count} setTimeout or sleep call${count === 1 ? '' : 's'} and its baseline allows ${allowed}. Wait on a real condition (an event, a callback, a poll for the state you need), or put the reason in a comment at the call and raise this file's number under "timers" in ${path}.`,
+  },
+  raf: {
+    dirs: RAF_DIRS,
+    count: rafCalls,
+    message: (count, allowed, path) =>
+      `this file has ${count} requestAnimationFrame call${count === 1 ? '' : 's'} and its baseline allows ${allowed}. Avoid chaining frames as a timing workaround; if a frame loop or post-layout read is required, explain why in a comment at the call and raise this file's number under "raf" in ${path}.`,
+  },
+  useEffect: {
+    dirs: EFFECT_DIRS,
+    count: effectCalls,
+    message: (count, allowed, path) =>
+      `this file has ${count} useEffect call${count === 1 ? '' : 's'} and its baseline allows ${allowed}. Derive state during render or run work in an event handler instead of adding another effect. If an external subscription truly needs one, explain why in a comment and raise this file's number under "useEffect" in ${path}.`,
+  },
+};
+
+function readBaseline(baselinePath, sections) {
+  if (!existsSync(baselinePath)) return Object.fromEntries(sections.map((s) => [s, {}]));
+  const raw = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  // Backward-compatible with flat { "path": count } timer baselines if one exists on an older branch.
+  const structured = sections.some((s) => raw[s] && typeof raw[s] === 'object');
+  if (!structured) {
+    return Object.fromEntries(sections.map((s) => [s, s === 'timers' ? raw : {}]));
+  }
+  return Object.fromEntries(sections.map((s) => [s, raw[s] ?? {}]));
+}
+
+function sameBaseline(a, b, sections) {
+  for (const s of sections) {
+    const ka = Object.keys(a[s] ?? {});
+    const kb = Object.keys(b[s] ?? {});
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) if (a[s][k] !== b[s][k]) return false;
+  }
+  return true;
 }
 
 function main() {
@@ -306,30 +413,56 @@ function main() {
   for (const file of MESSAGE_DIRS.flatMap((dir) => walk(dir))) {
     if (file !== MESSAGE_HOME) checkMessages(file, load(file).code, report);
   }
+  for (const file of CONSOLE_LOG_DIRS.flatMap((dir) => walk(dir))) {
+    checkConsoleLogs(file, load(file).code, report);
+  }
   for (const layer of LAYERS) {
     for (const file of walk(layer.dir)) {
       const { code, strings } = load(file);
       checkLayer(file, code, strings, layer, report);
     }
   }
-
-  const timerFiles = [...new Set(TIMER_DIRS.flatMap((dir) => walk(dir)))].sort();
-  for (const { path, covers } of BASELINES) {
-    const mine = timerFiles.filter((file) => BASELINES.find((b) => b.covers(file)).path === path);
-    const baselinePath = join(root, path);
-    if (!existsSync(baselinePath) && mine.length === 0) continue;
-    const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {};
-    const kept = {};
-    for (const file of mine) {
-      const calls = timerCalls(load(file).code);
-      const allowed = baseline[file] ?? 0;
-      if (calls.length > allowed) {
-        report(file, calls[allowed], `this file has ${calls.length} setTimeout or sleep call${calls.length === 1 ? '' : 's'} and its baseline allows ${allowed}. Wait on a real condition (an event, a callback, a poll for the state you need), or put the reason in a comment at the call and raise this file's number in ${path}.`);
-      }
-      const lowest = Math.min(calls.length, allowed);
-      if (lowest > 0) kept[file] = lowest;
+  for (const layer of MOBILE_LAYERS) {
+    for (const file of walk(layer.dir)) {
+      const { code, strings } = load(file);
+      checkMobileLayer(file, code, strings, layer, report);
     }
-    if (Object.keys(baseline).some((file) => kept[file] !== baseline[file])) {
+  }
+  for (const file of PUBLIC_CODE_DIRS.flatMap((dir) => walk(dir))) {
+    const { code, strings } = load(file);
+    checkPrivateImports(file, code, strings, false, report);
+  }
+  for (const file of walk('scripts')) {
+    const { code, strings } = load(file);
+    checkPrivateImports(file, code, strings, true, report);
+  }
+  checkMarkdown(problems);
+
+  for (const { path, covers, sections } of BASELINES) {
+    const baselinePath = join(root, path);
+    const allCovered = [...new Set(sections.flatMap((s) => BUDGETS[s].dirs.flatMap((dir) => walk(dir))))]
+      .filter((file) => BASELINES.find((b) => b.covers(file)).path === path);
+    if (!existsSync(baselinePath) && allCovered.length === 0) continue;
+    const baseline = readBaseline(baselinePath, sections);
+    const kept = {};
+    for (const section of sections) {
+      const budget = BUDGETS[section];
+      const mine = [...new Set(budget.dirs.flatMap((dir) => walk(dir)))]
+        .filter((file) => BASELINES.find((b) => b.covers(file)).path === path)
+        .sort();
+      const keptSection = {};
+      for (const file of mine) {
+        const calls = budget.count(load(file).code);
+        const allowed = baseline[section][file] ?? 0;
+        if (calls.length > allowed) {
+          report(file, calls[allowed], budget.message(calls.length, allowed, path));
+        }
+        const lowest = Math.min(calls.length, allowed);
+        if (lowest > 0) keptSection[file] = lowest;
+      }
+      kept[section] = keptSection;
+    }
+    if (!sameBaseline(baseline, kept, sections)) {
       // CI can't commit the lower numbers, and a stale higher number there is harmless until someone runs this locally.
       if (process.env.CI) console.log(`${path} is higher than the code needs. Run npm run lint locally to lower it.`);
       else {

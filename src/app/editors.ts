@@ -173,7 +173,7 @@ function editorDialog(
   const dialog = h('dialog', { class: `mx mx-${kind}`, 'aria-label': spec.text.title },
     h('form', { method: 'dialog' },
       h('h2', {}, spec.text.title),
-      h('p', { class: 'mx-sub' }, extra.inline ? 'Fill in the grid — inserts straight into your expression.' : spec.text.subtitle),
+      extra.inline ? null : spec.text.subtitle ? h('p', { class: 'mx-sub' }, spec.text.subtitle) : null,
       extra.inline ? null : h('div', { class: 'mx-head' },
         h('label', {}, h('span', {}, 'Name'), nameCtrl.input),
         hint,
@@ -386,6 +386,7 @@ export function openFormBuilder(kind: FormBuilderKind, startMode?: string): void
     seedDefaults();
     const mode = spec.modes[modeIdx];
     noteEl.textContent = mode.note;
+    noteEl.hidden = !mode.note;
     if (modeBar) {
       modeBar.replaceChildren(...spec.modes.map((m, i) => {
         const b = h('button', {
@@ -464,7 +465,7 @@ export function openFormBuilder(kind: FormBuilderKind, startMode?: string): void
   const dialog = h('dialog', { class: `mx fb-dialog fb-${kind}`, 'aria-label': spec.title },
     h('form', { method: 'dialog' },
       h('h2', {}, spec.title),
-      h('p', { class: 'mx-sub' }, spec.subtitle),
+      spec.subtitle ? h('p', { class: 'mx-sub' }, spec.subtitle) : null,
       modeBar,
       noteEl,
       presetBar,

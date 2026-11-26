@@ -3,7 +3,6 @@ import type { RowResult } from '../engine/document';
 import { lineCopy } from '../ui/document';
 import { copyableValue, slotInfo } from '../ui/linestate';
 import { caretAt } from './mathdom';
-import { play } from './sound';
 import { TYPING_PAUSE_MS } from '../ui/text';
 import { backspaceEdit, matrixPrevCell, matrixRowStep, slotForEnd, slotStep } from '../ui/slots';
 import type { Row } from './docmodel';
@@ -152,7 +151,7 @@ export function makeGutter(row: Row): { gutter: HTMLElement; idx: HTMLElement; c
     row.hidden = !row.hidden;
     sheetChanged();
   });
-  const gutter = h('div', { class: 'gutter', title: 'Right-click or long-press for line actions' }, idx, chip);
+  const gutter = h('div', { class: 'gutter' }, idx, chip);
   gutter.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     openLineMenu(row, e.clientX, e.clientY);
@@ -161,7 +160,7 @@ export function makeGutter(row: Row): { gutter: HTMLElement; idx: HTMLElement; c
   gutter.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
     clearTimeout(hold);
-    hold = window.setTimeout(() => { play('toggle'); openLineMenu(row, e.clientX, e.clientY); }, 420);
+    hold = window.setTimeout(() => { openLineMenu(row, e.clientX, e.clientY); }, 420);
   });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) gutter.addEventListener(ev, () => clearTimeout(hold));
   return { gutter, idx, chip };

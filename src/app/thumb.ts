@@ -1,6 +1,5 @@
 import { AC } from '../ui/keypad';
 import { USAGE } from '../ui/complete';
-import { play } from './sound';
 import { matrixAddRow } from '../ui/slots';
 import { FLUIDS, TABS, ROW1, type Tile, tileKey, faceRuns, tileLabel, tileCaption, tileFor, hasFluidChips } from '../ui/thumbindex';
 import { h } from './dom';
@@ -25,7 +24,7 @@ const deckPadBtn = h('button', {
   class: 'deck-pad ti-close lit',
   'aria-label': 'Number pad',
   'aria-pressed': 'true',
-  title: 'Back to number pad',
+  title: 'Number pad',
 }, '123');
 deckPadBtn.addEventListener('mousedown', (e) => e.preventDefault());
 deckPadBtn.addEventListener('click', () => {
@@ -34,11 +33,9 @@ deckPadBtn.addEventListener('click', () => {
     if (!keypadOn()) setKeypad(true);
     toggleSysKeyboard();
   } else if (ti.tab !== null) {
-    play('toggle');
     closeThumb();
     if (narrow.matches && !keypadOn()) setKeypad(true);
   } else if (narrow.matches) {
-    play('toggle');
     setKeypad(!keypadOn());
   }
 });
@@ -51,7 +48,7 @@ const deckKbBtn = h('button', {
   type: 'button',
   class: 'deck-kb',
   'aria-label': 'Use system keyboard',
-  title: 'Switch to system keyboard',
+  title: 'System keyboard',
 }, 'ABC');
 deckKbBtn.addEventListener('mousedown', (e) => e.preventDefault());
 deckKbBtn.addEventListener('click', () => { closeThumb(); toggleSysKeyboard(); });
@@ -79,7 +76,6 @@ export function buildThumbRows(): void {
     b.insertAdjacentHTML('afterbegin', TAB_ICONS[i]);
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', (e) => {
-      play('toggle');
       b.classList.remove('pop');
       void b.offsetWidth;
       b.classList.add('pop');
@@ -196,7 +192,6 @@ export function turnPage(dir: number): void {
   if (n < 2) return;
   const onTile = (document.activeElement as HTMLElement | null)?.classList.contains('ti-tile');
   const onSeg = (document.activeElement as HTMLElement | null)?.classList.contains('ti-seg');
-  play('detent');
   ti.page = (ti.page + dir + n) % n;
   drawThumbPage();
   placeThumbPage();
@@ -218,7 +213,6 @@ export function closeThumb(): void {
 }
 function chooseTile(tile: Tile): void {
   closeThumb();
-  play('fn');
   const view = activeId ? views.get(activeId) : undefined;
   const inp = view?.input;
   if (tile.matrixRow && inp) {
@@ -273,7 +267,6 @@ function drawThumbPage(): void {
       const b = tapButton(h('button', { type: 'button', role: 'tab', class: 'ti-seg', 'aria-selected': String(j === ti.page), tabindex: j === ti.page ? '0' : '-1' }, q.name));
       b.addEventListener('click', () => {
         if (ti.page === j) return;
-        play('detent');
         ti.page = j;
         drawThumbPage();
         placeThumbPage();
@@ -286,12 +279,12 @@ function drawThumbPage(): void {
     ? h('div', { class: 'ti-chips', role: 'radiogroup', 'aria-label': 'Refrigerant' }, h('span', { class: 'ti-chips-label', 'aria-hidden': 'true' }, 'Fluid'), ...FLUIDS.map((f) => {
       const on = f.key.ins === ti.fluid;
       const b = tapButton(h('button', { type: 'button', role: 'radio', class: 'ti-chip', 'aria-checked': String(on), 'aria-label': `R-${f.label}` }, f.label));
-      b.addEventListener('click', () => { play('detent'); ti.fluid = f.key.ins!; drawThumbPage(); placeThumbPage(); });
+      b.addEventListener('click', () => { ti.fluid = f.key.ins!; drawThumbPage(); placeThumbPage(); });
       return b;
     }))
     : null;
-  const note = h('div', { class: 'ti-note', 'aria-live': 'polite' }, pg.note ?? t.subtitle);
-  const resetNote = () => { note.replaceChildren(pg.note ?? t.subtitle); };
+  const note = h('div', { class: 'ti-note', 'aria-live': 'polite' });
+  const resetNote = () => { note.replaceChildren(); };
   const setNote = (sig: string, what: string) => {
     note.replaceChildren(h('b', { class: 'ti-note-sig' }, sig), ' ', h('span', { class: 'ti-note-what' }, what));
   };
@@ -323,7 +316,7 @@ function drawThumbPage(): void {
     hero = tapButton(h('button', { type: 'button', class: 'ti-tile ti-editor ti-hero', 'aria-label': editor.label, title: editor.title },
       h('span', { class: 'ti-hero-copy' }, h('span', { class: 'ti-face' }, editor.face), h('span', { class: 'ti-name', 'aria-hidden': 'true' }, editor.name)),
       h('span', { class: 'ti-hero-chev', 'aria-hidden': 'true' }, '›')));
-    hero.addEventListener('click', () => { closeThumb(); play('fn'); openBuilder(editor.editor, editor.mode); });
+    hero.addEventListener('click', () => { closeThumb(); openBuilder(editor.editor, editor.mode); });
     hero.addEventListener('mouseenter', () => setNote(editor.face, editor.title));
     hero.addEventListener('focus', () => setNote(editor.face, editor.title));
     hero.addEventListener('mouseleave', resetNote);

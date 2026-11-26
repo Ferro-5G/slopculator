@@ -14,7 +14,7 @@ export const PRIVACY: { heading: string; paragraphs: string[] }[] = [
   {
     heading: 'How the app runs',
     paragraphs: [
-      'All of the code, fonts, and sounds are bundled into the page itself. Once loaded, Slopculator works offline without talking to a server. The standalone HTML file from GitHub works the same way straight from your computer.',
+      'All of the code and fonts are bundled into the page itself. Once loaded, Slopculator works offline without talking to a server. The standalone HTML file from GitHub works the same way straight from your computer.',
     ],
   },
   {

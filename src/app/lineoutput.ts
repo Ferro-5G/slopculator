@@ -11,7 +11,6 @@ import { leadingOperator, errorFixes, UNFINISHED_HINT, isStrayComma, lineErrorTe
 import { warningFixes } from '../ui/linestate';
 import { mathNode, mapSource } from './mathdom';
 import { type SliderRange, wholeAwareRange } from '../ui/slider';
-import { play } from './sound';
 import { typeset, assignsLiteral, BLOCK_LIST_MAX, type SheetNames } from '../ui/typeset';
 import type { Row } from './docmodel';
 import { h } from './dom';
@@ -29,11 +28,10 @@ import { doc, renderNow, saveSoon, setKeepSelection, rowIndex, results, setTarge
 /** `names` is what the sheet defines (and `namesKey` its key), so a word sets as letters where the engine splits it. */
 export function renderTex(v: RowView, row: Extract<Row, { kind: 'expr' }>, r: RowResult, names?: SheetNames, namesKey = ''): void {
   if (!v.tex) return;
-  const look = doc.ui.look ?? 'modern';
-  const key = r.error ? '' : `${look}\n${namesKey}\n${row.text}`;
+  const key = r.error ? '' : `${namesKey}\n${row.text}`;
   if (key === v.texKey) return;
   v.texKey = key;
-  const boxes = key ? typeset(row.text, { stack: look !== 'retro', names, listMax: BLOCK_LIST_MAX }) : null;
+  const boxes = key ? typeset(row.text, { stack: true, names, listMax: BLOCK_LIST_MAX }) : null;
   v.el.classList.toggle('typeset', !!boxes);
   if (!boxes) {
     v.tex.replaceChildren();
@@ -149,7 +147,6 @@ export function renderOut(v: RowView, r: RowResult, o: DisplayOpts): void {
       e.stopPropagation();
       if (v.el.classList.contains('blk')) {
         const opened = v.el.classList.toggle('warn-open');
-        play('toggle');
         if (opened) v.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       } else if (rowOf?.kind === 'expr') {
         selectSpan(rowOf, check);
@@ -215,7 +212,7 @@ export function renderOut(v: RowView, r: RowResult, o: DisplayOpts): void {
       const raw = box.textContent ?? '';
       const digits = raw.replace(/[^0-9]/g, '').length;
       box.textContent = groupDigits(raw);
-      const cue = h('span', { class: 'long-cue', hidden: true }, `Scroll this answer · ${digits.toLocaleString('en-US')} digits`);
+      const cue = h('span', { class: 'long-cue', hidden: true }, `${digits.toLocaleString('en-US')} digits`);
       parts.push(cue);
       const more = () => box.classList.toggle('more', box.scrollTop + box.clientHeight < box.scrollHeight - 1);
       box.addEventListener('scroll', more, { passive: true });
@@ -237,7 +234,7 @@ export function renderOut(v: RowView, r: RowResult, o: DisplayOpts): void {
     (fixes.find((b) => b.textContent === focusedFix) ?? fixes[0])?.focus();
   }
   const fixes = lineFixes(v);
-  if (fixes.length === 1) fixes[0].title = `${fixes[0].title} (${kb('Ctrl+Enter')})`;
+  if (fixes.length === 1) fixes[0].title = fixes[0].title ? `${fixes[0].title} (${kb('Ctrl+Enter')})` : kb('Ctrl+Enter');
 }
 /** `shown`: only those on screen now (the stylesheet holds a warning back while typing), which are the ones Tab and Ctrl/⌘+Enter can reach. */
 export function lineFixes(v: RowView, shown = false): HTMLButtonElement[] {
@@ -255,7 +252,7 @@ function renderWarning(v: RowView, row: Row | undefined, warning: LineWarning | 
   text.addEventListener('pointerdown', (e) => e.stopPropagation());
   text.addEventListener('click', (e) => { e.stopPropagation(); selectSpan(row, warning); });
   const fixButton = (fix: string) => {
-    const btn = h('button', { type: 'button', class: 'fix', title: `Change the line to ${fix}` }, `Use ${fix.trim()}`);
+    const btn = h('button', { type: 'button', class: 'fix' }, `Use ${fix.trim()}`);
     btn.addEventListener('pointerdown', (e) => e.stopPropagation());
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -267,12 +264,11 @@ function renderWarning(v: RowView, row: Row | undefined, warning: LineWarning | 
   const fixes = warningFixes(warning).map(fixButton);
   if (warning.switchAngle) {
     const toDeg = warning.switchAngle === 'deg';
-    const sw = h('button', { type: 'button', class: 'fix', title: toDeg ? 'Switch angle mode to Degrees' : 'Switch angle mode to Radians' }, toDeg ? 'Switch to Deg' : 'Switch to Rad');
+    const sw = h('button', { type: 'button', class: 'fix' }, toDeg ? 'Switch to Deg' : 'Switch to Rad');
     sw.addEventListener('pointerdown', (e) => e.stopPropagation());
     sw.addEventListener('click', (e) => {
       e.stopPropagation();
       v.el.classList.remove('warn-open');
-      play('toggle');
       setMode(MODES.angle, toDeg);
     });
     fixes.push(sw);
@@ -401,10 +397,9 @@ function buildDist(row: Extract<Row, { kind: 'expr' }>): HTMLElement {
       preset('right', 'P(X > a)', () => presets().right),
       preset('clear', 'No shading', () => DIST_OFF),
       ...[1, 2, 3].map((k) =>
-        h('button', { type: 'button', class: 'preset sigma', title: `Shade μ − ${k}σ to μ + ${k}σ (${k === 1 ? '68' : k === 2 ? '95' : '99.7'}% by the empirical rule)`, onclick: () => {
+        h('button', { type: 'button', class: 'preset sigma', title: `μ ± ${k}σ (${k === 1 ? '68' : k === 2 ? '95' : '99.7'}%)`, onclick: () => {
           const band = presets().bands[k - 1];
           if (!band) return;
-          play('fn');
           shade(band);
         } }, `±${k}σ`),
       ),

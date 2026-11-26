@@ -8,7 +8,6 @@ export const KEYS = {
   document: 'slopculator:v1',
   sessions: 'slopculator:sessions',
   current: CURRENT_SHEET_KEY,
-  pride: 'slopculator:pride',
   left: 'slopculator:left',
   recentFunctions: 'slopculator.recentFunctions',
   /** Set once the first run's example has been put on a sheet, so it never comes back by itself. */

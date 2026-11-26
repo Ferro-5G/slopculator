@@ -140,7 +140,7 @@ function paintStep(o: OpenLine, sid: string): void {
   const v = el.querySelector<HTMLElement>('.v')!;
   v.textContent = el.classList.contains('full') && s.error && s.status === 'fails' ? s.error.text : stepAnswer(s, opts());
   v.classList.toggle('eq', s.status === 'ok');
-  el.title = s.error && s.status === 'fails' ? s.error.text : s.status === 'ok' ? 'Click to copy' : '';
+  el.title = s.error && s.status === 'fails' ? s.error.text : s.status === 'ok' ? 'Copy' : '';
 }
 
 /**
@@ -151,7 +151,6 @@ export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean,
   const room = new Map<string, Size>();
   const seen = new Set<string>();
   const defined = new Set(sheetDefiners(doc.rows, results, { lineNames: doc.settings.lineNames }).keys());
-  const look = doc.ui.look ?? 'modern';
   doc.rows.forEach((row, k) => {
     const v = views.get(row.id);
     if (!v || row.kind !== 'expr') return;
@@ -161,7 +160,6 @@ export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean,
     if (b) {
       b.hidden = !can;
       b.setAttribute('aria-expanded', String(!!row.open && can));
-      b.title = row.open ? 'Hide the steps' : 'Show the steps';
       b.classList.toggle('bad', !!r?.error);
     }
     const u = can && row.open ? unfoldSteps(row.text, { rows: doc.rows, settings: doc.settings, id: row.id, results }) : null;
@@ -192,9 +190,9 @@ export function syncUnfold(host: HTMLElement, composerId: string, wide: boolean,
     for (const [i, sid] of ids.entries()) {
       const s = u.steps.find((x) => x.id === sid)!;
       const el = stepEl(o, sid, i);
-      const textKey = `${look}\n${s.text}`;
+      const textKey = s.text;
       if (o.texts.get(sid) !== textKey) {
-        const boxes = typeset(s.text, { stack: look !== 'retro', names: sheetNames });
+        const boxes = typeset(s.text, { stack: true, names: sheetNames });
         el.querySelector('.sm')!.replaceChildren(boxes ? mathNode(boxes) : s.text);
         o.texts.set(sid, textKey);
       }

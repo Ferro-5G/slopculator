@@ -1,7 +1,6 @@
 import { addPopover, closePopovers } from './overlay';
 import { CHOICES, SWITCHES } from '../ui/modes';
 import { ROUND_SLIDER_MAX, roundToSlider, roundShort } from '../ui/rounding';
-import { play } from './sound';
 import { syncers, seg, toggle, MODES, setMode, bindRound } from './controls';
 import { h, iconLabel, roving } from './dom';
 import { motionNow } from './feedback';
@@ -11,11 +10,11 @@ import { openPalette } from './palette';
 import { kb, narrow, isMac } from './platform';
 import { views, isLineField } from './rowviews';
 import { doc, activeId } from './sheet';
-import { setKeypad, keypadOn, setGraph, graphOn } from './shell';
+import { setKeypad, keypadOn, setGraph, graphOn, setNodesMode, nodesOn } from './shell';
 import { appearBody, setAppear } from './theme';
 import { PresenceMotion } from './motion';
 
-const roundSlider = h('input', { type: 'range', class: 'slider round-slider', min: '0', max: String(ROUND_SLIDER_MAX), step: '1', 'aria-label': 'Rounding', title: 'Rounding for every result and for copying' }) as HTMLInputElement;
+const roundSlider = h('input', { type: 'range', class: 'slider round-slider', min: '0', max: String(ROUND_SLIDER_MAX), step: '1', 'aria-label': 'Rounding' }) as HTMLInputElement;
 const roundOut = h('output', { class: 'round-out' });
 /** The bar and its menu have less room than the sheet: [what the group is called, the short word for each side]. */
 const SEG_WORDS = {
@@ -37,22 +36,20 @@ function modeToggle(id: keyof typeof MODES, name: string, title: string): HTMLEl
   b.dataset.mode = id;
   return b;
 }
-const PERCENT_TITLE = 'Adding a percent. 92: 15% of 80 is added. 80.15: 15% is read as 0.15';
-const WORKING_TITLE = 'Angle units under trig answers, substituted formulas, the unit circle drawing and asymptote lines. Answers are the same either way.';
+const WORKING_TITLE = 'Angle units, substituted formulas, unit circle, and asymptotes';
 function percentSeg(): HTMLElement {
   const el = modeSeg('addPercent');
-  el.title = PERCENT_TITLE;
   for (const b of el.querySelectorAll('button')) b.removeAttribute('title');
   return el;
 }
-const graphModeBtn = h('button', { type: 'button', class: 'tog', 'aria-pressed': 'true', title: kb('Show or hide the graph (Ctrl+Alt+Shift+G)'), onclick: () => { play('toggle'); setGraph(!graphOn()); } }, 'Graph');
+const graphModeBtn = h('button', { type: 'button', class: 'tog', 'aria-pressed': 'true', title: kb('Graph (Ctrl+Alt+Shift+G)'), onclick: () => setGraph(!graphOn()) }, 'Graph');
 syncers.push(() => graphModeBtn.setAttribute('aria-pressed', String(graphOn())));
 const modeMenu = h('div', { class: 'menu mode-menu', role: 'group', 'aria-label': 'Modes', hidden: true },
   h('div', { class: 'mode-row', 'data-bar': 'angle' }, h('span', {}, 'Angle'), modeSeg('angle')),
   h('div', { class: 'mode-row', 'data-bar': 'answers' }, h('span', {}, 'Answers'), modeSeg('answers')),
   h('div', { class: 'mode-row' }, h('span', {}, 'Huge answers'), modeSeg('huge')),
   h('div', { class: 'mode-row', 'data-bar': 'sd' }, h('span', {}, 'Std dev'), modeSeg('sd')),
-  h('div', { class: 'mode-row pct-row', title: PERCENT_TITLE }, h('span', {}, '80 + 15% ='), percentSeg()),
+  h('div', { class: 'mode-row pct-row' }, h('span', {}, '80 + 15% ='), percentSeg()),
   h('div', { class: 'mode-row', title: WORKING_TITLE }, h('span', {}, 'Working'), modeSeg('working')),
   h('div', { class: 'mode-row toggles', 'data-bar': 'percent letters complex' }, h('span', {}, 'Also'), h('div', { class: 'togs' },
     modeToggle('percent', '%', 'Show probabilities as percents (Ctrl+Alt+P)'),
@@ -118,11 +115,11 @@ function syncModes(): void {
 // then Appearance, Keypad, Graph, File and ?. A window too narrow for them all folds the lowest first (Round, a+bi,
 // A=line, %, Pop|Sample, Dec|Exact, Deg|Rad) out of the bar; Modes opens every mode, those included. The phone keeps
 // its pills and its sheet.
-const barRound = h('input', { type: 'range', class: 'slider round-slider bar-round-slider', min: '0', max: String(ROUND_SLIDER_MAX), step: '1', 'aria-label': 'Rounding', title: 'Rounding for every result and for copying' }) as HTMLInputElement;
+const barRound = h('input', { type: 'range', class: 'slider round-slider bar-round-slider', min: '0', max: String(ROUND_SLIDER_MAX), step: '1', 'aria-label': 'Rounding' }) as HTMLInputElement;
 const barRoundOut = h('output', { class: 'round-out' });
 const roundChipText = h('span', {}, 'Round: Auto');
 const roundPop = h('div', { class: 'round-pop', role: 'dialog', 'aria-label': 'Rounding', hidden: true }, h('label', { class: 'bar-round' }, h('span', {}, 'Round'), barRound, barRoundOut));
-const roundChip = h('button', { type: 'button', class: 'tog round-chip', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Rounding for every result and for copying' }, roundChipText);
+const roundChip = h('button', { type: 'button', class: 'tog round-chip', 'aria-haspopup': 'dialog', 'aria-expanded': 'false' }, roundChipText);
 // The bar clips what overflows it (that's how items fold), so the popover sits on the page under the chip.
 const setRoundPop = (open: boolean) => {
   if (open && !roundPop.isConnected) document.body.append(roundPop);
@@ -142,9 +139,9 @@ const barModes = {
   answers: foldable(modeSeg('answers'), 6),
   sd: foldable(modeSeg('sd'), 5),
   // Words a newcomer can read; the old shorthand (%, A=line, a+bi) is in each one's title.
-  percent: foldable(modeToggle('percent', 'Percent', 'Percent (%): show probabilities as percents (Ctrl+Alt+P)'), 4),
-  letters: foldable(modeToggle('letters', 'Line letters', 'Line letters (A=line): line 1 is A, line 2 is B, … (Ctrl+Alt+L)'), 3),
-  complex: foldable(longLabel(modeToggle('complex', 'Complex', 'Complex numbers (a+bi): √(−1) = i'), 'Complex', ' numbers'), 2),
+  percent: foldable(modeToggle('percent', 'Percent', 'Show probabilities as percents (Ctrl+Alt+P)'), 4),
+  letters: foldable(modeToggle('letters', 'Line letters', 'Line 1 is A, line 2 is B, … (Ctrl+Alt+L)'), 3),
+  complex: foldable(longLabel(modeToggle('complex', 'Complex', '√(−1) = i'), 'Complex', ' numbers'), 2),
 };
 const deskModes = h('div', { class: 'desk-modes', role: 'group', 'aria-label': 'Modes' },
   barModes.angle, barModes.answers, barModes.sd,
@@ -154,9 +151,9 @@ const deskModes = h('div', { class: 'desk-modes', role: 'group', 'aria-label': '
   foldable(roundChip, 1),
 );
 // A menu button, so it says so with its ▾ and isn't mistaken for one of the toggles beside it.
-const deskMore = h('button', { type: 'button', class: 'pill desk-more', 'aria-haspopup': 'true', 'aria-expanded': 'false', title: 'More modes: huge answers, adding a percent and rounding, and any the bar has no room for' }, 'Modes');
-export const barKeypad = h('button', { type: 'button', class: 'bar-tog', 'aria-controls': 'keypad', title: kb('Show or hide the keypad (Ctrl+Alt+Shift+K)'), onclick: () => { play('toggle'); setKeypad(!keypadOn()); } }, 'Keypad');
-export const barGraph = h('button', { type: 'button', class: 'bar-tog', title: kb('Show or hide the graph (Ctrl+Alt+Shift+G)'), onclick: () => { play('toggle'); setGraph(!graphOn()); } }, 'Graph');
+const deskMore = h('button', { type: 'button', class: 'pill desk-more', 'aria-haspopup': 'true', 'aria-expanded': 'false' }, 'Modes');
+export const barKeypad = h('button', { type: 'button', class: 'bar-tog', 'aria-controls': 'keypad', title: kb('Keypad (Ctrl+Alt+Shift+K)'), onclick: () => setKeypad(!keypadOn()) }, 'Keypad');
+export const barGraph = h('button', { type: 'button', class: 'bar-tog', title: kb('Graph (Ctrl+Alt+Shift+G)'), onclick: () => setGraph(!graphOn()) }, 'Graph');
 export const refitBar = () => requestAnimationFrame(fitBar);
 
 export function fitBar(): void {
@@ -181,14 +178,14 @@ function placeBar(): void {
   else if (modeBar.parentElement !== app) app.insertBefore(modeBar, main);
   refitBar();
 }
-const headFind = h('button', { type: 'button', class: 'head-find', 'aria-label': 'Find a function', 'aria-keyshortcuts': isMac ? 'Meta+K' : 'Control+K', title: kb('Find a function or command (Ctrl+K)'), onclick: () => openPalette() }, ...iconLabel('search', 'Find'), h('kbd', { class: 'find-key', 'aria-hidden': 'true' }, isMac ? '⌘K' : 'Ctrl K'));
+const headFind = h('button', { type: 'button', class: 'head-find', 'aria-label': 'Find a function', 'aria-keyshortcuts': isMac ? 'Meta+K' : 'Control+K', onclick: () => openPalette() }, ...iconLabel('search', 'Find'), h('kbd', { class: 'find-key', 'aria-hidden': 'true' }, isMac ? '⌘K' : 'Ctrl K'));
 export const headPill = h('div', { class: 'head-pill', role: 'group', 'aria-label': 'Find and file' });
 export const SLIDERS_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 4.5h7M12.5 4.5H14M2 11.5h1.5M7 11.5h7"/><circle cx="10.75" cy="4.5" r="1.75"/><circle cx="5.25" cy="11.5" r="1.75"/></svg>';
-const modesMore = h('button', { type: 'button', class: 'pill more', 'aria-label': 'Modes', 'aria-haspopup': 'dialog', title: 'Modes' });
+const modesMore = h('button', { type: 'button', class: 'pill more', 'aria-label': 'Modes', 'aria-haspopup': 'dialog' });
 function choice(label: string, a: [string, string], b: [string, string], isA: () => boolean, set: (a: boolean) => void): HTMLElement {
   const opt = ([name, hint]: [string, string], v: boolean) => {
     const el = h('button', { type: 'button', role: 'radio' }, h('span', { class: 'name' }, name), h('span', { class: 'hint' }, hint));
-    el.addEventListener('click', () => { if (isA() !== v) { play('toggle'); set(v); } });
+    el.addEventListener('click', () => { if (isA() !== v) set(v); });
     return el;
   };
   const ea = opt(a, true), eb = opt(b, false);
@@ -206,7 +203,7 @@ function switchRow(name: string, hint: string, get: () => boolean, set: (v: bool
   const el = h('button', { type: 'button', role: 'switch', class: 'ms-switch' },
     h('span', { class: 'ms-text' }, h('span', { class: 'name' }, name), h('span', { class: 'hint' }, hint)),
     h('span', { class: 'knob', 'aria-hidden': 'true' }));
-  el.addEventListener('click', () => { play('toggle'); set(!get()); });
+  el.addEventListener('click', () => set(!get()));
   const sync = () => el.setAttribute('aria-checked', String(get()));
   syncers.push(sync);
   sync();
@@ -216,10 +213,11 @@ const sheetRound = h('input', { type: 'range', class: 'ms-round', min: '0', max:
 const sheetRoundOut = h('output', { class: 'ms-round-out' });
 const modeSheetDone = h('button', { type: 'button', class: 'ms-done' }, 'Done');
 const msAppear = h('section', { class: 'ms-group ms-appear' }, h('h3', {}, 'Appearance'));
-const msJumpThemes = h('button', { type: 'button', class: 'ms-jump', onclick: () => { play('toggle'); msAppear.scrollIntoView({ block: 'start', behavior: motionNow() === 'full' ? 'smooth' : 'auto' }); } }, 'Themes');
+const msJumpThemes = h('button', { type: 'button', class: 'ms-jump', onclick: () => msAppear.scrollIntoView({ block: 'start', behavior: motionNow() === 'full' ? 'smooth' : 'auto' }) }, 'Themes');
 const msBody = h('div', { class: 'ms-body' },
   ...(Object.keys(CHOICES) as (keyof typeof CHOICES)[]).map((id) => choice(CHOICES[id].title, CHOICES[id].a, CHOICES[id].b, MODES[id].on, (v) => setMode(MODES[id], v))),
   h('section', { class: 'ms-group' }, h('h3', {}, 'Also'), h('div', { class: 'ms-list' },
+    switchRow('Node canvas', '2D node grid on a phone', nodesOn, setNodesMode),
     ...(Object.keys(SWITCHES) as (keyof typeof SWITCHES)[]).map((id) => switchRow(SWITCHES[id].title, SWITCHES[id].hint, MODES[id].on, (v) => setMode(MODES[id], v))),
   )),
   h('section', { class: 'ms-group' }, h('h3', {}, 'Rounding', sheetRoundOut),
@@ -269,7 +267,6 @@ export function openModeSheet(section?: 'appear'): void {
     if (section === 'appear') msAppear.scrollIntoView({ block: 'start', behavior: motionNow() === 'full' ? 'smooth' : 'auto' });
     return;
   }
-  play('toggle');
   closePopovers();
   msAppear.append(appearBody);
   if (modeSheetMotion.phase === 'closed') {
@@ -356,7 +353,7 @@ export function initSettings(): void {
   bindRound(sheetRound, (pl) => {
     sheetRound.style.setProperty('--fill', `${(roundToSlider(pl) / ROUND_SLIDER_MAX) * 100}%`);
     sheetRoundOut.textContent = pl === null ? 'Auto' : pl === 0 ? 'Whole numbers' : `${pl} decimal place${pl === 1 ? '' : 's'}`;
-  }, (next) => { if (next !== doc.display.places) play('detent'); });
+  });
   document.body.append(modeScrim, modeSheet);
   modeSheet.addEventListener('click', (e) => e.stopPropagation());
   modeSheetDone.addEventListener('click', closeModeSheet);

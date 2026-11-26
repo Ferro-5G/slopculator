@@ -4,12 +4,11 @@ import { plotSVG } from '../ui/svg';
 import type { Draggable } from './graph';
 import { callsWave, draggablePoints, draggedLines, NOTHING_TO_FIT, slidersOnGraph, wantsPiTicks, ZOOM_STEP } from '../ui/plotmodel';
 import { wholeAwareRange } from '../ui/slider';
-import { play } from './sound';
 import { h, roving, ICONS, iconLabel } from './dom';
 import { dragEnds, dragLine } from './edits';
 import { motionNow } from './feedback';
 import { graph, graphHost, marksHint, graphPane, graphChips, graphSliders, graphTools, graphDock, modeBar, announcer, main, splitter } from './layout';
-import { endDragOnRelease, fitRange } from './lineoutput';
+import { endDragOnRelease, fitRange, paintRange } from './lineoutput';
 import { revealRow } from './listscroll';
 import { store, KEYS } from './persistence';
 import { coarse, narrow, kb } from './platform';
@@ -76,9 +75,14 @@ export function syncGraphSliders(): void {
     // Escaped: an id comes from whatever file was imported, and a quote in it made this throw on every render.
     const range = graphSliders.querySelector<HTMLInputElement>(`input[data-row="${CSS.escape(row.id)}"]`);
     if (!range) continue;
+    (range.nextElementSibling as HTMLElement).textContent = String(Number(value.toPrecision(6)));
+    // Hold the slider's ends and step while focused (dragged or moved with keys) so the track never shifts under the pointer.
+    if (document.activeElement === range) {
+      paintRange(range);
+      continue;
+    }
     const rg = wholeAwareRange(value, row.slider);
     fitRange(range, rg, value);
-    (range.nextElementSibling as HTMLElement).textContent = String(Number(value.toPrecision(6)));
   }
 }
 let curvesSeen: Set<string> | null = null;
@@ -145,13 +149,11 @@ export function exportSVG(): void {
     piTicks: wantsPiTicks(doc.rows, results, doc.settings.deg),
   });
   downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `slopculator-graph-${fileDate(true)}.svg`);
-  play('copy');
 }
 export async function copyGraphImage(): Promise<void> {
   if (await graph.copyImage()) {
-    play('copy');
     showToast('Copied the graph image');
-  } else showToast('This browser could not copy images. Use Save as PNG instead');
+  } else showToast("Couldn't copy image. Save as PNG instead.");
 }
 export function graphSummary(): string {
   const parts: string[] = [];
@@ -198,7 +200,7 @@ export function initGraphpane(): void {
       gbtn('minus', '−', 'Zoom out', () => graph.zoomStep(ZOOM_STEP)),
     ),
     h('div', { class: 'gt-group' },
-      gbtn(null, 'fit', kb('Fit to plotted items (Ctrl+Alt+F)'), () => fitGraph(), 'gt-word gt-fit'),
+      gbtn(null, 'fit', kb('Fit (Ctrl+Alt+F)'), () => fitGraph(), 'gt-word gt-fit'),
       squareBtn,
       homeBtn,
     ),
@@ -267,7 +269,6 @@ export function initGraphpane(): void {
       fn();
     }
   });
-  graph.onPin = () => play('toggle');
   // On the canvas the graph block's tools float in its corner over the plot, so nothing is held back from it.
   const syncCover = () => graph.setCover({ top: 0, bottom: 0 });
   new ResizeObserver(syncCover).observe(graphDock);

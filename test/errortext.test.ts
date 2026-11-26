@@ -78,7 +78,7 @@ describe('friendlyError', () => {
     expect(shown('(2 +)')).toBe("Something's missing before )");
   });
   it('covers lines that stop early and empty parentheses', () => {
-    expect(shown('2 +')).toBe('Unfinished: add what comes next');
+    expect(shown('2 +')).toBe('Unfinished');
     expect(shown('()')).toBe('Empty ( )');
   });
   it('leaves everything else alone', () => {
@@ -108,7 +108,7 @@ describe('what a screen reader hears (UX round 4)', () => {
     const { spokenError } = await import('../src/ui/errortext');
     const { isUnit, otherUnit } = await import('../src/engine/units');
     expect(spokenError('*100', 'Unexpected "*"', true, isUnit, otherUnit)).toBe('going on from the line above? Use ans × 100');
-    expect(spokenError('2*(3+', 'Expression ends too early', true, isUnit, otherUnit)).toBe('Unfinished: add what comes next');
+    expect(spokenError('2*(3+', 'Expression ends too early', true, isUnit, otherUnit)).toBe('Unfinished');
     expect(spokenError('3 m + 2 s', 'Unknown name "m". Define it on its own line, like m = 5', false, isUnit, otherUnit)).toBe("error. Length and time can't be added");
     expect(spokenError('*100', 'Unexpected "*"', false, isUnit, otherUnit)).not.toContain('Unexpected');
   });

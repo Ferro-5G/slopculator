@@ -7,7 +7,6 @@ import { type Row, newId } from './docmodel';
 import { pushStep } from './edits';
 import { KEYS, store } from './persistence';
 import { doc, rowsChanged, saveSoon } from './sheet';
-import { play } from './sound';
 
 export const hasExample = (): boolean => doc.rows.some(isExampleRow);
 
@@ -38,7 +37,6 @@ export function clearExample(): void {
   const before = doc.rows;
   const after = before.filter((r) => !isExampleRow(r));
   if (after.length === before.length) return;
-  play('clear');
   const put = (rows: Row[]) => {
     doc.rows = rows;
     rowsChanged();

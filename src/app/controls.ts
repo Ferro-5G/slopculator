@@ -13,8 +13,8 @@ function live(sync: () => void): void {
 export function seg(label: string, a: string, b: string, isA: () => boolean, set: (a: boolean) => void, key: string): HTMLElement {
   // Each label keeps the room its bold takes, so choosing one never changes the control's size (.seg-l).
   const face = (t: string) => h('span', { class: 'seg-l', 'data-label': t }, t);
-  const btnA = h('button', { type: 'button', title: key ? kb(`${a} (Ctrl+Alt+${key})`) : a }, face(a));
-  const btnB = h('button', { type: 'button', title: key ? kb(`${b} (Ctrl+Alt+${key})`) : b }, face(b));
+  const btnA = h('button', { type: 'button', ...(key ? { title: kb(`${a} (Ctrl+Alt+${key})`) } : {}) }, face(a));
+  const btnB = h('button', { type: 'button', ...(key ? { title: kb(`${b} (Ctrl+Alt+${key})`) } : {}) }, face(b));
   const sync = () => {
     btnA.setAttribute('aria-pressed', String(isA()));
     btnB.setAttribute('aria-pressed', String(!isA()));

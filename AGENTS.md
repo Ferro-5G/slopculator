@@ -36,13 +36,17 @@ A feature or behavior reaches every front end together, unless the platform is t
 | When | Run |
 | --- | --- |
 | Any change | `npm run lint`, `npm run typecheck`, `npm test` |
-| Anything visible on the web or desktop | `npm run build`, then `npm run e2e` |
+| Anything visible on the web or desktop | `npm run build`, then `npm run e2e` (or `npm run cli -- ...` / `npm run fuzz:ui` / `npm run perf:ui`) |
 | Before asking for review | `npm run verify`, which is the list CI runs |
 
-The browser suite and native builds are heavy, so run one at a time.
+The browser suite and native builds are heavy, so run one at a time. See [docs/feature-map.md](docs/feature-map.md) for feature names and CLI verification recipes, and [docs/statecharts.md](docs/statecharts.md) for interactive state machines.
 
-`npm run lint` enforces three things beyond the layers above:
+`npm run lint` enforces these rules beyond the shared layers above:
 
 - Failures are read through `readError` and `isWarningNote` in `src/engine/errors.ts`, never by testing their wording.
-- A file can't gain a `setTimeout` or `sleep` past its number in `scripts/lint-baseline.json`. Wait on a real condition. If a timer is the right tool, say why in a comment at the call and raise the number.
-- When a file loses a timer, the lint lowers its number. Commit that change.
+- `console.log` is disallowed in `src/` and `mobile/src/`.
+- Files outside `mobile/` and `src-tauri/` cannot statically import from those directories (`src/`, `test/`, and `site/` cannot import from them at all).
+- Inside `mobile/src/`, `state/` and `lib/` stay below `components/` and `app/`, and `components/` does not import from `app/`.
+- Stray Markdown files outside `docs/` and the repo root docs fail lint.
+- A file can't gain a `setTimeout`/`sleep`, `requestAnimationFrame`, or `useEffect` (in `mobile/src/`) past its number in `scripts/lint-baseline.json` or `mobile/lint-baseline.json`. Wait on a real condition, derive state during render, or run work in an event handler. If one is truly needed, say why in a comment at the call and raise the number.
+- When a file loses one, the lint lowers its number. Commit that change.

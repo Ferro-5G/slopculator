@@ -340,7 +340,7 @@ describe('the first run', () => {
   const example = EXAMPLE_LINES.map((l, k) => ({ id: `e${k}`, kind: 'expr' as const, text: l.text, example: true as const }));
   it('cues the first line until the sheet holds one of the person\'s own', () => {
     expect(composerPlaceholder([...example, { id: 'd', kind: 'expr', text: '' }])).toBe('12 × 7, or r = 4');
-    expect(composerPlaceholder([...example, { id: 'r1', kind: 'expr', text: 'r = 4' }])).toBe('Type a calculation');
+    expect(composerPlaceholder([...example, { id: 'r1', kind: 'expr', text: 'r = 4' }])).toBe('');
   });
   it("wires the example to its own graph, and the person's curves to the sheet's graph, never both", () => {
     const rows: CanvasRow[] = [...example, ...lines('y = 2sin(45x)')];

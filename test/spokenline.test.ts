@@ -35,7 +35,7 @@ describe('spokenLine', () => {
     expect(say(['1 + q'])).toMatch(/^Line 1: error\. q isn't defined/);
   });
   it.each(['nCr(1, )', 'binompdf(10, , 3)', 'integral(x, , 0, 1)', 'round(1.5, )', '[[1, ],[2,3]]', 'nCr(,2)', 'deriv(x^2, , 2)', '[[,],[,]]', 'solve(x=1, )'])('never calls %s an error while the screen says Unfinished', (line) => {
-    expect(say([line])).toBe('Line 1: Unfinished: add what comes next');
+    expect(say([line])).toBe('Line 1: Unfinished');
   });
   it('says the function\'s usage in an empty slot', () => {
     expect(say(['nCr(1, |)'])).toMatch(/^Line 1: nCr\(n, r\)/);

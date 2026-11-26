@@ -25,8 +25,8 @@ export interface Rect extends Point, Size {}
  * `fromPort`: the wire reads one of `from`'s results (src/ui/ports.ts), as A.h reads a state's enthalpy, and leaves
  * from that result's port.
  */
-export interface Wire { from: string; to: string; name: string; fromPort?: string }
-export const wireKey = (w: Pick<Wire, 'from' | 'to'> & { fromPort?: string }): string => `${w.from}${w.fromPort ? `.${w.fromPort}` : ''}>${w.to}`;
+export interface Wire { from: string; to: string; name: string; fromPort?: string; toPin?: number }
+export const wireKey = (w: Omit<Wire, 'name'>): string => `${w.from}${w.fromPort ? `.${w.fromPort}` : ''}>${w.to}${w.toPin === undefined ? '' : `@${w.toPin}`}`;
 
 type Expr = Extract<RowInput, { kind: 'expr' }>;
 /** A sheet's row as the canvas sees it: the engine's input, and whether it belongs to the first run's example. */
@@ -91,16 +91,22 @@ export function namesRead(n: Node, isDefined: (name: string) => boolean, locals:
  * namesRead). `ans` is wired from the line above it. A line with something drawn, and not hidden, is wired to the
  * graph it draws on: the example's own graph for the example's lines, the sheet's graph block for every other line.
  */
-export function sheetWires(rows: readonly CanvasRow[], results: readonly (RowResult | undefined)[], opts: { lineNames?: boolean } = {}): Wire[] {
+export type PinInspector = (
+  row: RowInput,
+  result: RowResult | undefined,
+) => { inputs: readonly { index: number; wiredFrom: { rowId: string; name: string; fromPort?: string } | null }[] } | null;
+
+export function sheetWires(rows: readonly CanvasRow[], results: readonly (RowResult | undefined)[], opts: { lineNames?: boolean; inspectPins?: PinInspector } = {}): Wire[] {
   const definer = sheetDefiners(rows, results, opts);
+  const inspect = opts.inspectPins ?? null;
   const out: Wire[] = [];
   const seen = new Set<string>();
-  const add = (from: string, to: string, name: string, fromPort?: string) => {
+  const add = (from: string, to: string, name: string, fromPort?: string, toPin?: number) => {
     if (from === to) return;
-    const key = wireKey({ from, to, fromPort });
+    const key = wireKey({ from, to, fromPort, toPin });
     if (seen.has(key)) return;
     seen.add(key);
-    out.push(fromPort ? { from, to, name, fromPort } : { from, to, name });
+    out.push({ from, to, name, ...(fromPort ? { fromPort } : {}), ...(toPin === undefined ? {} : { toPin }) });
   };
   const index = new Map(rows.map((r, k) => [r.id, k]));
   const definerOf = (name: string) => {
@@ -115,6 +121,13 @@ export function sheetWires(rows: readonly CanvasRow[], results: readonly (RowRes
   };
   rows.forEach((row, k) => {
     if (!isExpr(row) || isBlank(row)) return;
+    for (const pin of inspect?.(row, results[k])?.inputs ?? []) {
+      const source = pin.wiredFrom;
+      if (!source || source.rowId === row.id) continue;
+      add(source.rowId, row.id, source.name, source.fromPort, pin.index);
+      // Keep legacy dependencies that have no pin, such as the definition of a called function.
+      seen.add(wireKey({ from: source.rowId, to: row.id, fromPort: source.fromPort }));
+    }
     const n = tree(row.text);
     if (n) {
       const own = results[k]?.defines ?? lineDefines(row.text);
@@ -457,13 +470,14 @@ export function flowLayout(blocks: readonly FlowBlock[], wires: readonly Wire[],
  * `lane` nudges the lane a wire takes so wires side by side don't draw as one. `minRun` (across) and `minDrop` (down)
  * prefer routes whose run into `b` is that long, so a tag fits on it.
  */
-export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { inY?: number; inX?: number; lane?: number; gap?: number; minRun?: number; minDrop?: number; outY?: number } = {}): Point[] {
+export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { inY?: number; spreadY?: number; inX?: number; lane?: number; gap?: number; minRun?: number; minDrop?: number; outY?: number } = {}): Point[] {
   const gap = opts.gap ?? 14, lane = opts.lane ?? 0, minRun = opts.minRun ?? 0, minDrop = opts.minDrop ?? minRun;
   const midY = (r: Rect) => r.y + Math.min(r.h / 2, 26);
   // A wire from a readout's port (outY) leaves from the port, on the block's right edge, and nowhere else.
   const port = opts.outY !== undefined;
+  const inputPort = opts.inY !== undefined;
   const outR = { x: a.x + a.w, y: opts.outY ?? midY(a) }, outB = { x: a.x + 28, y: a.y + a.h }, outT = { x: a.x + 28, y: a.y };
-  const inL = { x: b.x, y: opts.inY ?? midY(b) }, inT = { x: opts.inX ?? b.x + 28, y: b.y }, inB = { x: opts.inX ?? b.x + 28, y: b.y + b.h };
+  const inL = { x: b.x, y: opts.inY ?? opts.spreadY ?? midY(b) }, inT = { x: opts.inX ?? b.x + 28, y: b.y }, inB = { x: opts.inX ?? b.x + 28, y: b.y + b.h };
   const right = a.x + a.w, left = b.x;
   const ys = new Set<number>([a.y - gap, a.y + a.h + gap, b.y - gap, b.y + b.h + gap]);
   const xs = new Set<number>([right + gap, left - gap, Math.min(a.x, b.x) - gap - 8]);
@@ -478,9 +492,9 @@ export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { 
       if (o.x + o.w > right && o.x + o.w < left && left - (o.x + o.w) >= 10) mids.add(Math.round((o.x + o.w + left) / 2));
     }
     for (const lx of mids) cands.push([outR, { x: lx, y: outR.y }, { x: lx, y: inL.y }, inL]);
-    if (inT.y > outR.y) cands.push([outR, { x: inT.x, y: outR.y }, inT]);
+    if (!inputPort && inT.y > outR.y) cands.push([outR, { x: inT.x, y: outR.y }, inT]);
   }
-  if (a.y > b.y + b.h) {
+  if (!inputPort && a.y > b.y + b.h) {
     // Up into the foot of b when a sits below it (e.g. a curve below a graph): exit right and turn cleanly up.
     if (inB.x > outR.x) cands.push([outR, { x: inB.x, y: outR.y }, inB]);
     if (!port) {
@@ -492,11 +506,13 @@ export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { 
   }
   if (b.y > a.y + a.h && !port) {
     // Straight down, out of the foot into the top, where the two overlap: a block stepped right under what it reads.
-    const sx = Math.max(a.x, b.x) + 28 + lane;
-    if (sx <= Math.min(a.x + a.w, b.x + b.w) - 28) cands.push([{ x: sx, y: a.y + a.h }, { x: sx, y: b.y }]);
-    // Down: out of the foot, across a lane between them, into the top.
-    const mids = new Set([Math.round((a.y + a.h + b.y) / 2) + lane, ...[...ys].filter((y) => y > a.y + a.h && y < b.y)]);
-    for (const ly of mids) cands.push([outB, { x: outB.x, y: ly }, { x: inT.x, y: ly }, inT]);
+    if (!inputPort) {
+      const sx = Math.max(a.x, b.x) + 28 + lane;
+      if (sx <= Math.min(a.x + a.w, b.x + b.w) - 28) cands.push([{ x: sx, y: a.y + a.h }, { x: sx, y: b.y }]);
+      // Down: out of the foot, across a lane between them, into the top.
+      const mids = new Set([Math.round((a.y + a.h + b.y) / 2) + lane, ...[...ys].filter((y) => y > a.y + a.h && y < b.y)]);
+      for (const ly of mids) cands.push([outB, { x: outB.x, y: ly }, { x: inT.x, y: ly }, inT]);
+    }
     if (inL.x > outB.x) cands.push([outB, { x: outB.x, y: inL.y }, inL]);
   }
   // Round the outside: out of the right edge, along a lane above or below, down the left of b into its left edge.
@@ -512,7 +528,7 @@ export function routeWire(a: Rect, b: Rect, obstacles: readonly Rect[], opts: { 
   // `inX` spreads wires along the top from its left end; here they spread from its right end the same way.
   const inTR = { x: b.x + b.w - 28 - (opts.inX === undefined ? 0 : opts.inX - (b.x + 28)), y: b.y };
   const outer = new Set([right + gap + lane, Math.max(right, b.x + b.w) + gap + lane, ...[...xs].filter((x) => x > right)]);
-  for (const ly of ys) if (ly < b.y && ly > a.y + a.h) for (const x1 of outer) cands.push([outR, { x: x1, y: outR.y }, { x: x1, y: ly }, { x: inTR.x, y: ly }, inTR]);
+  if (!inputPort) for (const ly of ys) if (ly < b.y && ly > a.y + a.h) for (const x1 of outer) cands.push([outR, { x: x1, y: outR.y }, { x: x1, y: ly }, { x: inTR.x, y: ly }, inTR]);
   const segHits = (p: Point, q: Point, r: Rect, pad: number) => {
     const x0 = Math.min(p.x, q.x), x1 = Math.max(p.x, q.x), y0 = Math.min(p.y, q.y), y1 = Math.max(p.y, q.y);
     return x0 < r.x + r.w + pad && x1 > r.x - pad && y0 < r.y + r.h + pad && y1 > r.y - pad;
@@ -692,13 +708,13 @@ export const EXAMPLE_LINES: readonly { text: string; slider?: { min: number; max
 export const EXAMPLE_TITLE = 'Example';
 export const CLEAR_EXAMPLE = 'Clear example';
 /** The first run's example, listed first under Examples while it's off the sheet so it can come back. */
-export const WELCOME_EXAMPLE = { title: 'Welcome example', subtitle: 'Slider, curve, and graph' } as const;
+export const WELCOME_EXAMPLE = { title: 'Welcome example' } as const;
 export const EXAMPLE_CLEARED = 'Example cleared';
 export const isExampleRow = (r: { example?: boolean }): boolean => r.example === true;
 
 /** What the composer says before anything is typed on a sheet with no lines of the person's own: the one blank-state cue. */
 export const FIRST_PLACEHOLDER = '12 × 7, or r = 4';
-export const PLACEHOLDER = 'Type a calculation';
+export const PLACEHOLDER = '';
 
 /** The composer's placeholder: the first-run cue until the sheet holds a line of the person's own. */
 export function composerPlaceholder(rows: readonly CanvasRow[]): string {

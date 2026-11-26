@@ -15,7 +15,7 @@ import { slotForEnd } from '../ui/slots';
 import { slotInfo, shownWarning } from '../ui/linestate';
 import { keyButton } from './keypad';
 import { composerDock } from './layout';
-import { kb, narrow } from './platform';
+import { narrow } from './platform';
 import { views, focusRow, setFocusGuard } from './rowviews';
 import { setTypingPauseListener } from './rows';
 import { doc, opts, rowIndex, results, screen, renderNow, setEvalRows } from './sheet';
@@ -34,11 +34,11 @@ let editStart = '';
 // Also a .rows: like the canvas's list, it holds a line's view, so anything that finds every line (`.rows .row`) finds
 // the one being written too, last, as the sheet's last line is.
 export const composerSlot = h('div', { class: 'composer-slot rows' });
-// The composer's enter is the keypad's enter key (ENTER): the same action, sound and offers as the Enter key.
+// The composer's enter is the keypad's enter key (ENTER): the same action and offers as the Enter key.
 const enterBtn = keyButton(ENTER);
 enterBtn.classList.add('composer-enter');
 const enterWord = (text: string) => { enterBtn.querySelector('.kl')!.textContent = text; };
-const cancelBtn = h('button', { type: 'button', class: 'composer-cancel', title: 'Leave the line as it was (Esc)', hidden: true }, 'Cancel');
+const cancelBtn = h('button', { type: 'button', class: 'composer-cancel', hidden: true }, 'Cancel');
 const preview = h('span', { class: 'composer-preview', hidden: true });
 export const composerBox = h('div', { class: 'composer', 'data-state': 'idle' }, h('span', { class: 'composer-halo', 'aria-hidden': 'true' }), composerSlot, preview, cancelBtn, enterBtn);
 export const composerTabs = h('div', { class: 'composer-tabs', role: 'group', 'aria-label': 'Function tabs' });
@@ -176,8 +176,9 @@ export function syncComposer(): void {
   // A figure line's table (the unit circle's, the tangent's) takes no room at all: it would wrap the line.
   composerBox.classList.toggle('quiet-figure', composerQuietFigure(text, r));
   composerBox.classList.toggle('editing', !!editingId);
-  enterWord(editingId ? 'Update' : intent?.kind === 'update' ? `Update ${intent.name}` : 'ENTER');
-  enterBtn.title = editingId ? kb('Keep the change (Enter)') : intent?.kind === 'update' ? `Change the line that defines ${intent.name} (Enter)` : kb('Send the line (Enter)');
+  const enterLabel = editingId ? 'Update' : intent?.kind === 'update' ? `Update ${intent.name}` : 'ENTER';
+  enterWord(enterLabel);
+  enterBtn.setAttribute('aria-label', enterLabel);
   cancelBtn.hidden = !editingId;
   // A line that draws shows a sparkline of its curve in its color, where a value shows its answer.
   const draws = !!r && r.graph.length > 0 && r.value === undefined && !r.error;

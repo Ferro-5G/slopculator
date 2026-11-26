@@ -1,7 +1,6 @@
 import { COMBINE_TOO_FEW, type CombineOp, combineLines, combineTarget, planCombine } from '../ui/combine';
 import { CURVES, isBlankSheet, isEmptyLine, nextColor } from '../ui/document';
 import { addEntry, commitLine } from '../ui/history';
-import { play } from './sound';
 import { movedLabel, UndoStack, type Step, typingRecorder, valueDrag } from '../ui/undo';
 import { type Row, blankRow, newId } from './docmodel';
 import { changeHistory } from './persistence';
@@ -49,7 +48,6 @@ export function applyFix(row: Extract<Row, { kind: 'expr' }>, text: string, end 
   const before = row.text;
   writeLine(row, text);
   recordFix(row.id, before, text);
-  play('fn');
   sheetChanged();
   if (!focus) return;
   if (end) screen.focusRow(row.id);
@@ -209,7 +207,6 @@ export function clearAll(): void {
   commitRow(activeId);
   const before = doc.rows;
   if (isBlankSheet(before)) return;
-  play('clear');
   const replacement = blankRow();
   doc.rows = [replacement];
   rowsChanged(doc.rows[0].id);
@@ -229,11 +226,9 @@ export function combineAll(op: CombineOp): void {
   const target = combineTarget(doc.rows, activeId);
   const plan = planCombine(combineLines(doc.rows, results, doc.settings.lineNames), op, target?.id);
   if (!plan.text) {
-    play('error');
     showToast(COMBINE_TOO_FEW);
     return;
   }
-  play('fn');
   const before = target ? { ...target } : undefined;
   let id: string;
   if (target?.kind === 'expr') {

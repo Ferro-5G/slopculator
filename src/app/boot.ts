@@ -11,17 +11,15 @@ import { firstRunExample } from './example';
 import { initLineoutput } from './lineoutput';
 import { initListscroll } from './listscroll';
 import { initListtools } from './listtools';
-import { initPride } from './pride';
 import { rebuildRows, initRows } from './rows';
 import { focusRow, views } from './rowviews';
 import { fitBar, initSettings } from './settings';
-import { connectScreen, doc, recompute } from './sheet';
+import { connectScreen, recompute } from './sheet';
 import { renderResults } from './render';
 import { applyUI, initShell } from './shell';
 import { applyTheme, initTheme } from './theme';
 import { initEdits } from './edits';
 import { initThumb } from './thumb';
-import { setSound } from './sound';
 
 /**
  * Starts the app, synchronously. Modules only declare things when they load: elements, functions, tables, and the
@@ -33,7 +31,6 @@ export function boot(): void {
   initOverlay();
   initListscroll();
   initGraphpane();
-  initPride();
   initFile();
   initEdits();
   initSettings();
@@ -50,7 +47,6 @@ export function boot(): void {
   void document.fonts.ready.then(() => { graph.refreshTheme(); fitKeyLabels(); fitBar(); layoutCanvas(); });
   // A look's faces load when it's first chosen, after its refit: fold the bar again once they're in.
   document.fonts.addEventListener('loadingdone', () => fitBar());
-  setSound(doc.ui.sound !== false);
   applyTheme();
   restoreLeft();
   buildMenu();

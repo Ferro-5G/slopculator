@@ -1,4 +1,3 @@
-import { play } from './sound';
 import { syncers } from './controls';
 import { h, iconLabel } from './dom';
 import { motionNow } from './feedback';
@@ -14,7 +13,7 @@ import { closeThumb, syncTabs } from './thumb';
 import { replaceToast } from './toast';
 import { finishPresence, initialPresence, presenceOpen, requestPresence } from '../ui/presence';
 import { registerMotionSettler } from './motion';
-import { layoutCanvas } from './canvas';
+import { layoutCanvas, resetCanvasView } from './canvas';
 import { composerHead } from './composer';
 
 /** The graph is always up beside the notebook, so the window never has a blank half; Hide graph in File is the only way off. */
@@ -35,6 +34,16 @@ export function setKeypad(show: boolean): void {
   if (narrow.matches) doc.ui.keypad = show;
   else doc.ui.deskKeypad = show;
   applyUI({ glide: true });
+  saveSoon();
+}
+export function nodesOn(): boolean {
+  return doc.ui.nodes === true;
+}
+export function setNodesMode(show: boolean): void {
+  if (show) doc.ui.nodes = true;
+  else delete doc.ui.nodes;
+  resetCanvasView();
+  applyUI();
   saveSoon();
 }
 let keypadFold: Animation | null = null;
@@ -122,9 +131,8 @@ export function applyUI({ glide = false } = {}): void {
 }
 const navCalc = h('button', { type: 'button', class: 'nav-view', 'aria-pressed': 'true' }, 'Calculate');
 const navGraph = h('button', { type: 'button', class: 'nav-view' }, 'Graph');
-const navKeys = h('button', { type: 'button', class: 'nav-keys', title: 'Switch between the keypad and the system keyboard' }, ...iconLabel('keys', 'ABC'));
+const navKeys = h('button', { type: 'button', class: 'nav-keys', title: 'System keyboard' }, ...iconLabel('keys', 'ABC'));
 export function setView(view: 'calc' | 'graph'): void {
-  if (doc.ui.view !== view) play('toggle');
   doc.ui.view = view;
   saveSoon();
   applyUI();
@@ -186,7 +194,6 @@ export function initShell(): void {
 export function toggleSysKeyboard(): void {
   {
     doc.ui.sysKeyboard = !doc.ui.sysKeyboard;
-    play('toggle');
     saveSoon();
     applyUI();
     // Refocus so the keyboard appears or goes away right now.

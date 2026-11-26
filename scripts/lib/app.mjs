@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const launchBrowser = () => chromium.launch({ channel: process.env.BROWSER ?? 'chrome' });
+const CHANNELS = new Set(['chrome', 'chrome-beta', 'chrome-dev', 'chrome-canary', 'msedge', 'msedge-beta', 'msedge-dev', 'msedge-canary', 'chromium']);
+const channel = CHANNELS.has(process.env.BROWSER ?? '') ? process.env.BROWSER : 'chrome';
+export const launchBrowser = () => chromium.launch({ channel });
 export const appUrl = pathToFileURL(resolve('dist/index.html')).href;
 
 function keysFrom(file, name) {

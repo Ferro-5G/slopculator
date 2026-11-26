@@ -276,8 +276,7 @@ await check('undoing Open saves edits to the outgoing named sheet before its tim
 
 await check('desktop combined probabilities keep their answer whole in their block, in both looks', async (p) => {
   await seed(p, ['normalcdf(-1,1)+normalcdf(-2,2)']);
-  for (const look of ['modern', 'retro']) {
-    await p.selectOption('select.look', look, { force: true });
+  for (const look of ['modern']) {
     await p.waitForTimeout(150);
     const fit = await p.evaluate(() => {
       const block = document.querySelector('.tape .rows .row.blk:not(.blk-blank)');
@@ -289,9 +288,8 @@ await check('desktop combined probabilities keep their answer whole in their blo
   }
 });
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`desktop ${look} wraps long list inputs without clipping or splitting numbers`, async (p) => {
-    await p.selectOption('select.look', look, { force: true });
     await seed(p, ['mean([12,18,24,30,36,42,48,54,60,66,72,78])', 'mean([12,18,24])', '']);
     await p.evaluate(() => document.fonts.ready);
     for (const width of [1280, 1366, 1440, 1920]) {
@@ -314,11 +312,10 @@ for (const look of ['modern', 'retro']) {
   });
 }
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   for (const reducedMotion of ['no-preference', 'reduce']) {
     await check(`${look} released keys return to their row with motion ${reducedMotion}`, async (p) => {
-      await p.selectOption('select.look', look, { force: true });
-      await seed(p, ['']);
+        await seed(p, ['']);
       const keys = [p.locator('.key[aria-label="Math"]'), p.locator('.numpad .key[aria-label="7"]')];
       const before = await Promise.all(keys.map((key) => key.boundingBox()));
       await keys[0].click();
@@ -337,7 +334,6 @@ for (const look of ['modern', 'retro']) {
 // aria-expanded is script, the same in both looks.
 for (const look of ['modern']) {
   await check(`${look} Modes button clears its open state when its menu closes`, async (p) => {
-    await p.selectOption('select.look', look, { force: true });
     const trigger = p.locator('.desk-more'), menu = p.locator('.mode-menu');
     await trigger.click();
     assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
@@ -352,23 +348,8 @@ for (const look of ['modern']) {
   });
 }
 
-for (const look of ['modern', 'retro']) {
-  await check(`${look} Appearance preview keeps every key legend complete`, async (p) => {
-    await p.selectOption('select.look', look, { force: true });
-    await p.locator('.appear-btn').click();
-    await p.evaluate(() => document.fonts.ready);
-    const legends = await p.locator('.appear-sample .key .kl').evaluateAll((labels) => labels.map((e) => {
-      const range = document.createRange(); range.selectNodeContents(e);
-      return { text: e.textContent, width: range.getBoundingClientRect().width, room: e.clientWidth };
-    }));
-    assert.deepEqual(legends.map((l) => l.text), ['7', '8', '9', '×', 'ENTER']);
-    for (const label of legends) assert.ok(label.width <= label.room + 1, `${look}: ${label.text} needs ${label.width}px but has ${label.room}px`);
-  });
-}
-
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`${look} narrow desktop keeps the graph block's controls inside it and the bar inside the window`, async (p) => {
-    await p.selectOption('select.look', look, { force: true });
     await seed(p, ['y = x^2']);
     await p.evaluate(() => document.fonts.ready);
     for (const theme of ['paper', 'contrastLight']) {
@@ -392,14 +373,13 @@ for (const look of ['modern', 'retro']) {
 }
 
 // Dismissing is script; only the longest menu, File, is sized differently enough by the looks to check in both.
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   for (const [name, trigger, panel] of [
     ['File', '.menu-btn', '.menu[role="menu"]'],
     ...(look === 'modern' ? [['Appearance', '.appear-btn', '.appear-menu'], ['Modes', '.desk-more', '.mode-menu']] : []),
   ]) {
     await check(`${look} ${name} dismisses on resize and reopens inside the shorter window`, async (p) => {
-      await p.selectOption('select.look', look, { force: true });
-      await p.locator(trigger).click();
+        await p.locator(trigger).click();
       assert.ok(await p.locator(panel).isVisible());
       await p.setViewportSize({ width: 761, height: 560 });
       await p.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -420,9 +400,8 @@ for (const look of ['modern', 'retro']) {
   }
 }
 
-for (const look of ['modern', 'retro']) {
+for (const look of ['modern']) {
   await check(`${look} short desktop Math pages keep readable tiles and scroll the final action into view`, async (p) => {
-    await p.selectOption('select.look', look, { force: true });
     for (const viewport of [{ width: 761, height: 560 }, { width: 1280, height: 600 }, { width: 1440, height: 900 }]) {
       await p.setViewportSize(viewport);
       await p.locator('.ti-tab[aria-label="Math"]').click();

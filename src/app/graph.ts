@@ -156,7 +156,6 @@ export class Graph {
   private piTicks = false;
   private degreeWaves = false;
   private asymptotes = true;
-  onPin?: () => void;
   private activeRowId: string | null = null;
   private pois: Mark[] = [];
   private pins: Target[] = [];
@@ -586,7 +585,7 @@ export class Graph {
           this.onViewChange?.();
         } else {
           lastTap = { t: now, x: e.offsetX, y: e.offsetY };
-          if (this.togglePin(e.offsetX, e.offsetY)) this.onPin?.();
+          this.togglePin(e.offsetX, e.offsetY);
         }
       }
       down = null;

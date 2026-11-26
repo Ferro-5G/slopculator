@@ -6,6 +6,8 @@ export interface Key {
   ins?: string;
   action?: 'left' | 'right' | 'back' | 'enter' | 'clear' | 'clearall' | 'matrix' | 'table';
   title?: string;
+  /** Keep `title` for screen readers without showing it in the desktop hover hint strip. */
+  quiet?: boolean;
   sub?: string;
   /**
    * hero: the keys a bank exists for, listed first and drawn as plain function keys (enter is the one accent key;
@@ -22,10 +24,10 @@ export interface Panel {
 
 const fn = (name: string, title: string, sub?: string, label = name): Key => ({ label, ins: `${name}(¦)`, title, sub, tone: 'fn' });
 const hero = (name: string, title: string, sub?: string): Key => ({ label: name, ins: `${name}(¦)`, title, sub, tone: 'hero' });
-const op = (label: string, ins = label, title?: string, sub?: string): Key => ({ label, ins, title, sub, tone: 'op' });
+const op = (label: string, ins = label, title?: string, sub?: string, quiet = false): Key => ({ label, ins, title, ...(quiet ? { quiet } : {}), sub, tone: 'op' });
 const name = (name: string, title: string, sub?: string): Key => ({ label: name, ins: name, title, sub, tone: 'fn' });
 const d = (label: string): Key => ({ label, ins: label, tone: 'num' });
-const act = (label: string, action: Key['action'], title: string, sub?: string): Key => ({ label, action, title, sub, tone: 'act' });
+const act = (label: string, action: Key['action'], title: string, sub?: string, quiet = false): Key => ({ label, action, title, ...(quiet ? { quiet } : {}), sub, tone: 'act' });
 
 /**
  * The number pad under the everyday row (x y π e % ans, ROW1 in thumbindex.ts): four rows of six for a right thumb,
@@ -34,12 +36,12 @@ const act = (label: string, action: Key['action'], title: string, sub?: string):
  * the line reads.
  */
 export const PAD: Key[][] = [
-  [act('←', 'left', 'Move the caret left. Hold to repeat, or slide to move it along'), act('→', 'right', 'Move the caret right. Hold to repeat, or slide to move it along'), d('7'), d('8'), d('9'), op('÷', '/', 'Divide')],
-  [op('xʸ', '^', 'Power'), op('√', '√(¦)', 'Square root'), d('4'), d('5'), d('6'), op('×', '*', 'Multiply')],
-  [op('(', '('), op(')', ')'), d('1'), d('2'), d('3'), op('−', '-', 'Subtract')],
+  [act('←', 'left', 'Caret left', undefined, true), act('→', 'right', 'Caret right', undefined, true), d('7'), d('8'), d('9'), op('÷', '/', 'Divide', undefined, true)],
+  [op('xʸ', '^', 'Power', undefined, true), op('√', '√(¦)', 'Square root', undefined, true), d('4'), d('5'), d('6'), op('×', '*', 'Multiply', undefined, true)],
+  [op('(', '('), op(')', ')'), d('1'), d('2'), d('3'), op('−', '-', 'Subtract', undefined, true)],
   // , and = type just themselves: the typeset line spaces them, and no space the app put in hides between them and
   // the caret (a tap landed between the comma and an invisible space, and a fix could give a wrong answer).
-  [op(',', ',', 'Separates inputs: f(a, b)'), op('=', '=', 'Define a variable, graph a curve or write an equation'), d('0'), d('.'), act('⌫', 'back', 'Backspace. Hold to clear the line; Undo brings it back'), op('+', '+', 'Add')],
+  [op(',', ','), op('=', '='), d('0'), d('.'), act('⌫', 'back', 'Hold to clear line'), op('+', '+', 'Add', undefined, true)],
 ];
 
 /** For a left hand, each group keeps its order and the groups swap ends: operators down the left edge. */
@@ -49,10 +51,10 @@ export function padRows(padLeft = false): Key[][] {
 }
 
 /** The composer's send key: the one accent-filled key, drawn on the composer rather than on the pad. */
-export const ENTER: Key = { label: 'ENTER', action: 'enter', title: 'Send the line (Enter)', tone: 'hero' };
+export const ENTER: Key = { label: 'ENTER', action: 'enter', tone: 'hero' };
 
 export const ANS: Key = { label: 'ans', ins: 'ans', title: 'Answer from the line above', tone: 'fn' };
-export const AC: Key = { label: 'AC', action: 'clearall', title: 'Clear every line (Ctrl+Alt+Backspace). Ctrl+Z brings them back', tone: 'red' };
+export const AC: Key = { label: 'AC', action: 'clearall', title: 'Clear all (Ctrl+Alt+Backspace)', tone: 'red' };
 /** ÷, on the pad's top row. */
 export const DIV: Key = PAD[0][5];
 

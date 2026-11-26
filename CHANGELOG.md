@@ -4,6 +4,15 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.0-alpha] - 2026-11-26
+
+- Visual node editor on the canvas: spawn Math, Stats, Chance, Matrix, and HVAC nodes from the `+ Node` palette or by dragging a wire into open space, wire outputs to input pins with live cycle blocking and undoable rewiring, edit inline values on unconnected pins, and toggle between List and Nodes mode from the top bar on narrow screens.
+- OLED dark look with cobalt-indigo Aurora Glow is now the default across web and phone. Removed the separate theme, Retro look, Pride, and Keyboard Glow pickers from Appearance so Motion, Graph frame rate, and Number pad side stay focused.
+- Composer rim lighting stays quiet when empty and traces smoothly around the outside edge as you type or evaluate, with a restrained `ENTER` shadow and a frosted `Undo` toast.
+- Boxless frosted glass Steps: removed the outer tray around step breakdowns so nested steps sit directly on the canvas with clean hairline elbows and no floating connector dots.
+- Integrated flush-port node cards, smoother List-to-Nodes transitions, and capsule glass top-bar controls across web and mobile.
+- Removed UI sound effects, refined tooltip/copy polish, locked slider ranges while focused during drags, and added property-based engine tests, a headless CLI runner (`npm run cli`), UI fuzzing (`npm run fuzz:ui`), UI performance benchmarks (`npm run perf:ui`), and stricter lint guardrails.
+
 ## [0.2.6-alpha] - 2026-11-23
 
 - Phone web app refresh: added a web app manifest and Apple touch icon for Home Screen installs, fixed standalone iOS top-bar blur and bottom safe-area height, matched the mobile machined matte keypad and frosted menus, centered `Deg | Rad`, kept `123` toggling the keypad cleanly, and prevented touch hover states from sticking.
@@ -117,7 +126,8 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.2.6-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.3.0-alpha...HEAD
+[0.3.0-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.6-alpha...v0.3.0-alpha
 [0.2.6-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.5-alpha...v0.2.6-alpha
 [0.2.5-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...v0.2.5-alpha
 [0.2.4-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.3-alpha...v0.2.4-alpha

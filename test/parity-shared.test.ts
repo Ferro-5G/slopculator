@@ -103,8 +103,8 @@ describe('what a saved sheet carries', () => {
     expect(cleanSheetView({ graph: false, panel: 3, bank: 'Calc' })).toEqual({ graph: false });
   });
   it('brings the sheet\'s view and leaves the device\'s settings', () => {
-    const device = { view: 'calc' as const, keypad: true, sound: true };
-    expect(withSheetView(device, { view: 'graph', keypad: false })).toEqual({ view: 'graph', keypad: false, sound: true });
+    const device = { view: 'calc' as const, keypad: true, haptics: true };
+    expect(withSheetView(device, { view: 'graph', keypad: false })).toEqual({ view: 'graph', keypad: false, haptics: true });
   });
   it('a field the sheet never stored clears, unless the caller asks to keep what\'s showing', () => {
     const device = { view: 'graph' as const, keypad: false };

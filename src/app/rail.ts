@@ -110,11 +110,7 @@ export function syncRail(composerRowId: string, isWide: boolean): void {
 
   railCount.textContent = String(items.length);
   railCount.hidden = items.length === 0;
-  if (!items.length) {
-    railList.replaceChildren(h('div', { class: 'rail-empty' }, 'Sent calculations rise here and appear on the canvas.'));
-  } else {
-    railList.replaceChildren(...items);
-  }
+  railList.replaceChildren(...items);
 
   if (items.length > lastCount) {
     railList.scrollTop = railList.scrollHeight;

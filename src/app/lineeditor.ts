@@ -6,7 +6,6 @@ import { type Completion, completions as findCompletions, sheetCandidates, type 
 import { lineCopy, nextColor } from '../ui/document';
 import { enterStep, isFinishedLine, planInsert, searchInsertLabel } from '../ui/lineedit';
 import { heldBack, typingState } from '../ui/linestate';
-import { play } from './sound';
 import { slotStep, wantsMatrix, matrixCell } from '../ui/slots';
 import { openMatrixEditor } from './editors';
 import { newId, type Row } from './docmodel';
@@ -187,7 +186,7 @@ export function updateHint(input: HTMLInputElement, hint: HTMLElement): void {
   if (c) {
     rowEl?.classList.add('completing');
     const pick = (item: Candidate) => {
-      const b = h('button', { type: 'button', class: item === c.items[0] ? 'cand first' : 'cand', tabindex: '-1', title: `Insert ${item.name}` }, item.name);
+      const b = h('button', { type: 'button', class: item === c.items[0] ? 'cand first' : 'cand', tabindex: '-1' }, item.name);
       b.addEventListener('mousedown', (e) => {
         e.preventDefault();
         complete(input, item);
@@ -203,12 +202,11 @@ export function updateHint(input: HTMLInputElement, hint: HTMLElement): void {
   const phone = caret === input.selectionEnd;
   const next = phone ? nextButton(input) : null;
   if (phone && wantsMatrix(input.value, caret)) {
-    const b = h('button', { type: 'button', class: 'cand grid-chip', tabindex: '-1', 'aria-label': 'Build matrix', title: 'Open the visual Matrix Builder and insert here' }, 'Build matrix…');
+    const b = h('button', { type: 'button', class: 'cand grid-chip', tabindex: '-1', 'aria-label': 'Build matrix' }, 'Build matrix…');
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', () => {
       const from = input.selectionStart ?? caret;
       const to = input.selectionEnd ?? from;
-      play('fn');
       openMatrixEditor({
         inline: true,
         onInsert: (m) => {
@@ -248,10 +246,9 @@ function nextButton(input: HTMLInputElement): HTMLButtonElement | null {
   const to = slotStep(text, caret, true);
   const edit = to !== null ? { text, caret: to } : nextSlot(text, caret);
   if (!edit) return null;
-  const b = h('button', { type: 'button', class: 'next-slot', tabindex: '-1', 'aria-label': 'Next argument', title: 'Moves to the next argument, or out of the brackets' }, 'Next');
+  const b = h('button', { type: 'button', class: 'next-slot', tabindex: '-1', 'aria-label': 'Next argument', title: 'Next argument' }, 'Next');
   b.addEventListener('mousedown', (e) => e.preventDefault());
   b.addEventListener('click', () => {
-    play('detent');
     applyEdit(input, edit);
     viewOfInput.get(input)?.refresh?.();
   });

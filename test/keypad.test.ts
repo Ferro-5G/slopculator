@@ -218,8 +218,8 @@ describe('readable bank labels', () => {
     expect(keyLines('wetbulb', 46)).toEqual(['wet', 'bulb']);
   });
 
-  it('⌫ says Undo brings back a line it cleared', () => {
-    expect(PAD.flat().find((k) => k.action === 'back')!.title).toMatch(/Undo/);
+  it('⌫ says hold clears the line', () => {
+    expect(PAD.flat().find((k) => k.action === 'back')!.title).toBe('Hold to clear line');
   });
 });
 

@@ -9,10 +9,6 @@ Slopculator's own code is under the MIT License (see [LICENSE](LICENSE)). The bu
 | IBM Plex Sans, IBM Plex Sans Condensed, IBM Plex Mono (via @fontsource) | SIL Open Font License 1.1 | Latin and Greek subsets are embedded in the single-file build. Copyright IBM Corp. "Plex" is a reserved font name. |
 | Geist Sans, Geist Mono (via @fontsource) | SIL Open Font License 1.1 | Latin subsets are embedded in the single-file build. Copyright 2023 Vercel, made in collaboration with basement.studio. Exponent glyphs drawn from Geist Mono are added to the fonts bundled in the apps and to `src/assets/Superscripts.woff2`. |
 
-## Sounds
-
-The key clicks and chimes in `src/assets/sounds/` are cut from two sound packs by Kenney (kenney.nl), "Interface Sounds" and "UI Audio", both released into the public domain under Creative Commons Zero (CC0 1.0). No credit is required; this one is given gladly. `scripts/make-sounds.mjs` names the clip each sound comes from and how it was trimmed and levelled.
-
 ## HVAC data and equations
 
 `src/engine/hvac.ts` follows PsychroLib (MIT, copyright The PsychroLib Contributors) for moist-air properties, using equations and coefficients from the 2017 ASHRAE Handbook of Fundamentals, chapter 1. `src/engine/refrigerants-data.ts` holds values computed with CoolProp (MIT, copyright Ian Bell and others). Saturation pressures for R-448A, R-449A, and R-454B are scaled to published tables from Honeywell and Chemours. Neither library is bundled; `scripts/build-hvac-data.py` uses them to generate the data and test values.

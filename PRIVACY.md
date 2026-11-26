@@ -8,7 +8,7 @@ Your sheets, history, and preferences are saved in your browser's local storage 
 
 ## How the app runs
 
-All of the code, fonts, and sounds are bundled into the page itself. Once loaded, Slopculator works offline without talking to a server. The standalone HTML file from GitHub works the same way straight from your computer.
+All of the code and fonts are bundled into the page itself. Once loaded, Slopculator works offline without talking to a server. The standalone HTML file from GitHub works the same way straight from your computer.
 
 ## Website hosting
 
