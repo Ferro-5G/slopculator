@@ -515,6 +515,11 @@ export function heldLit(drag: { source: string; hops: ReadonlyMap<string, number
   return drag ? new Set([drag.source, ...drag.hops.keys()]) : new Set();
 }
 
+/** The blocks lit while the slider is still held: none once it's let go, though its tags and traces may linger. */
+export function heldLitNow(drag: { source: string; hops: ReadonlyMap<string, number>; releasedAt: number | null } | null): Set<string> {
+  return drag && drag.releasedAt === null ? heldLit(drag) : new Set();
+}
+
 /**
  * The curves a held slider moves, each traced faintly, dotted, where it was when the drag began: the lines its change
  * reaches (and the slider's own line) that draw on `graph`.

@@ -2411,9 +2411,9 @@ dialog.palette::backdrop {
 
 @media (--phone) {
   :root {
-    /* One-handed: the bank's two rows 48 px and the pad's four 56 px, 6 px apart. Shorter phones take a little off,
-       never under 44 px a key. */
-    --bank-row: 48px;
+    /* One-handed, as phoneRows() and indexRowHeights() in src/ui/keypad.ts set the phones' tray: on a tall screen a
+       48 px bank whose everyday row takes 44, and the pad's four rows 56 px, 6 px apart. */
+    --bank-row: 44px;
     --pad-row: 56px;
     --kgap: 6px;
     --pad-h: calc(2 * var(--bank-row) + 4 * var(--pad-row) + 5 * var(--kgap));
@@ -2809,12 +2809,19 @@ dialog.palette::backdrop {
   }
 }
 
-/* Phones that aren't tall (or iOS Safari with its URL bar visible): keep every key at least 44 px while giving the canvas room. */
-@media (max-width: 760px) and (max-height: 760px), (max-height: 460px) and (pointer: coarse) {
+/* Phones that aren't tall (or iOS Safari with its URL bar visible), as phoneRows() steps down: 46 and 50 px under
+   800 px, 44 and 46 under 700, every key at least 44 px. */
+@media (max-width: 760px) and (max-height: 799px), (max-height: 460px) and (pointer: coarse) {
+  :root {
+    --bank-row: 46px;
+    --pad-row: 50px;
+    --pad-h: calc(2 * var(--bank-row) + 4 * var(--pad-row) + 5 * var(--kgap));
+  }
+}
+@media (max-width: 760px) and (max-height: 699px), (max-height: 460px) and (pointer: coarse) {
   :root {
     --bank-row: 44px;
     --pad-row: 46px;
-    --kgap: 5px;
     --pad-h: calc(2 * var(--bank-row) + 4 * var(--pad-row) + 5 * var(--kgap));
   }
 }

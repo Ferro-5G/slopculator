@@ -1,5 +1,6 @@
 // Colors the web draws with and the phones don't stay in the stylesheets; a variable named here comes only from here.
 import { type ColorPref, swatchOver, type HeroCap, type LookPref, type SwatchBase, type WebTheme } from './appearance.ts';
+import { GLASS_RADIUS, glassCard, ISLAND_RADIUS } from './glass.ts';
 import { type Palette, paletteFor, swatchBase } from './palettes.ts';
 
 const THEMES: WebTheme[] = ['paper', 'ink', 'oled', 'contrast', 'contrastLight'];
@@ -12,6 +13,7 @@ function modernVars(p: Palette): Record<string, string> {
     '--bg': p.bg,
     '--accent-soft': p.accentSoft,
     '--active-fill': p.tapeActive,
+    '--surface-high': p.surfaceHigh,
     '--key': p.caps.num.cap,
     '--key-ink': p.caps.num.ink,
     '--key-fn': p.caps.fn.cap,
@@ -24,7 +26,14 @@ function modernVars(p: Palette): Record<string, string> {
     '--key-bed': p.keyBed,
     '--hero-fill': heroFill(p.caps.hero),
     '--hero-glow': p.caps.hero.cap,
+    ...glassVars(p),
   };
+}
+
+/** Modern's glass (src/ui/glass.ts): a card's fill, edge and lift, and the corners of cards and the composer. */
+function glassVars(p: Palette): Record<string, string> {
+  const card = glassCard(p);
+  return { '--glass-fill': card.fill, '--glass-edge': card.edge, '--glass-shadow': card.shadow, '--glass-radius': `${GLASS_RADIUS}px`, '--island-radius': `${ISLAND_RADIUS}px` };
 }
 
 function sharedVars(p: Palette): Record<string, string> {
@@ -35,6 +44,9 @@ function sharedVars(p: Palette): Record<string, string> {
     '--rule': p.rule,
     '--rule-2': p.rule2,
     '--accent': p.accent,
+    // The canvas's accent (focus, Enter, the composer's light, slider fills) and the ink on it, as the phones' accent2.
+    '--accent-2': p.accent2,
+    '--on-accent': p.onAccent,
     '--err': p.error,
     '--warn': p.warn,
     '--well': p.well,
@@ -78,6 +90,8 @@ export function colorTokens(look: LookPref, theme: WebTheme, color: ColorPref): 
   if (color === 'default') return {};
   const s = swatchOver(SWATCH_BASE[`${look}/${theme}`], color);
   const out: Record<string, string> = { '--accent': s.accent, '--led': s.led, '--caret': s.caret, '--hero-ink': s.hero.ink, '--key-op-ink': s.opInk, '--hero-fill': heroFill(s.hero) };
+  out['--accent-2'] = s.accent2;
+  if (s.onAccent) out['--on-accent'] = s.onAccent;
   if (s.accentSoft) out['--accent-soft'] = s.accentSoft;
   if (s.hero.edge) out['--hero-edge'] = s.hero.edge;
   return out;

@@ -179,6 +179,7 @@ export function syncComposer(): void {
   const enterLabel = editingId ? 'Update' : intent?.kind === 'update' ? `Update ${intent.name}` : 'ENTER';
   enterWord(enterLabel);
   enterBtn.setAttribute('aria-label', enterLabel);
+  enterBtn.classList.toggle('updates', enterLabel !== 'ENTER');
   cancelBtn.hidden = !editingId;
   // A line that draws shows a sparkline of its curve in its color, where a value shows its answer.
   const draws = !!r && r.graph.length > 0 && r.value === undefined && !r.error;

@@ -6,7 +6,7 @@ import { h } from './dom';
 import { motionNow, pulse } from './feedback';
 import { CURVES, DURATIONS } from '../ui/motiontokens';
 import { keyButton, keyHint, cancelKeyHintTimer, clearKeyHintSoon, runKeyAction } from './keypad';
-import { tape, listEl, keypadEl, composerDock } from './layout';
+import { tape, listEl, keypadEl, composerDock, leftPane } from './layout';
 import { composerTabs, stirAurora } from './composer';
 import { openBuilder } from './editors';
 import { editText, insertFromSearch } from './lineeditor';
@@ -111,7 +111,8 @@ export function syncTabs(): void {
   // blocks, glide between them.
   const deckColor = onPad || onKb ? 'var(--cv-accent)' : ti.tab !== null ? `var(--tab-${ti.tab})` : 'var(--cv-accent)';
   composerDock.style.setProperty('--au-a', deckColor);
-  tape.style.setProperty('--au-deck', deckColor);
+  // On the pane, so the canvas's clouds take it wherever they're drawn: behind the tape, or the whole phone screen.
+  leftPane.style.setProperty('--au-deck', deckColor);
   // Keyboard Glow backlights the keys in the same color.
   keypadEl.style.setProperty('--kg', deckColor);
   tiPage.style.setProperty('--kg', deckColor);
@@ -133,7 +134,7 @@ function inkAt(el: HTMLElement, color: string): Ink | null {
   return r.width > 0 && box.width > 0 ? { left: r.left - box.left, top: r.top - box.top, width: r.width, height: r.height, color } : null;
 }
 /** A deck button's solid fill, resolved from its color token so the ink never waits on the button's own transition. */
-const deckColor = (el: HTMLElement): string => getComputedStyle(el).getPropertyValue(el === deckPadBtn ? '--cv-accent' : '--tab').trim();
+const deckColor = (el: HTMLElement): string => getComputedStyle(el).getPropertyValue(el === deckPadBtn ? '--accent' : '--tab').trim();
 function inkStart(tab: number | null): Ink | null {
   if (motionNow() !== 'full' || !deckInk.isConnected || getComputedStyle(deckInk).display === 'none') return null;
   if (inkRun?.playState === 'running') return inkAt(deckInk, getComputedStyle(deckInk).backgroundColor);

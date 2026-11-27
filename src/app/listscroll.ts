@@ -30,7 +30,11 @@ const sheetFits = (): boolean => {
   }
   if (!last) return true;
   const base = listEl.getBoundingClientRect().top - listEl.scrollTop;
-  const over = last.getBoundingClientRect().bottom - base - listEl.clientHeight;
+  // The free-scrolling column (the phone's, under its floating header) keeps its foot clear of the composer too, as
+  // the phones' list does; elsewhere the foot is --end-pad's to size.
+  const cs = getComputedStyle(listEl);
+  const foot = cs.scrollSnapType === 'none' ? parseFloat(cs.paddingBottom) || 0 : 0;
+  const over = last.getBoundingClientRect().bottom + foot - base - listEl.clientHeight;
   if (over <= 1) return true;
   const row = doc.rows[doc.rows.length - 1];
   const trailingEmpty = row && isEmptyLine(row) && views.get(row.id)?.el === last;
@@ -100,6 +104,8 @@ function placeCovers(): void {
   tape.classList.toggle('covered', b > 0);
 }
 function settleTarget(): number | null {
+  // A list that scrolls freely (the phone column under its floating header, as the phone apps' does) rests where it's left.
+  if (getComputedStyle(listEl).scrollSnapType === 'none') return null;
   const cur = listEl.scrollTop;
   const view = listEl.clientHeight;
   const max = listEl.scrollHeight - view;
@@ -229,9 +235,10 @@ export function revealRow(el: HTMLElement): void {
   const view = listEl.clientHeight;
   const cur = listEl.scrollTop;
   let to = cur;
-  if (rowTop < cur + EDGE_CLEAR) {
+  // Near the top edge, measured from where a line comes to rest there (its scroll margin: under a floating header).
+  if (top(el) < cur + EDGE_CLEAR) {
     const prev = rows[k - 1];
-    to = prev && rowTop - top(prev) <= view / 3 ? top(prev) : top(el);
+    to = prev && top(el) - top(prev) <= view / 3 ? top(prev) : top(el);
   } else if (rowBottom > cur + view - EDGE_CLEAR) {
     const want = rowBottom + EDGE_CLEAR - view;
     to = top(el);

@@ -4,6 +4,13 @@ Notable changes, newest first. The format follows [Keep a Changelog](https://kee
 
 ## [Unreleased]
 
+## [0.3.1-alpha] - 2026-11-26
+
+- On phones, the top bar floats over the lines with translucent glass buttons and updated icons and spacing, so lines scroll underneath. When added to an iPhone Home Screen, the app runs behind the clock and battery.
+- Phone line blocks fit the width of each line with new corners, padding, type sizes, and spacing, and graph blocks use the same frosted glass. Aurora Glow no longer tints block edges.
+- The phone input bar, tabs, and keypad have updated sizing, rim glow, fonts, and key colors, and the `√` key now draws its top bar. `ENTER` is lighter blue with dark text on both phone and desktop.
+- In Safari on phones, the list scrolls freely to the last line without stopping short or jumping while you type at the end. The `ABC` bar sits right on the system keyboard, Safari's toolbar no longer shrinks the input and tabs on short screens, and the Welcome example's `Clear example` button no longer hides under the clock on a Home Screen install.
+
 ## [0.3.0-alpha] - 2026-11-26
 
 - Visual node editor on the canvas: spawn Math, Stats, Chance, Matrix, and HVAC nodes from the `+ Node` palette or by dragging a wire into open space, wire outputs to input pins with live cycle blocking and undoable rewiring, edit inline values on unconnected pins, and toggle between List and Nodes mode from the top bar on narrow screens.
@@ -126,7 +133,8 @@ The first public version.
 - A line that takes more than 2 seconds, or a sheet that takes more than 6 in all, stops with an error instead of freezing the page.
 - iOS and Android apps are in development and not part of this release.
 
-[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.3.0-alpha...HEAD
+[Unreleased]: https://github.com/Ferro-5G/slopculator/compare/v0.3.1-alpha...HEAD
+[0.3.1-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.3.0-alpha...v0.3.1-alpha
 [0.3.0-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.6-alpha...v0.3.0-alpha
 [0.2.6-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.5-alpha...v0.2.6-alpha
 [0.2.5-alpha]: https://github.com/Ferro-5G/slopculator/compare/v0.2.4-alpha...v0.2.5-alpha

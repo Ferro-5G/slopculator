@@ -81,6 +81,8 @@ export function runKeyAction(action: NonNullable<Key['action']>): void {
   }
 }
 const BACK_ICON = '<svg class="kicon back" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.2 4.5h8.55c.97 0 1.75.78 1.75 1.75v7.5c0 .97-.78 1.75-1.75 1.75H7.2L2.5 10z"/><path d="M9.5 7.5l5 5M14.5 7.5l-5 5"/></svg>';
+// Most faces draw the radical as a bare check; the phones' (Geist Mono's) carries its bar over the radicand.
+const ROOT_ICON = '<svg class="kicon root" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.6 11.3 5.7 10.2 8.9 17.4 13 2.6H16.6"/></svg>';
 const arrowIcon = (left: boolean) => `<svg class="kicon" viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${left ? 'M16 10H4.5M9 5 4 10l5 5' : 'M4 10h11.5M11 5l5 5-5 5'}"/></svg>`;
 export function keyButton(k: Key): HTMLButtonElement {
   const tone = capTone(k);
@@ -101,6 +103,7 @@ export function keyButton(k: Key): HTMLButtonElement {
   // The ⌫ and arrow glyphs come out tiny in most fonts; draw them at the digits' size instead.
   if (k.action === 'back') b.querySelector('.kl')!.innerHTML = BACK_ICON;
   if (k.action === 'left' || k.action === 'right') b.querySelector('.kl')!.innerHTML = arrowIcon(k.action === 'left');
+  if (k.label === '√') b.querySelector('.kl')!.innerHTML = ROOT_ICON;
   // A modifier letter (xʸ, eˣ) comes from a fallback face, with a gap; set it as a superscript in the key's own font.
   const sup = /^(.+?)([ˣʸ])$/u.exec(face);
   if (sup) b.querySelector('.kl')!.replaceChildren(sup[1], h('sup', { class: 'ksup' }, sup[2] === 'ʸ' ? 'y' : 'x'));

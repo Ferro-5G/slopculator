@@ -431,3 +431,8 @@ export function phoneRows(screenH: number): { bank: number; pad: number } {
   return { bank: 44, pad: 46 };
 }
 export const PHONE_GAP = 6;
+
+/** The everyday row (r1) and the row under it (r2) for a bank height: a tall bank gives a little back to the pad. */
+export function indexRowHeights(bank: number): { r1: number; r2: number } {
+  return bank >= 48 ? { r1: bank - 4, r2: bank - 2 } : { r1: bank, r2: bank };
+}

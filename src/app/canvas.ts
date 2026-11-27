@@ -11,7 +11,7 @@ import {
   DOT_PITCH, dragGraph, dragTo, DRAG_SLOP, FRAME_PAD, FRAME_TOP, GRAPH_MIN, GRAPH_SIZE, needsFreshFlow, viewRects, wideHomeView, wideScreen,
   wideLayout, wideWireRoute, ZOOM_STEP, type WideBlock, type WideScreen,
 } from '../ui/canvaswide';
-import { CASCADE_PHONE, cascadeColumn, cascadeGaps, cascadeWires, heldLit, heldTraces, type CascadeBlock, type CascadeOptions } from '../ui/cascade';
+import { CASCADE_PHONE, cascadeColumn, cascadeGaps, cascadeWires, heldLitNow, heldTraces, type CascadeBlock, type CascadeOptions } from '../ui/cascade';
 import { lineDefines, type RowResult } from '../engine/document';
 import { portExpr, rowPorts } from '../ui/ports';
 import { sheetNames, typeset } from '../ui/typeset';
@@ -115,11 +115,18 @@ function railRoom(): number {
   const r = deskRail.getBoundingClientRect(), t = tape.getBoundingClientRect();
   return Math.max(0, Math.round(r.right - t.left));
 }
+/**
+ * How much of the canvas's top the top bar covers, with a little room under it, in viewport px: it floats over the
+ * world on the desktop and over the column and node canvas on a phone.
+ */
+function barRoom(): number {
+  const b = modeBar.getBoundingClientRect(), t = tape.getBoundingClientRect();
+  return b.height > 0 && b.bottom > t.top ? Math.round(b.bottom - t.top) + 8 : 0;
+}
 /** The part of the viewport the floating sidebar and top bar leave free, in viewport pixels. */
 function freeArea(): Rect {
   const left = railRoom() ? railRoom() + 14 : 0;
-  // Under the top bar, which floats over the canvas.
-  const top = modeBar.parentElement === app ? modeBar.offsetHeight + 8 : 0;
+  const top = barRoom();
   return { x: left, y: top, w: Math.max(200, tape.clientWidth - left), h: Math.max(160, tape.clientHeight - top - 16) };
 }
 function applyView(): void {
@@ -173,12 +180,13 @@ function sizeAsBlock(id: string): Size | null {
 /** The drag whose curves the graphs trace, by its start (kept across a release and a quick press again). */
 let tracedFrom: unknown = null;
 /**
- * While a slider is held, and for the moment its changes linger: the blocks it reaches light up (heldLit), and each
- * graph traces, faint and dotted, where every curve it moves was when the drag began (heldTraces).
+ * While a slider is held the blocks it reaches light up (heldLitNow), as on the phones; while it's held and for the
+ * moment its changes linger, each graph traces, faint and dotted, where every curve it moves was when the drag began
+ * (heldTraces).
  */
 function holdLook(): void {
   const d = tagDrag();
-  const lit = heldLit(d);
+  const lit = heldLitNow(d);
   for (const [id, v] of views) v.el.classList.toggle('cv-lit', lit.has(id));
   graphPane.classList.toggle('cv-lit', lit.has(GRAPH_BLOCK));
   exampleGraphPane.classList.toggle('cv-lit', lit.has(EXAMPLE_GRAPH));
@@ -392,7 +400,7 @@ function showTrays(): void {
 /** Where the home view fits the sheet: the unobstructed canvas right of the floating sidebar and under the top bar. */
 function homeScreen(): WideScreen {
   const t = tape.getBoundingClientRect();
-  const top = modeBar.parentElement === app ? modeBar.offsetHeight + 8 : 0;
+  const top = barRoom();
   const left = railRoom() ? railRoom() + 14 : 0;
   return wideScreen({ w: t.width, h: t.height }, top, null, null, left);
 }
@@ -487,8 +495,10 @@ function spans(id: string): boolean {
 function cascadeColumnLayout(ids: readonly string[]): void {
   const opts = columnOptions();
   const els = ids.map((id) => [id, blockEl(id)] as const).filter((e): e is readonly [string, HTMLElement] => !!e[1]);
-  // Each line's own width first, unset.
-  for (const [, el] of els) Object.assign(el.style, { width: '', marginLeft: '', marginTop: '' });
+  // Each line's own width first, unset. Its gap above stays: clearing it would shorten the list for a moment, and the
+  // browser would pull a scroll at the end back by the gaps, with nothing to put it back.
+  const atEnd = listEl.scrollTop >= listEl.scrollHeight - listEl.clientHeight - 1;
+  for (const [, el] of els) Object.assign(el.style, { width: '', marginLeft: '' });
   // Rounded up: a pill a fraction of a pixel narrower than its line wraps it.
   const blocks: CascadeBlock[] = els.map(([id, el]) => {
     const w = Math.ceil(el.getBoundingClientRect().width);
@@ -505,6 +515,9 @@ function cascadeColumnLayout(ids: readonly string[]): void {
     const c = across.get(id)!;
     Object.assign(el.style, { width: `${c.w}px`, marginLeft: `${c.x - opts.margin}px`, marginTop: `${gaps.get(id) ?? 0}px` });
   }
+  // A line that wrapped while unset can have shortened it all the same: a list read to its end (or one that didn't
+  // scroll yet) stays at its end. Not while a slider is held, so its track never moves under the finger.
+  if (atEnd && !holding) listEl.scrollTop = listEl.scrollHeight - listEl.clientHeight;
 }
 
 /** Each readout port's height, from where its readout row sits now. */
@@ -904,7 +917,8 @@ function settleLift(): void {
   const r = rects.get(l.id);
   if (!el || !r || !el.isConnected) return;
   if (!wide()) {
-    const target = el.offsetTop + el.offsetHeight - listEl.clientHeight + 18;
+    // It lands clear of the list's foot: 18 px, or the foot's padding where that's more (the phone column's 32).
+    const target = el.offsetTop + el.offsetHeight - listEl.clientHeight + Math.max(18, parseFloat(getComputedStyle(listEl).paddingBottom) || 0);
     if (target > listEl.scrollTop) listEl.scrollTo({ top: target, behavior: motion() ? 'smooth' : 'auto' });
     syncNarrowScrollEdges();
   }
@@ -1052,7 +1066,8 @@ addNodeBtn.setAttribute('aria-haspopup', 'dialog');
 const nodesBackBtn = zoomBtn('← List', 'Back to list view', () => setNodesMode(false), 'cv-btn cv-nodes-back');
 nodesBackBtn.hidden = true;
 const nodesPillBtn = h('button', { type: 'button', class: 'cv-nodes-pill', 'aria-label': 'Switch to node canvas', title: 'Switch to node canvas', hidden: true, onclick: () => setNodesMode(true) });
-nodesPillBtn.innerHTML = '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true"><path d="M5.4 5.2H8.5C9.4 5.2 9.4 10.8 10.6 10.8M5.4 10.8H7.2" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/><circle cx="3.6" cy="5.2" r="1.6" fill="currentColor"/><circle cx="3.6" cy="10.8" r="1.6" fill="currentColor"/><circle cx="12.2" cy="10.8" r="1.6" fill="currentColor"/></svg>';
+// The iOS app's symbol for it (point.3.connected.trianglepath.dotted): three rings joined by a dotted triangle.
+nodesPillBtn.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5.6 4.2H10.4M4.4 6.1 6.9 10.4M11.6 6.1 9.1 10.4" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="0 2.1"/><circle cx="3.4" cy="4.2" r="1.75" stroke-width="1.3"/><circle cx="12.6" cy="4.2" r="1.75" stroke-width="1.3"/><circle cx="8" cy="12.2" r="1.75" stroke-width="1.3"/></svg>';
 const tidyBtn = zoomBtn('Reset layout', '', () => resetAllLayout(), 'cv-btn cv-reset');
 tidyBtn.setAttribute('aria-label', 'Reset layout');
 tidyBtn.replaceChildren(icon('home'), h('span', { class: 'cv-reset-label' }, 'Reset layout'));
@@ -1280,6 +1295,10 @@ export function initCanvas(): void {
     if (pending) return;
     pending = requestAnimationFrame(() => { pending = 0; layoutCanvas(); });
   });
+  // So does the phone's floating header: a home-screen app learns the status bar's inset after its first layout, the
+  // header's border box grows by it (its padding takes the inset, so its content box doesn't), the column's padding with
+  // it, and the example's frame (placed in pixels) must follow.
+  blockSizes.observe(modeBar, { box: 'border-box' });
   new ResizeObserver(() => {
     if (wide()) layoutCanvas();
     else syncNarrowScrollEdges();

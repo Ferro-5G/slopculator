@@ -33,8 +33,8 @@
   --cv-raised: var(--active-fill, var(--well));
   --cv-edge: var(--rule);
   --cv-edge-2: var(--rule-2);
-  /* The accent follows Appearance › Color: a swatch sets --led, and the theme's own cobalt is the hero key's glow. */
-  --cv-accent: var(--led, var(--hero-glow, var(--accent)));
+  /* The phones' accent2 (canvasInk in the phone app): focus, Enter, the composer's light and slider fills. */
+  --cv-accent: var(--accent-2, var(--accent));
   --cv-accent-soft: color-mix(in srgb, var(--cv-accent) 16%, transparent);
   --cv-sky: color-mix(in srgb, var(--cv-accent) 55%, #58c4f5);
   --cv-iris: color-mix(in srgb, var(--cv-accent) 55%, #8e7bff);
@@ -1640,9 +1640,9 @@
 }
 .canvas-ui .deck-bar .deck-pad.lit,
 .canvas-ui .deck-bar .deck-pad.ti-close.lit {
-  background: var(--cv-accent);
-  border-color: var(--cv-accent);
-  color: var(--hero-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent, var(--hero-ink));
 }
 .canvas-ui .deck-sep {
   flex: none;
@@ -2048,9 +2048,9 @@
   border: 0;
   border-radius: 12px;
   background: var(--cv-accent);
-  color: var(--hero-ink);
-  font: 600 13.5px var(--sans);
-  letter-spacing: 0.04em;
+  color: var(--on-accent, var(--hero-ink));
+  font: 600 14px var(--sans);
+  letter-spacing: 0.6px;
   cursor: pointer;
   white-space: nowrap;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 2px 8px color-mix(in srgb, var(--cv-accent) 30%, transparent);
@@ -2063,6 +2063,10 @@
 }
 .canvas-ui .composer-enter:active {
   transform: scale(0.97);
+}
+/* ENTER is spaced out; Update and Update a isn't. */
+.canvas-ui .composer-enter.updates {
+  letter-spacing: 0;
 }
 .canvas-ui .composer-cancel {
   flex: none;
@@ -2564,29 +2568,51 @@
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
     mask-image: linear-gradient(to bottom, transparent 0, rgb(0 0 0 / 0.55) 7px, #000 18px, #000 calc(100% - 18px), rgb(0 0 0 / 0.55) calc(100% - 7px), transparent 100%);
   }
+  /* Blocks as the phone app's Block.tsx sets them in its column: a line 20 pt with 16 pt either side; a curve a little
+     more on the left for its pen's bar; a value its question 17 pt, its answer 25 pt, and only as wide as they are
+     (Cascade's least width, CASCADE_PHONE.minW, holds it to 132). */
+  .canvas-ui .cv-narrow > .rows > .row.blk:not(.blk-slider, .blk-figure) {
+    min-height: 48px;
+    padding: 11px 16px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk-curve:not(.blk-figure) {
+    padding: 10px 14px 10px 22px;
+  }
+  .canvas-ui .cv-narrow > .rows > .row.blk:not(.blk-value, .blk-slider) :is(.tex, .expr) {
+    font-size: 20px;
+  }
   .canvas-ui .cv-narrow > .rows > .row.blk-value {
-    padding: 8px 13px 9px;
+    min-width: 0;
+    padding: 11px 16px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line {
     flex-direction: row;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 2px 8px;
+    gap: 2px 12px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line > * {
-    align-self: baseline;
+    align-self: center;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure):not(:has(> .cv-steps:not([hidden]))) .line > .out {
     margin-left: auto;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value .tex,
   .canvas-ui .cv-narrow > .rows > .row.blk-value .expr {
-    font-size: 15.5px;
+    font-size: 17px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value .out,
   .canvas-ui .cv-narrow > .rows > .row.blk-value .out .result {
-    font-size: 19px;
+    font-size: 25px;
+    letter-spacing: -0.5px;
+  }
+  /* "= " and the answer, a space apart, with nothing round them: the block's padding is the answer's edge. */
+  .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure) .out .result {
+    padding: 0;
+    gap: 0;
+    /* The line iOS gives a 25 pt Schibsted answer. */
+    line-height: 31px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk-value:not(.blk-figure) > .cv-steps {
     top: 8px;
@@ -2704,7 +2730,7 @@
   .canvas-ui .mob-act.primary {
     background: var(--cv-accent);
     border-color: var(--cv-accent);
-    color: var(--hero-ink);
+    color: var(--on-accent, var(--hero-ink));
   }
   .canvas-ui .mob-act.danger {
     color: var(--cv-ac);
@@ -2718,15 +2744,29 @@
     top: auto;
     bottom: calc(100% + 10px);
   }
+  /* The deck bar as the phone app's ThumbIndex draws it: its rule from edge to edge and its pills 6 pt in from the
+     screen's sides, 123 a pill 8 pt either side inside a 1 pt rim, the decks and ABC 6 pt with no rim, words 12 pt
+     (AC 12.5). */
   .canvas-ui .deck-bar {
     padding: 5px 0 6px;
     margin-bottom: 6px;
     gap: 4px;
   }
+  /* Its insets on every phone height. */
+  #app.canvas-ui .keypad .deck-bar {
+    padding-inline: 6px;
+    margin-inline: -8px;
+  }
   .canvas-ui .deck-pad {
     height: 27px;
-    padding: 0 7px;
+    padding: 0 8px;
     font-size: 12px;
+  }
+  #app.canvas-ui .keypad .deck-bar .deck-pad {
+    border: 1px solid color-mix(in srgb, var(--rule-2) 90%, transparent);
+  }
+  #app.canvas-ui .keypad .deck-bar .deck-pad.lit {
+    border-color: transparent;
   }
   .canvas-ui .deck-ac-sep {
     display: block;
@@ -2742,7 +2782,7 @@
     border-radius: 999px;
     background: transparent;
     color: var(--ink-2);
-    font: 600 12px/1 var(--sans);
+    font: 600 11.5px/1 var(--sans);
     cursor: pointer;
   }
   .canvas-ui .deck-kb:active:not(.lit) {
@@ -2750,9 +2790,11 @@
     background: var(--cv-raised);
     transform: scale(0.96);
   }
+  /* ABC on, as 123: the accent, and the ink on it. */
   .canvas-ui .deck-kb.lit {
-    background: var(--cv-accent);
-    color: var(--hero-ink);
+    background: var(--accent);
+    color: var(--on-accent, var(--hero-ink));
+    font-weight: 600;
   }
   .canvas-ui .keypad .deck-bar .key.deck-ac {
     display: inline-flex;
@@ -2769,7 +2811,7 @@
     box-shadow: none;
   }
   .canvas-ui .keypad .deck-bar .key.deck-ac .kl {
-    font: 600 13px/1 var(--sans);
+    font: 600 12.5px/1 var(--sans);
     color: var(--cv-ac);
   }
   .canvas-ui .keypad .deck-bar .key.deck-ac:active {
@@ -2789,12 +2831,22 @@
   .canvas-ui .composer-tabs {
     gap: 1px;
   }
-  .canvas-ui .composer-tabs .key.ti-tab {
+  #app.canvas-ui .composer-tabs .key.ti-tab {
     height: 27px;
-    padding: 0 5.5px;
+    padding: 0 6px;
+  }
+  /* Modern's ink tabs (ThumbIndex's ink path): the decks without a rim, ABC in the decks' medium 12. */
+  :root[data-look='modern']:not([data-theme^='contrast']) #app.canvas-ui .composer-tabs .key.ti-tab {
+    border: 0;
+  }
+  :root[data-look='modern']:not([data-theme^='contrast']) .canvas-ui .deck-kb:not([hidden]) {
+    font-size: 12px;
+  }
+  :root[data-look='modern']:not([data-theme^='contrast']) .canvas-ui .deck-kb:not([hidden], .lit) {
+    font-weight: 500;
   }
   .canvas-ui .composer-tabs .key.ti-tab .kl {
-    font-size: 12.5px;
+    font-size: 12px;
   }
   .canvas-ui .composer {
     min-height: 52px;
@@ -3104,10 +3156,11 @@
   #app.canvas-ui .left > .modebar {
     display: flex;
     align-items: center;
-    gap: 6px;
+    /* CanvasHeader in the phone app: 54 pt tall, 10 pt in from the sides, its buttons 5 pt apart. */
+    gap: 5px;
     box-sizing: border-box;
-    height: calc(50px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
+    height: calc(54px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--rule);
     background: var(--bg);
   }
@@ -3116,7 +3169,7 @@
     transform: scale(0.96);
     background: var(--cv-raised);
   }
-  #app.canvas-ui .left > .modebar .brand { order: 0; min-width: 0; gap: 0; flex: none; }
+  #app.canvas-ui .left > .modebar .brand { order: 0; min-width: 0; gap: 0; flex: none; margin: 0; }
   #app.canvas-ui .left > .modebar .spacer { order: 1; flex: 1; }
   #app.canvas-ui .left > .modebar .desk-modes { order: 2; }
   #app.canvas-ui .left > .modebar .modes { order: 3; display: flex !important; flex: none; gap: 0; margin: 0; }
@@ -3208,7 +3261,7 @@
     display: inline;
   }
   #app.canvas-ui .left > .modebar .head-pill {
-    gap: 6px;
+    gap: 5px;
     background: none;
     border: 0;
     padding: 0;
@@ -3260,9 +3313,6 @@
   }
   .canvas-ui .cv-narrow > .rows:not(.has-example) {
     padding-top: 12px;
-  }
-  .canvas-ui .cv-narrow > .rows > .row.blk {
-    padding: 7px 14px 7px 20px;
   }
   .canvas-ui .cv-narrow > .rows > .row.blk .gutter {
     top: 8px;
@@ -3427,6 +3477,7 @@
 .canvas-ui .composer-enter .kl {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
 }
 
 /* ---------- figure blocks: a line's own picture under its line (src/ui/figures.ts decides the marks) ---------- */
@@ -4532,6 +4583,18 @@ dialog.examples-dialog .sc-lines {
 
 /* ---------- Liquid Glass desktop & mobile chrome (Modern look, non-high-contrast) ---------- */
 :root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) {
+  /* Glass corners (src/ui/glass.ts): blocks and the graph card, and the composer island a touch rounder. */
+  & .canvas-ui {
+    --cv-radius: var(--glass-radius);
+    --cv-comp-r: var(--island-radius);
+  }
+  /* The island's rim, as Aurora strokes it: 1.5 pt wide, half a stroke outside the island, so it runs flush outside. */
+  & .canvas-ui .composer::before,
+  & .canvas-ui .composer::after {
+    inset: -1.5px;
+    padding: 1.5px;
+    border-radius: calc(var(--cv-comp-r) + 1.5px);
+  }
   --lg-fill: rgba(24, 28, 42, 0.56);
   --lg-fill-strong: rgba(14, 17, 26, 0.76);
   --lg-rim: inset 0 1px 0.5px rgba(255, 255, 255, 0.24), inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
@@ -4713,9 +4776,14 @@ dialog.examples-dialog .sc-lines {
   & .canvas-ui .composer[data-state='typing']:not(.editing, .has-warn)::before {
     background: rgba(255, 255, 255, 0.13);
   }
+  /* The phones' Enter: flat accent with a specular top line. */
   & .canvas-ui .composer-enter {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--cv-accent) 84%, #ffffff), var(--cv-accent));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 3px 10px rgba(0, 0, 0, 0.34);
+    background: var(--cv-accent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+  & .canvas-ui .composer-enter:active {
+    background: color-mix(in srgb, var(--cv-accent) 82%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
   }
   @media (hover: hover) and (pointer: fine) {
     & .canvas-ui .composer-enter:hover {
@@ -4738,10 +4806,11 @@ dialog.examples-dialog .sc-lines {
   & .canvas-ui .deck-pad {
     border: 0;
   }
+  /* The phones fill 123 with the accent and set it in the ink on it (ThumbIndex). */
   & .canvas-ui .deck-pad.lit {
-    background: color-mix(in srgb, var(--cv-accent) 68%, #dbeafe);
-    color: #081226;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 10px color-mix(in srgb, var(--cv-accent) 35%, transparent);
+    background: var(--accent);
+    color: var(--on-accent, var(--hero-ink));
+    box-shadow: none;
   }
   & .canvas-ui .composer-tabs .key.ti-tab:not(.lit) {
     background: transparent;
@@ -4797,15 +4866,6 @@ dialog.examples-dialog .sc-lines {
       background-color: rgba(36, 42, 58, 0.95);
     }
   }
-  & .canvas-ui .rows > .blk-graph,
-  & .canvas-ui .rows > .blk-example-graph,
-  & .canvas-ui .rows > .blk-psych {
-    background: rgba(14, 17, 26, 0.76);
-    border-color: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(26px) saturate(190%);
-    -webkit-backdrop-filter: blur(26px) saturate(190%);
-    box-shadow: var(--lg-rim), var(--lg-shadow);
-  }
   & .menu {
     background: rgba(16, 20, 30, 0.96);
     backdrop-filter: blur(24px) saturate(180%);
@@ -4836,16 +4896,17 @@ dialog.examples-dialog .sc-lines {
        capsules, warm slate glass blocks, a floating composer island, and machined matte keycaps on a recessed bed.
        Backdrop blur lives only on the individual top-bar pills (never on .modebar or .menu-wrap), so there is no
        WebKit header haze and no nested-backdrop-filter glitch on popovers. */
+    /* The phones' dot grid (DotGrid): a 2.4 pt dot every 18 pt. */
     & .canvas-ui .main > .left {
       background-image: radial-gradient(var(--cv-dot) 1.2px, transparent 1.4px);
-      background-size: 22px 22px;
+      background-size: 18px 18px;
     }
     &[data-theme='ink'] .canvas-ui .main > .left {
-      --cv-dot: rgba(190, 210, 255, 0.14);
+      --cv-dot: #232836;
       background-color: #06070c;
     }
     &[data-theme='oled'] .canvas-ui .main > .left {
-      --cv-dot: rgba(190, 210, 255, 0.13);
+      --cv-dot: #232836;
       background-color: #000000;
     }
     & .canvas-ui .main > .left > :is(.tape, .composer-dock, .keypad) {
@@ -4859,46 +4920,92 @@ dialog.examples-dialog .sc-lines {
       background-color: transparent;
       background-image: none;
     }
-    /* Keep .modebar sticky and solid-opaque with zero backdrop-filter on phone: iOS 26/27 WebKit samples y=0 for a
-       sticky/fixed opaque header and otherwise paints a progressive system blur across the top bar. */
+    /* The header floats over the column, as on the phones (CanvasHeader over CanvasColumn): the column runs up under
+       it, and a fade of the page's own colour, solid at the top and gone 30 px under the header, keeps scrolled blocks
+       from showing behind the buttons. No backdrop-filter on the bar itself (iOS WebKit would haze the top); each
+       button blurs on its own. */
+    & .canvas-ui .main > .left {
+      --head-h: calc(54px + env(safe-area-inset-top, 0px));
+      --head-fade: var(--bg);
+    }
+    &[data-theme='ink'] .canvas-ui .main > .left {
+      --head-fade: #06070c;
+    }
+    &[data-theme='oled'] .canvas-ui .main > .left {
+      --head-fade: #000000;
+    }
     & #app.canvas-ui .left > .modebar {
-      position: sticky;
+      position: absolute;
       top: 0;
-      width: 100%;
-      background: var(--bg);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      width: auto;
+      height: var(--head-h);
+      background: transparent;
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       border-bottom: 0;
     }
+    /* CanvasColumn starts its fade at the top of the screen, behind the status bar. Where the page starts under the
+       status bar (Safari, or a home-screen app with the default bar) the fade starts as far above it, so it is as
+       thin under the buttons as on the phones. */
     & #app.canvas-ui .left > .modebar::after {
+      --status-gap: max(0px, calc(62px - env(safe-area-inset-top, 0px)));
       content: '';
       position: absolute;
       left: 0;
       right: 0;
-      top: 100%;
-      height: 12px;
+      top: calc(0px - var(--status-gap));
+      z-index: -1;
+      height: calc(100% + 30px + var(--status-gap));
       pointer-events: none;
-      background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
+      background: linear-gradient(180deg, var(--head-fade) 0%, color-mix(in srgb, var(--head-fade) 72%, transparent) 38%, color-mix(in srgb, var(--head-fade) 26%, transparent) 72%, transparent 100%);
     }
-    &[data-theme='ink'] #app.canvas-ui .left > .modebar {
-      background: #06070c;
+    & .canvas-ui .cv-narrow > .rows {
+      padding-top: calc(var(--head-h) + 36px);
     }
-    &[data-theme='ink'] #app.canvas-ui .left > .modebar::after {
-      background: linear-gradient(180deg, #06070c 0%, transparent 100%);
+    & .canvas-ui .cv-narrow > .rows:not(.has-example) {
+      padding-top: calc(var(--head-h) + 14px);
     }
-    &[data-theme='oled'] #app.canvas-ui .left > .modebar {
-      background: #000000;
+    /* The last block rests 32 px above the composer, as CanvasColumn pads its foot. */
+    & .canvas-ui .cv-narrow > .rows {
+      padding-bottom: 32px;
     }
-    &[data-theme='oled'] #app.canvas-ui .left > .modebar::after {
-      background: linear-gradient(180deg, #000000 0%, transparent 100%);
+    /* The deck bar keeps DECK_BAR_H on every height (its 27 px pills 5 and 6 px from its edges, and its rule), and
+       upright the keys clear the home indicator as the tray does: max(8, inset - 6). On its side the phone keeps its
+       own foot. */
+    & #app.canvas-ui .keypad .deck-bar {
+      padding-block: 5px 6px;
     }
-    @media (display-mode: standalone) {
-      & #app.canvas-ui .left > .modebar {
-        height: calc(54px + env(safe-area-inset-top, 0px));
-        padding-top: calc(env(safe-area-inset-top, 0px) + 4px);
+    & #app.canvas-ui .keypad:not(.bar-only) .deck-bar {
+      margin-bottom: 6px;
+    }
+    @media (min-height: 461px) {
+      & .canvas-ui .main > .left .keypad:not(.bar-only) {
+        padding-bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) - 6px));
+      }
+      /* With the system keyboard, the bar alone clears the home indicator the same way while the keyboard is down,
+         and sits right on it once it's up (kb-open, which shell.ts sets from the visual viewport), as the phones'
+         does. */
+      & .canvas-ui .main > .left .keypad.bar-only {
+        padding-bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) - 6px));
+      }
+      &.kb-open .canvas-ui .main > .left .keypad.bar-only {
+        padding-bottom: 0;
       }
     }
-    /* With zero backdrop-filter on .modebar or its pills, .menu and .mode-sheet use real frosted glass on iOS WebKit. */
+    /* A block the list settles on or brings into view (listscroll.ts) lands under the header, not behind it. The
+       column scrolls freely, as the phones' does, rather than snapping: snap points this far down would leave the
+       list's end between two of them, and Safari pulls a scroll that ends there back to the nearer one. */
+    & .canvas-ui .cv-narrow > .rows {
+      scroll-snap-type: none;
+    }
+    & .canvas-ui .cv-narrow > .rows > * {
+      scroll-margin-top: calc(var(--head-h) + 14px);
+    }
+    /* .menu and .mode-sheet frost on their own: neither sits inside a blurred button (the File menu is the button's
+       sibling, the Modes sheet lives outside the bar), and the bar itself never blurs. */
     & .menu {
       background: rgba(20, 24, 36, 0.76);
       backdrop-filter: blur(28px) saturate(190%);
@@ -4919,26 +5026,53 @@ dialog.examples-dialog .sc-lines {
       background: rgba(12, 13, 18, 0.88);
     }
     & #app.canvas-ui .left > .modebar :is(.cv-nodes-pill, .desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history) {
-      height: 32px;
+      height: 34px;
       border-radius: 999px;
-      background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
+      /* Glass each button wears on its own (never the bar, which hazes iOS WebKit's top edge): a block passing under
+         shows through blurred, as through the phones' Liquid Glass. */
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent) rgba(32, 36, 48, 0.62);
+      backdrop-filter: blur(14px) saturate(170%);
+      -webkit-backdrop-filter: blur(14px) saturate(170%);
       border: 0;
       color: rgba(248, 250, 252, 0.94);
       box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
-        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
-        0 4px 12px rgba(0, 0, 0, 0.34);
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.24),
+        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.06),
+        0 4px 12px rgba(0, 0, 0, 0.3);
     }
+    /* As the phone app's header sets them: round buttons 34 pt, words 14 pt in a capsule 9 pt either side, Deg | Rad a
+       31 pt control 86 pt wide, everything in the ink. */
     & #app.canvas-ui .left > .modebar .cv-nodes-pill,
     & #app.canvas-ui .left > .modebar .head-pill .head-history {
-      width: 32px;
-      min-width: 32px;
+      width: 34px;
+      min-width: 34px;
+      color: var(--ink);
+    }
+    /* Sized to their words, as iOS sizes them; each one's ::after keeps a 44 px target. */
+    & #app.canvas-ui .left > .modebar :is(.modes .more, .head-pill .head-find, .head-pill .menu-btn) {
+      height: 33px;
+      min-width: 0;
+      padding: 0 9px;
+      font: 500 14px/1 var(--sans);
+      letter-spacing: 0;
+      color: var(--ink);
     }
     & #app.canvas-ui .left > .modebar .desk-modes .seg {
+      width: 86px;
+      height: 31px;
       padding: 2px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    & #app.canvas-ui .left > .modebar .desk-modes .seg button {
+      min-width: 0;
+      padding: 0;
+      justify-content: center;
+      font: 500 13px/1 var(--sans);
+      color: var(--ink);
+    }
+    /* The native segmented control sets the chosen half semibold. */
+    & #app.canvas-ui .left > .modebar .desk-modes .seg button[aria-pressed='true'] {
+      font-weight: 600;
     }
     & #app.canvas-ui .left > .modebar .desk-modes .seg::before {
       top: 2px;
@@ -4954,19 +5088,19 @@ dialog.examples-dialog .sc-lines {
       min-height: 0;
       border-radius: 999px;
     }
+    /* The mark is a glass circle like the buttons beside it. */
     & #app.canvas-ui .left > .modebar .brand .mark {
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 999px;
-      background: linear-gradient(180deg, #2a2f42 0%, #1c202e 100%) #222738;
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent) rgba(32, 36, 48, 0.62);
+      backdrop-filter: blur(14px) saturate(170%);
+      -webkit-backdrop-filter: blur(14px) saturate(170%);
       border: 0;
       box-shadow:
-        inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
-        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.08),
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.14),
-        0 4px 12px rgba(0, 0, 0, 0.34);
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.24),
+        inset 0 -0.5px 0.5px rgba(255, 255, 255, 0.06),
+        0 4px 12px rgba(0, 0, 0, 0.3);
     }
     @media (max-width: 375px) {
       & #app.canvas-ui .left > .modebar {
@@ -4981,35 +5115,54 @@ dialog.examples-dialog .sc-lines {
         padding: 0 8px;
       }
     }
-    &[data-theme='ink'] .canvas-ui .rows > .row.blk {
-      background: rgba(24, 27, 36, 0.74);
-      border-color: rgba(255, 255, 255, 0.1);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 4px 14px rgba(0, 0, 0, 0.28);
+    /* Narrower than any iPhone: the words and Deg | Rad give a little, and under 360 px the Nodes button goes (Modes
+       and Find still switch to the node canvas), so History stays on screen. */
+    @media (max-width: 374px) {
+      & #app.canvas-ui .left > .modebar :is(.modes .more, .head-pill .menu-btn) {
+        padding: 0 6px;
+      }
+      & #app.canvas-ui .left > .modebar .desk-modes .seg {
+        width: 80px;
+      }
+    }
+    @media (max-width: 359px) {
+      & #app.canvas-ui .left > .modebar .cv-nodes-pill {
+        display: none;
+      }
+    }
+    /* The island as Composer.tsx draws it: its box 8 pt from the screen's sides, 54 pt inside a 1.25 pt border (React
+       Native draws a border inside the box, so the web pads by it), its fill the raised surface at 88%. */
+    @media (min-height: 461px) {
+      & .canvas-ui .composer-dock {
+        padding: 0 max(8px, env(safe-area-inset-right, 0px)) 3.75px max(8px, env(safe-area-inset-left, 0px));
+      }
     }
     & .canvas-ui .composer {
-      min-height: 54px;
-      padding: 5px 5px 5px 16px;
-      background: rgba(20, 23, 32, 0.86);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.3);
+      min-height: 56.5px;
+      padding: 6.25px 6.25px 6.25px 17.25px;
+      gap: 10px;
+      background: color-mix(in srgb, var(--surface-high) 88%, transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 20px rgba(0, 0, 0, 0.28);
     }
     & .canvas-ui .composer-enter {
       height: 42px;
       min-width: 78px;
-      padding: 0 18px;
+      padding: 0 16px;
       border-radius: 13px;
-      background: var(--cv-accent);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 16px color-mix(in srgb, var(--cv-accent) 48%, transparent);
     }
-    @media (max-width: 760px) and (max-height: 760px) and (min-height: 461px) {
-      & .canvas-ui .composer {
-        min-height: 48px;
-        padding: 4px 5px 4px 14px;
-      }
-      & .canvas-ui .composer-enter {
-        height: 38px;
-        min-width: 72px;
-        padding: 0 15px;
-      }
+    /* The live answer: 19 pt in the accent, its "=" at 0.8 of that in the third ink. */
+    & .canvas-ui .composer-slot > .row .out,
+    & .canvas-ui .composer-slot > .row .out .result {
+      font-size: 19px;
+      letter-spacing: -0.2px;
+    }
+    & .canvas-ui .composer-slot > .row .out .result {
+      padding: 0;
+      gap: 0;
+    }
+    & .canvas-ui .composer-slot > .row .out .result::before {
+      font-size: 0.8em;
+      margin-right: 0.25em;
     }
     & .canvas-ui .main > .left .keypad {
       border-radius: 0;
@@ -5024,7 +5177,7 @@ dialog.examples-dialog .sc-lines {
       border-top-color: rgba(255, 255, 255, 0.11);
     }
     & .canvas-ui .main > .left .keypad .pad .key.num {
-      border-radius: 16px;
+      border-radius: 18px;
       background-color: #2b2d34;
       color: #f4f3ef;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11), 0 2px 0 #020305, 0 3px 6px rgba(0, 0, 0, 0.42);
@@ -5047,7 +5200,7 @@ dialog.examples-dialog .sc-lines {
     & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
       background-color: #181a20;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #020305, 0 2.5px 4px rgba(0, 0, 0, 0.36);
-      color: var(--accent);
+      color: var(--key-op-ink);
     }
     &[data-theme='oled'] .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) {
       background-color: #1c1c1f;
@@ -5055,6 +5208,66 @@ dialog.examples-dialog .sc-lines {
     }
     &:not([data-motion='off']) .canvas-ui .main > .left .keypad .pad .key:active {
       transform: translateY(1.5px) scale(0.97);
+    }
+    /* Legends as the iOS app's KeyLabel sets them (ios/KeypadTray.tsx): digits and the one-character operators in
+       the medium sans, the arithmetic four larger, sized to the digits' cap height; letters that stand for numbers in
+       STIX's italic; words smaller. Each in its cap's ink. */
+    & .canvas-ui .main > .left .keypad .pad .key:is(.fn, .act, .op) .kl {
+      color: var(--key-fn-ink);
+      font: 500 25px/1 var(--sans);
+      letter-spacing: 0;
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.act .kl {
+      color: var(--key-act-ink);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.num .kl {
+      color: var(--key-ink);
+      font: 500 24px/1 var(--sans);
+      /* RN centres the line a point lower than the web's line box does. */
+      transform: translateY(1px);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.word .kl {
+      font: 500 15px/1 var(--sans);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key:is([data-key='x'], [data-key='y'], [data-key='e'], [data-key='π']) .kl {
+      font: italic 500 23px/1 var(--math);
+      transform: translateY(-0.7px);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key.op:is([data-key='÷'], [data-key='×'], [data-key='−'], [data-key='+']) .kl {
+      color: var(--key-op-ink);
+      font: 500 33px/1 var(--sans);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key[data-key='√'] .kicon {
+      width: 21.5px;
+      height: 21.5px;
+      stroke-width: 1.75;
+      transform: translateY(2px);
+    }
+    /* xʸ isn't arithmetic, so it sets in the mono face, as on iOS. */
+    & .canvas-ui .main > .left .keypad .pad .key[data-key='xʸ'] .kl {
+      font-family: 'Geist Mono', var(--mono);
+    }
+    & .canvas-ui .main > .left .keypad .pad .key:is([data-key='('], [data-key=')']) .kl {
+      font-size: 22px;
+      transform: translateY(1px);
+    }
+    /* iOS sets ʸ as a modifier letter, which sits lower than a raised <sup>. */
+    & .canvas-ui .main > .left .keypad .pad .key[data-key='xʸ'] .kl {
+      font-size: 26px;
+    }
+    & .canvas-ui .main > .left .keypad .pad .key[data-key='xʸ'] .kl .ksup {
+      vertical-align: 0.5em;
+    }
+    /* The SF Symbols' size: arrow.left / arrow.right at 24 pt, delete.left at 20 pt. */
+    & .canvas-ui .main > .left .keypad .pad .key:is([data-action='left'], [data-action='right']) .kicon {
+      width: 27px;
+      height: 27px;
+      stroke-width: 1.5;
+    }
+    & .canvas-ui .main > .left .keypad .pad .key[data-action='back'] .kicon {
+      width: 21px;
+      height: 21px;
+      stroke-width: 1.35;
     }
   }
 }
@@ -5158,9 +5371,9 @@ dialog.examples-dialog .sc-lines {
     border-bottom-color: rgba(15, 23, 42, 0.08);
   }
   & .canvas-ui .deck-pad.lit {
-    background: var(--cv-accent);
-    color: #ffffff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 8px color-mix(in srgb, var(--cv-accent) 30%, transparent);
+    background: var(--accent);
+    color: var(--on-accent, var(--hero-ink));
+    box-shadow: none;
   }
   & .canvas-ui .composer-tabs .key.ti-tab:not(.lit) {
     color: #475569;
@@ -5194,12 +5407,6 @@ dialog.examples-dialog .sc-lines {
     background-color: rgba(240, 243, 250, 0.94);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1.5px 0 rgba(15, 23, 42, 0.1);
   }
-  & .canvas-ui .rows > .blk-graph,
-  & .canvas-ui .rows > .blk-example-graph,
-  & .canvas-ui .rows > .blk-psych {
-    background: rgba(255, 255, 255, 0.82);
-    border-color: rgba(255, 255, 255, 0.9);
-  }
   & .menu {
     background: rgba(255, 255, 255, 0.97);
     border: 1px solid rgba(15, 23, 42, 0.12);
@@ -5228,12 +5435,9 @@ dialog.examples-dialog .sc-lines {
       background-color: transparent;
       background-image: none;
     }
-    & #app.canvas-ui .left > .modebar {
-      background: #f3f5f9;
-      border-bottom: 0;
-    }
-    & #app.canvas-ui .left > .modebar::after {
-      background: linear-gradient(180deg, #f3f5f9 0%, transparent 100%);
+    /* The floating header's fade in Paper's page colour. */
+    & .canvas-ui .main > .left {
+      --head-fade: #f3f5f9;
     }
     & .menu {
       background: rgba(255, 255, 255, 0.8);
@@ -5248,8 +5452,8 @@ dialog.examples-dialog .sc-lines {
       -webkit-backdrop-filter: blur(28px) saturate(190%);
       box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.98), 0 -12px 40px rgba(15, 23, 42, 0.16);
     }
-    & #app.canvas-ui .left > .modebar :is(.desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history, .brand .mark) {
-      background: linear-gradient(180deg, #ffffff 0%, #eef1f7 100%) #f6f8fc;
+    & #app.canvas-ui .left > .modebar :is(.cv-nodes-pill, .desk-modes .seg, .modes .more, .head-pill .head-find, .head-pill .menu-btn, .head-pill .head-history, .brand .mark) {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent) rgba(246, 248, 252, 0.7);
       color: #0f172a;
       box-shadow:
         inset 0 1px 0.5px rgba(255, 255, 255, 0.98),
@@ -5380,20 +5584,20 @@ dialog.examples-dialog .sc-lines {
 /* ---------- glass blocks (Modern look, non-high-contrast) ----------
    Blocks are frosted cards over the canvas: a mostly opaque fill that blurs what passes under it, a specular top
    edge and a soft drop. The fill stays opaque enough that text keeps 4.5:1 over the Aurora backdrop on every theme.
-   The rail down a drawing line's left edge keeps its curve's color, and Aurora Glow's tinted edge (below) still wins
-   over the resting edge set here. */
+   The rail down a drawing line's left edge keeps its curve's color; the edge stays neutral under Aurora Glow too, as
+   on the phones. */
 :root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) {
-  & .canvas-ui .rows > .row.blk {
+  /* The card every front end draws (glassCard in src/ui/glass.ts, emitted by webtokens.ts): line cards, and the graph
+     and figure cards beside them. */
+  & .canvas-ui .rows > :is(.row.blk, .blk-graph, .blk-example-graph, .blk-psych) {
+    background: var(--glass-fill);
+    border-color: var(--glass-edge);
+    box-shadow: var(--glass-shadow);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
 }
 :root[data-look='modern'][data-theme='ink'] {
-  & .canvas-ui .rows > .row.blk {
-    background: rgba(20, 24, 36, 0.64);
-    border-color: rgba(255, 255, 255, 0.11);
-    box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.2), inset 0 -0.5px 0 rgba(255, 255, 255, 0.06), 0 10px 28px rgba(0, 0, 0, 0.42);
-  }
   @media (hover: hover) and (pointer: fine) {
     & .canvas-ui .rows > .row.blk:hover {
       background: rgba(26, 31, 46, 0.72);
@@ -5413,15 +5617,10 @@ dialog.examples-dialog .sc-lines {
     color: var(--accent);
     text-decoration: none;
   }
-  & .canvas-ui .rows > .row.blk {
-    background: rgba(20, 20, 24, 0.8);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
-  }
   & .canvas-ui .cv-step {
-    background: rgba(20, 20, 24, 0.8);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 4px 14px rgba(0, 0, 0, 0.36);
+    background: var(--glass-fill);
+    border-color: var(--glass-edge);
+    box-shadow: var(--glass-shadow);
   }
   @media (hover: hover) and (pointer: fine) {
     & .canvas-ui .rows > .row.blk:hover {
@@ -5433,11 +5632,6 @@ dialog.examples-dialog .sc-lines {
   }
 }
 :root[data-look='modern']:is(:not([data-theme]), [data-theme='paper']) {
-  & .canvas-ui .rows > .row.blk {
-    background: rgba(255, 255, 255, 0.78);
-    border-color: rgba(255, 255, 255, 0.92);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 4px 14px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.05);
-  }
   @media (hover: hover) and (pointer: fine) {
     & .canvas-ui .rows > .row.blk:hover {
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 5px 16px rgba(32, 48, 96, 0.1), 0 0 0 0.5px rgba(23, 23, 26, 0.1);
@@ -5447,12 +5641,25 @@ dialog.examples-dialog .sc-lines {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 6px rgba(32, 48, 96, 0.07), 0 0 0 0.5px rgba(23, 23, 26, 0.08);
   }
 }
-/* Held, selected and keyboard-focused blocks take the accent edge over any resting or hover edge. */
-:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk:is(.dragging, .cv-selected, :has(:focus-visible)) {
+/* A peer of the dragged block tints its edge over the glass... */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > :is(.row.blk, .blk-graph, .blk-example-graph, .blk-psych).cv-peer {
+  border-color: color-mix(in srgb, var(--cv-accent) 52%, var(--cv-edge));
+}
+/* ...and held, selected and keyboard-focused blocks, and every block a held slider reaches, take the full accent edge
+   over both, as the phones draw them. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > :is(.row.blk, .blk-graph, .blk-example-graph, .blk-psych):is(.dragging, .cv-selected, .cv-lit, :has(:focus-visible)) {
   border-color: var(--cv-accent);
 }
+/* A graph a held slider reaches lights at 55%, as the phones' graph card does. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > :is(.blk-graph, .blk-example-graph).cv-lit:not(.dragging) {
+  border-color: color-mix(in srgb, var(--cv-accent) 55%, transparent);
+}
+/* A dragged card still lifts over the glass. */
+:root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > :is(.row.blk, .blk-graph, .blk-psych).dragging {
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.34), 0 0 0 1px color-mix(in srgb, var(--cv-accent) 45%, transparent);
+}
 :root[data-look='modern']:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .rows > .row.blk.cv-selected {
-  box-shadow: 0 0 0 1px var(--cv-accent), 0 0 0 4px color-mix(in srgb, var(--cv-accent) 22%, transparent);
+  box-shadow: 0 0 0 1px var(--cv-accent), 0 0 0 6px color-mix(in srgb, var(--cv-accent) 16%, transparent);
 }
 
 /* ---------- Aurora Glow: an atmosphere that answers the line ----------
@@ -5466,9 +5673,22 @@ dialog.examples-dialog .sc-lines {
     --au-k: 1;
     transition: --au-a 0.36s ease-out, --au-b 0.36s ease-out;
   }
+  /* The companion colour the phones draw (analogousTint): the tint's hue turned 18° toward indigo, a touch lighter. */
+  @supports (color: hsl(from red calc(h + 18) min(s, 95) clamp(28, calc(l + 4), 72))) {
+    & .canvas-ui .composer-dock {
+      --au-b: hsl(from var(--au-a) calc(h + 18) min(s, 95) clamp(28, calc(l + 4), 72));
+    }
+    &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer-dock {
+      --au-b: hsl(from var(--au-a) calc(h + 18) min(s, 95) clamp(28, calc(l - 5), 72));
+    }
+  }
   & .canvas-ui .composer:not([data-state='idle']) {
     border-color: transparent;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.34);
+  }
+  /* Once the line is live, the lit rim is the only edge (the resting stroke fades out), unless a warning holds it. */
+  & .canvas-ui .composer:not([data-state='idle'], .has-warn)::before {
+    opacity: 0;
   }
   &:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .composer-dock {
     --au-k: 0.6;
@@ -5483,50 +5703,49 @@ dialog.examples-dialog .sc-lines {
     /* The light runs the whole way round, the two colors meeting on each side, so both ends of the bar match. */
     background: conic-gradient(from var(--cv-ang), var(--au-a), var(--au-b) 25%, var(--au-a) 50%, var(--au-b) 75%, var(--au-a));
     opacity: 0;
-    clip-path: inset(0 100% 0 0 round var(--cv-radius));
+    clip-path: inset(0 100% 0 0 round var(--cv-comp-r));
     transition: opacity 0.28s ease-out, clip-path 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
   & .canvas-ui .composer[data-state='typing']::after {
     opacity: 0.78;
-    clip-path: inset(0 0 0 0 round var(--cv-radius));
+    clip-path: inset(0 0 0 0 round var(--cv-comp-r));
   }
   & .canvas-ui .composer[data-state='err']::after {
     opacity: 0.72;
-    clip-path: inset(0 0 0 0 round var(--cv-radius));
+    clip-path: inset(0 0 0 0 round var(--cv-comp-r));
   }
   & .canvas-ui .composer[data-state='ok']::after {
     opacity: 1;
-    clip-path: inset(0 0 0 0 round var(--cv-radius));
+    clip-path: inset(0 0 0 0 round var(--cv-comp-r));
   }
+  /* The bloom, as Aurora draws it: two ovals behind the island, each 62% of its width and 104% of its height, centred
+     at 30% and 70% across, blurred 10 pt. */
   & .canvas-ui .composer .composer-halo {
-    inset: -22px -8px;
-    border-radius: calc(var(--cv-radius) + 12px);
+    inset: 0;
+    border-radius: 0;
     background:
-      radial-gradient(closest-side at 30% 50%, var(--au-a), transparent),
-      radial-gradient(closest-side at 70% 50%, var(--au-b), transparent);
-    filter: blur(28px);
+      radial-gradient(31% 52% at 30% 50%, var(--au-a) 97%, transparent),
+      radial-gradient(31% 52% at 70% 50%, var(--au-b) 97%, transparent);
+    filter: blur(10px);
     opacity: 0;
     transition: opacity 0.36s ease-out;
   }
   & .canvas-ui .composer[data-state='typing'] .composer-halo {
-    opacity: calc(0.18 * var(--au-k));
+    opacity: calc(0.16 * var(--au-k));
   }
   & .canvas-ui .composer[data-state='ok'] .composer-halo {
-    opacity: calc(0.32 * var(--au-k));
+    opacity: calc(0.28 * var(--au-k));
   }
   & .canvas-ui .composer[data-state='err'] .composer-halo {
-    opacity: calc(0.18 * var(--au-k));
+    opacity: calc(0.16 * var(--au-k));
   }
   & .canvas-ui .composer.stir .composer-halo {
     animation: au-drift 9s cubic-bezier(0.45, 0, 0.55, 1) 1 both;
   }
   & .canvas-ui .composer-enter {
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--cv-accent) 26%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 2px 8px color-mix(in srgb, var(--cv-accent) 24%, transparent);
   }
-  & .canvas-ui .rows > .row.blk {
-    border-color: color-mix(in srgb, var(--c, var(--cv-accent)) 48%, var(--cv-edge));
-  }
-  /* Only a block that just landed glows, and only for a moment. */
+  /* Blocks keep their glass edge, as on the phones. Only a block that just landed glows, and only for a moment. */
   & .canvas-ui .rows > .row.blk.landed {
     animation: au-land 1.2s ease-out 1;
   }
@@ -5535,9 +5754,6 @@ dialog.examples-dialog .sc-lines {
   }
   & .canvas-ui .composer-tabs .key.ti-tab.lit {
     box-shadow: 0 0 14px -2px var(--tab);
-  }
-  & .canvas-ui .keypad .key.op .kl {
-    text-shadow: 0 0 10px color-mix(in srgb, var(--cv-accent) 55%, transparent);
   }
 }
 @keyframes au-drift {
@@ -5556,7 +5772,7 @@ dialog.examples-dialog .sc-lines {
 }
 @keyframes au-land {
   from {
-    box-shadow: 0 0 18px color-mix(in srgb, var(--c, var(--cv-accent)) 30%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--c, var(--cv-accent)) 45%, transparent);
   }
   to {
     box-shadow: 0 0 18px transparent;
@@ -5602,32 +5818,50 @@ dialog.examples-dialog .sc-lines {
     radial-gradient(46% 52% at 90% 54%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
   opacity: 0.13;
 }
-/* On phone, match iOS CanvasAtmosphere.tsx cloud positions (20% 16% and 86% 56% of the canvas area above the keypad). */
+/* On a phone the clouds fill the whole screen behind the column, as CanvasAtmosphere draws them. */
 @media (--phone) {
   :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .tape.cv-viewport::before {
     display: none;
   }
+  /* CanvasAtmosphere's two clouds: circles 85% and 72% of the width across, at 20% 16% and 86% 56%, each fading from
+     its colour to nothing at its edge; the first in the deck's colour, the second its companion (analogousTint),
+     fainter on pure black. */
   :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .main > .left::before {
     --au-a: var(--au-deck, var(--cv-accent));
+    --au-c: color-mix(in srgb, var(--au-a) 55%, #7c8cff);
+    --cloud-1: 26%;
+    --cloud-2: 18%;
     content: '';
     position: absolute;
     inset: 0;
     z-index: 0;
     pointer-events: none;
+    /* The dots over the clouds, as DotGrid sits above CanvasAtmosphere (the pane below then draws none: a
+       translucent dot drawn twice would darken). */
     background:
-      radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
-      radial-gradient(72% 38% at 86% 32%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
-    opacity: 0.24;
+      radial-gradient(var(--cv-dot) 1.2px, transparent 1.4px) 0 0 / 18px 18px,
+      radial-gradient(circle 85vw at 20% 16%, color-mix(in srgb, var(--au-a) var(--cloud-1), transparent), transparent),
+      radial-gradient(circle 72vw at 86% 56%, color-mix(in srgb, var(--au-c) var(--cloud-2), transparent), transparent);
     transition: --au-a 0.42s ease-out;
   }
+  @supports (color: hsl(from red calc(h + 18) min(s, 95) clamp(28, calc(l + 4), 72))) {
+    :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .main > .left::before {
+      --au-c: hsl(from var(--au-a) calc(h + 18) min(s, 95) clamp(28, calc(l + 4), 72));
+    }
+    :root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .main > .left::before {
+      --au-c: hsl(from var(--au-a) calc(h + 18) min(s, 95) clamp(28, calc(l - 5), 72));
+    }
+  }
+  :root[data-look='modern'][data-glow]:not([data-theme='contrast'], [data-theme='contrastLight']) .canvas-ui .main > .left {
+    background-image: none;
+  }
   :root[data-look='modern'][data-glow][data-theme='oled'] .canvas-ui .main > .left::before {
-    opacity: 0.19;
+    --cloud-1: 20%;
+    --cloud-2: 14%;
   }
   :root[data-look='modern'][data-glow]:is(:not([data-theme]), [data-theme='paper']) .canvas-ui .main > .left::before {
-    background:
-      radial-gradient(85% 42% at 20% 10%, var(--au-a), transparent 72%),
-      radial-gradient(72% 38% at 86% 32%, color-mix(in srgb, var(--au-a) 55%, #7c8cff), transparent 72%);
-    opacity: 0.17;
+    --cloud-1: 18%;
+    --cloud-2: 13%;
   }
 }
 

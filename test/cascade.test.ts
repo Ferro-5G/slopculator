@@ -172,6 +172,24 @@ describe('cascade', () => {
     expect(pairs).toBeLessThanOrEqual(3);
   });
 
+  it('lays the busier sheet out as the phones do with values only as wide as their lines', () => {
+    // The same sheet with the widths the phone apps (and the phone web) measure: values hug their line, no wider than
+    // CASCADE_PHONE.minW asks. Narrower blocks leave more open canvas on the right, and the routes that take it cross
+    // a little more; the margin carries one more wire.
+    const blocks = [
+      { id: 'a', w: 320, h: 55, slider: true, least: 200 }, { id: 'b', w: 320, h: 55, slider: true, least: 200 }, { id: 'c', w: 150, h: 55 },
+      { id: 'y', w: 192, h: 58 }, { id: 'q', w: 142, h: 55 }, { id: 'g', w: 167, h: 55 }, { id: 'h', w: 132, h: 55 }, { id: 'y2', w: 132, h: 58 },
+      { id: GRAPH_BLOCK, w: 344, h: 220, span: true },
+    ];
+    const ws = [wire('a', 'c'), wire('b', 'c'), wire('a', 'y'), wire('b', 'y'), wire('c', 'q'), wire('q', 'g'), wire('a', 'g'), wire('g', 'h'), wire('b', 'h'), wire('c', 'y2'), wire('y', GRAPH_BLOCK, ''), wire('y2', GRAPH_BLOCK, '')];
+    const l = cascadeLayout(blocks, ws, opts);
+    const routes = [...l.routes.values()];
+    let pairs = 0;
+    for (let i = 0; i < routes.length; i++) for (let j = 0; j < i; j++) if (routesCross(routes[i].points, routes[j].points) || routesCross(routes[j].points, routes[i].points)) pairs++;
+    expect(routes.filter((r) => r.kind === 'margin').length).toBe(3);
+    expect(pairs).toBe(4);
+  });
+
   it('keeps lanes side by side apart, and gives a readout port and a side block the margin', () => {
     const rects = new Map<string, Rect>([
       ['a', { x: 34, y: 0, w: 300, h: 40 }],

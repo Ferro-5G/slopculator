@@ -149,6 +149,8 @@ function syncMobileNav(): void {
   navKeys.hidden = !coarse.matches || chose;
 }
 
+/** The tallest the window has been at its current width with no keyboard up. */
+let tallestAt = { width: 0, height: 0 };
 function syncVisualViewport(): void {
   const vv = window.visualViewport;
   const root = document.documentElement;
@@ -160,7 +162,15 @@ function syncVisualViewport(): void {
     }
     return;
   }
-  const kbOpen = window.innerHeight - vv.height > 80;
+  // The keyboard either overlays the page (the visual viewport shrinks under the layout viewport, as iOS Safari does)
+  // or resizes it (both shrink together). The second shows only against the tallest the page has been at this width,
+  // and only while a field that takes the system keyboard is focused, so a browser toolbar sliding never counts.
+  if (window.innerWidth !== tallestAt.width) tallestAt = { width: window.innerWidth, height: 0 };
+  const typing = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement
+    ? (document.activeElement as HTMLInputElement).inputMode !== 'none'
+    : false;
+  if (!typing) tallestAt.height = Math.max(tallestAt.height, window.innerHeight);
+  const kbOpen = window.innerHeight - vv.height > 80 || (typing && tallestAt.height - vv.height > 80);
   if (kbOpen) {
     root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
     root.classList.add('kb-open');
@@ -187,6 +197,7 @@ export function initShell(): void {
     syncVisualViewport();
     applyUI();
   });
+  tallestAt = { width: window.innerWidth, height: window.innerHeight };
   window.visualViewport?.addEventListener('resize', syncVisualViewport);
   window.visualViewport?.addEventListener('scroll', syncVisualViewport);
 }

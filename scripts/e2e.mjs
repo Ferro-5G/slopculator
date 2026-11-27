@@ -469,9 +469,10 @@ await check('phone canvas: Cascade makes a block a pill as wide as its line and 
   expect(Math.abs(f.left - c.column.left) < 1 && Math.abs(p.left - c.column.left) < 1, `a source is off the left: f ${f.left}, p ${p.left}, column ${c.column.left}`);
   expect(y.left - f.left > 20 && Math.abs((d.left - c.column.left) - (y.left - c.column.left)) < 1, `dependents don't step right: y ${y.left}, d ${d.left}`);
   expect(Math.abs(c.graph.width - width) < 2, `the graph doesn't span: ${c.graph.width} of ${width}`);
-  // One radius for blocks, the graph and the composer.
-  const radii = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank), .tape .rows > .blk-graph, .composer')].map((e) => getComputedStyle(e).borderTopLeftRadius));
-  expect(new Set(radii).size === 1 && radii[0] === '22px', `radii differ: ${radii}`);
+  // Modern's glass corners, as the phones draw them: blocks and the graph 18, the composer island 20.
+  const radii = await page.evaluate(() => [...document.querySelectorAll('.tape .rows > .row.blk:not(.blk-blank), .tape .rows > .blk-graph')].map((e) => getComputedStyle(e).borderTopLeftRadius));
+  const island = await page.evaluate(() => getComputedStyle(document.querySelector('.composer')).borderTopLeftRadius);
+  expect(new Set(radii).size === 1 && radii[0] === '18px' && island === '20px', `radii differ: ${radii}, composer ${island}`);
 }, true);
 
 await check('phone canvas: Cascade wires drop straight down in lanes of their own and never cross; only one takes the margin', async (page) => {
@@ -498,13 +499,17 @@ await check('phone canvas: on a busier sheet sliders leave open canvas on their 
   const listLeft = await page.evaluate(() => document.querySelector('.tape .rows').getBoundingClientRect().left);
   const routes = c.wires.map((w) => wirePoints(w.d));
   const inMargin = routes.filter((pts) => pts.some((q) => q.x < margin - 1));
-  const onRight = routes.filter((pts) => pts.some((q) => q.x > c.column.right - listLeft - 60));
-  expect(inMargin.length <= 2, `more than two wires in the margin: ${inMargin.length}`);
+  // Down the open canvas the sliders leave on their right: a run of wire straight down it.
+  const sliderRight = await page.evaluate(() => Math.max(...[...document.querySelectorAll('.tape .rows > .row.blk-slider')].map((b) => b.getBoundingClientRect().right)));
+  const onRight = routes.filter((pts) => pts.some((q, i) => i > 0 && q.x === pts[i - 1].x && q.x > sliderRight - listLeft + 4 && Math.abs(q.y - pts[i - 1].y) > 40));
+  // With values as narrow as the phones draw them (CASCADE_PHONE.minW), Cascade gives a third wire the margin here.
+  expect(inMargin.length <= 3, `more than three wires in the margin: ${inMargin.length}`);
   expect(onRight.length >= 2, `no wires down the right: ${JSON.stringify(routes)}`);
-  // a → g, b → h, c → y₂ and y → graph interleave pairwise, so one crossing at least; the layout keeps to a few.
+  // a → g, b → h, c → y₂ and y → graph interleave pairwise, so one crossing at least; the layout keeps to a few (four
+  // with values as narrow as the phones draw them).
   let pairs = 0;
   for (let i = 0; i < routes.length; i++) for (let j = 0; j < i; j++) if (wiresCross(routes[i], routes[j])) pairs++;
-  expect(pairs <= 3, `too many crossings: ${pairs}`);
+  expect(pairs <= 4, `too many crossings: ${pairs}`);
 }, true);
 
 await check('phone canvas: on the example sheet the wires drop straight and the held tag rides on its wire', async (page) => {
@@ -857,6 +862,24 @@ await check('canvas: the first run shows an editable example; Clear example take
   await page.waitForFunction(() => !!window.slopculator);
   expect(!(await lines(page)).some((x) => x.text === 'k = 45'), 'the example came back by itself');
 });
+
+// A home-screen app on an iPhone learns the status bar's inset after its first layout. The header's padding takes it, so
+// only its border box grows; the example's frame (placed in pixels) has to follow the column down.
+await check('phone: a status-bar inset that arrives late moves the example frame with the column', async (page) => {
+  await page.evaluate(() => { localStorage.removeItem(window.slopKeys.firstRun); localStorage.removeItem(window.slopKeys.document); sessionStorage.setItem('e2e-first-run', '1'); });
+  await page.reload();
+  await page.waitForTimeout(300);
+  const at = () => page.evaluate(() => {
+    const y = (s) => document.querySelector(s).getBoundingClientRect().y;
+    return { first: Math.round(y('.cv-narrow > .rows > .row')), clear: Math.round(y('.example-clear')) };
+  });
+  const before = await at();
+  await page.addStyleTag({ content: '.canvas-ui .main > .left { --head-h: 116px !important } #app.canvas-ui .left > .modebar { padding-top: 62px !important }' });
+  await page.waitForTimeout(300);
+  const after = await at();
+  expect(after.first - before.first >= 60, `the column did not move down with the inset: ${before.first} to ${after.first}`);
+  expect(Math.abs((after.first - after.clear) - (before.first - before.clear)) <= 1, `Clear example stayed behind: ${before.clear} to ${after.clear} while the first block went ${before.first} to ${after.first}`);
+}, true);
 
 await check('canvas: Fit all, zoom and the keypad toggle; Ctrl+K opens Find', async (page) => {
   for (const t of ['1', '2', '3']) await typeLine(page, t);
@@ -1950,8 +1973,8 @@ await check('phone: the top bar is one row with a Modes button, and the sheet ho
     await setLook(page, look);
     await page.waitForTimeout(150);
     const bar = await page.locator('.modebar').boundingBox();
-    // 36 px controls with 8 px above and 6 below; a second row would be 80 or more.
-    expect(bar.height <= 50, `${look}: the top bar is one row: ${bar.height}`);
+    // 54 px, as the phones' header; a second row would be 80 or more.
+    expect(bar.height <= 54, `${look}: the top bar is one row: ${bar.height}`);
     const pills = await page.evaluate(() => [...document.querySelectorAll('.modebar .modes .pill:not(.more)')].filter((p) => p.offsetParent).length);
     expect(pills === 0, `${look}: ${pills} mode pills in a phone's top bar`);
     const mid = (b) => b.y + b.height / 2;
@@ -2024,7 +2047,7 @@ await check('phone on its side: the top bar stays one row, and the Modes sheet c
   await page.keyboard.type('123456789*987654321');
   await page.waitForTimeout(300);
   const bar = await page.locator('.modebar').boundingBox();
-  expect(bar.height <= 50, `the top bar stays one row: ${bar.height}`);
+  expect(bar.height <= 54, `the top bar stays one row: ${bar.height}`);
   await page.locator('.modebar .modes .pill.more').tap();
   await page.waitForTimeout(450);
   const [sheet, tape] = await page.evaluate(() => ['.mode-sheet', '.tape'].map((q) => document.querySelector(q).getBoundingClientRect().toJSON()));
@@ -2213,7 +2236,7 @@ await check('phone: Find opens focused and says where each function lives in the
   expect(await page.evaluate(() => document.querySelector('.ti-tab[aria-label="HVAC"]').classList.contains('found')), 'the HVAC tab did not light');
 }, true);
 
-await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down the right edge, enter on the composer the one filled key', async (page) => {
+await check('phone, one-handed: 44 and 56 px keys up to the seam, operators down the right edge, enter on the composer the one filled key', async (page) => {
   for (const look of ['modern']) {
     await setLook(page, look);
     await page.waitForTimeout(200);
@@ -2231,7 +2254,8 @@ await check('phone, one-handed: 48 and 56 px keys up to the seam, operators down
       };
     });
     const lip = look === 'retro' ? 2 : 0;
-    expect(g.index.length === 6 && g.index.every((h) => Math.abs(h - (48 - lip)) < 1), `${look}: the everyday row ${g.index}`);
+    // phoneRows() gives an 844 px phone a 48 px bank, of which the everyday row takes 44 (indexRowHeights).
+    expect(g.index.length === 6 && g.index.every((h) => Math.abs(h - (44 - lip)) < 1), `${look}: the everyday row ${g.index}`);
     expect(g.pad.every((row) => row.every((k) => Math.abs(k.h - (56 - lip)) < 1)), `${look}: pad rows ${g.pad.map((r) => r[0].h)}`);
     expect(g.firstTop - g.keypadTop <= (look === 'retro' ? 16 : 10), `${look}: ${Math.round(g.firstTop - g.keypadTop)} px from the seam to the keys`);
     expect(g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ') === '← → 7 8 9 ÷ / xʸ √ 4 5 6 × / ( ) 1 2 3 − / , = 0 . ⌫ +', `${look}: pad ${g.pad.map((r) => r.map((k) => k.label).join(' ')).join(' / ')}`);
@@ -3448,7 +3472,7 @@ await check('R5 phone: Modes, Find and File are word pills, as on the phone apps
     return { modes: box('.modebar .pill.more'), find: box('.head-find'), file: box('.head-pill .menu-btn'), deg: !!document.querySelector('.modebar .desk-modes .seg')?.offsetParent };
   });
   expect(g.modes.text === 'Modes' && g.find.text.startsWith('Find') && g.file.text === 'File' && g.deg, `the bar's words: ${JSON.stringify(g)}`);
-  expect(g.find.h === g.file.h && g.modes.h === g.file.h && g.file.l - g.find.r >= 6 && g.find.l - g.modes.r >= 6, `pills apart and alike: ${JSON.stringify(g)}`);
+  expect(g.find.h === g.file.h && g.modes.h === g.file.h && g.file.l - g.find.r >= 5 && g.find.l - g.modes.r >= 5, `pills apart and alike: ${JSON.stringify(g)}`);
   expect([g.modes, g.find, g.file].every((x) => x.bg !== 'rgba(0, 0, 0, 0)'), `pills with no ground: ${JSON.stringify(g)}`);
 }, true);
 
